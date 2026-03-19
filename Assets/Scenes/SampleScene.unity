@@ -403,7 +403,7 @@ Transform:
   m_GameObject: {fileID: 519420028}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -10}
+  m_LocalPosition: {x: 0, y: -0.00053191185, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -778,7 +778,7 @@ Transform:
   m_GameObject: {fileID: 1262686310}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -10}
+  m_LocalPosition: {x: 0, y: -0.00053191185, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -928,11 +928,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1277669218}
   - component: {fileID: 1277669217}
-  - component: {fileID: 1277669216}
-  - component: {fileID: 1277669221}
-  - component: {fileID: 1277669220}
   - component: {fileID: 1277669219}
-  - component: {fileID: 1277669222}
   m_Layer: 0
   m_Name: rack
   m_TagString: Untagged
@@ -940,33 +936,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!50 &1277669216
-Rigidbody2D:
-  serializedVersion: 5
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1277669214}
-  m_BodyType: 0
-  m_Simulated: 1
-  m_UseFullKinematicContacts: 0
-  m_UseAutoMass: 0
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_GravityScale: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 1
-  m_Constraints: 0
 --- !u!212 &1277669217
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -1031,78 +1000,13 @@ Transform:
   m_GameObject: {fileID: 1277669214}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.08116318, y: 0.17753191, z: -0.0074879904}
+  m_LocalPosition: {x: 0.08116318, y: 0.177, z: -0.0074879904}
   m_LocalScale: {x: 5, y: 5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1623591420}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1277669219
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1277669214}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a10d59204f23344d8bf54a1bb0692b0c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  backWheelJoint: {fileID: 1277669221}
-  speed: -1000
-  torque: 1000
---- !u!235 &1277669220
-WheelJoint2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1277669214}
-  m_Enabled: 1
-  serializedVersion: 4
-  m_EnableCollision: 0
-  m_ConnectedRigidBody: {fileID: 1137113645}
-  m_BreakForce: Infinity
-  m_BreakTorque: Infinity
-  m_BreakAction: 3
-  m_AutoConfigureConnectedAnchor: 1
-  m_Anchor: {x: 0, y: 0}
-  m_ConnectedAnchor: {x: 0.016859101, y: 0.014535648}
-  m_Suspension:
-    m_DampingRatio: 0.7
-    m_Frequency: 1
-    m_Angle: 90
-  m_UseMotor: 0
-  m_Motor:
-    m_MotorSpeed: 0
-    m_MaximumMotorForce: 10000
---- !u!235 &1277669221
-WheelJoint2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1277669214}
-  m_Enabled: 1
-  serializedVersion: 4
-  m_EnableCollision: 0
-  m_ConnectedRigidBody: {fileID: 405992477}
-  m_BreakForce: Infinity
-  m_BreakTorque: Infinity
-  m_BreakAction: 3
-  m_AutoConfigureConnectedAnchor: 1
-  m_Anchor: {x: 0, y: 0}
-  m_ConnectedAnchor: {x: 0.0038757105, y: 0.01127307}
-  m_Suspension:
-    m_DampingRatio: 0.7
-    m_Frequency: 10
-    m_Angle: 90
-  m_UseMotor: 0
-  m_Motor:
-    m_MotorSpeed: 0
-    m_MaximumMotorForce: 10000
---- !u!60 &1277669222
+--- !u!60 &1277669219
 PolygonCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1148,12 +1052,12 @@ PolygonCollider2D:
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 0.054749485, y: 0.163636}
-      - {x: -0.11393814, y: 0.10818749}
-      - {x: -0.2290964, y: 0.04948997}
-      - {x: 0.22552635, y: 0.039316293}
-      - {x: 0.10441202, y: 0.08266686}
-      - {x: 0.10123923, y: 0.163636}
+    - - {x: -0.02945299, y: 0.18032478}
+      - {x: -0.15945299, y: 0.12032478}
+      - {x: -0.13878372, y: 0.068441056}
+      - {x: 0.13987774, y: 0.061913922}
+      - {x: 0.16598627, y: 0.06513615}
+      - {x: 0.150547, y: 0.18032478}
   m_UseDelaunayMesh: 0
 --- !u!1 &1623591419
 GameObject:
@@ -1164,7 +1068,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1623591420}
+  - component: {fileID: 1623591423}
+  - component: {fileID: 1623591422}
   - component: {fileID: 1623591421}
+  - component: {fileID: 1623591424}
   m_Layer: 0
   m_Name: Bike
   m_TagString: Untagged
@@ -1186,11 +1093,61 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1277669218}
-  - {fileID: 405992475}
   - {fileID: 1137113644}
+  - {fileID: 405992475}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!50 &1623591421
+--- !u!235 &1623591421
+WheelJoint2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1623591419}
+  m_Enabled: 1
+  serializedVersion: 4
+  m_EnableCollision: 1
+  m_ConnectedRigidBody: {fileID: 405992477}
+  m_BreakForce: Infinity
+  m_BreakTorque: Infinity
+  m_BreakAction: 3
+  m_AutoConfigureConnectedAnchor: 1
+  m_Anchor: {x: -0.75, y: -0.17}
+  m_ConnectedAnchor: {x: -0.0000000054572915, y: 4.543903e-10}
+  m_Suspension:
+    m_DampingRatio: 1
+    m_Frequency: 3
+    m_Angle: 90
+  m_UseMotor: 0
+  m_Motor:
+    m_MotorSpeed: 0
+    m_MaximumMotorForce: 10000
+--- !u!235 &1623591422
+WheelJoint2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1623591419}
+  m_Enabled: 1
+  serializedVersion: 4
+  m_EnableCollision: 1
+  m_ConnectedRigidBody: {fileID: 1137113645}
+  m_BreakForce: Infinity
+  m_BreakTorque: Infinity
+  m_BreakAction: 3
+  m_AutoConfigureConnectedAnchor: 1
+  m_Anchor: {x: 0.88561064, y: -0.1807955}
+  m_ConnectedAnchor: {x: 0.009122139, y: 0.003840897}
+  m_Suspension:
+    m_DampingRatio: 0.7
+    m_Frequency: 1
+    m_Angle: 90
+  m_UseMotor: 0
+  m_Motor:
+    m_MotorSpeed: 0
+    m_MaximumMotorForce: 10000
+--- !u!50 &1623591423
 Rigidbody2D:
   serializedVersion: 5
   m_ObjectHideFlags: 0
@@ -1204,8 +1161,8 @@ Rigidbody2D:
   m_UseAutoMass: 0
   m_Mass: 2
   m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_GravityScale: 1
+  m_AngularDamping: 2
+  m_GravityScale: 3
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -1215,8 +1172,25 @@ Rigidbody2D:
     m_Bits: 0
   m_Interpolate: 1
   m_SleepingMode: 1
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
   m_Constraints: 0
+--- !u!114 &1623591424
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1623591419}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a10d59204f23344d8bf54a1bb0692b0c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  backWheelJoint: {fileID: 1623591421}
+  bikeRigidbody: {fileID: 1623591423}
+  speed: -500
+  torque: 1500
+  leanTorque: 15
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
