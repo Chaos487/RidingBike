@@ -203,7 +203,7 @@ Rigidbody2D:
   m_UseAutoMass: 0
   m_Mass: 1
   m_LinearDamping: 0
-  m_AngularDamping: 0.05
+  m_AngularDamping: 0.5
   m_GravityScale: 1
   m_Material: {fileID: 0}
   m_IncludeLayers:
@@ -212,9 +212,9 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
   m_Constraints: 0
 --- !u!212 &405992478
 SpriteRenderer:
@@ -573,7 +573,7 @@ Rigidbody2D:
   m_UseAutoMass: 0
   m_Mass: 1
   m_LinearDamping: 0
-  m_AngularDamping: 0.05
+  m_AngularDamping: 0.5
   m_GravityScale: 1
   m_Material: {fileID: 0}
   m_IncludeLayers:
@@ -582,9 +582,9 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
   m_Constraints: 0
 --- !u!58 &1137113646
 CircleCollider2D:
@@ -1115,8 +1115,8 @@ WheelJoint2D:
   m_Anchor: {x: -0.75, y: -0.17}
   m_ConnectedAnchor: {x: -0.0000000054572915, y: 4.543903e-10}
   m_Suspension:
-    m_DampingRatio: 1
-    m_Frequency: 3
+    m_DampingRatio: 0.9
+    m_Frequency: 10
     m_Angle: 90
   m_UseMotor: 0
   m_Motor:
@@ -1140,8 +1140,8 @@ WheelJoint2D:
   m_Anchor: {x: 0.88561064, y: -0.1807955}
   m_ConnectedAnchor: {x: 0.009122139, y: 0.003840897}
   m_Suspension:
-    m_DampingRatio: 0.7
-    m_Frequency: 1
+    m_DampingRatio: 0.9
+    m_Frequency: 10
     m_Angle: 90
   m_UseMotor: 0
   m_Motor:
@@ -1184,13 +1184,26 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a10d59204f23344d8bf54a1bb0692b0c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   backWheelJoint: {fileID: 1623591421}
+  frontWheelJoint: {fileID: 1623591422}
   bikeRigidbody: {fileID: 1623591423}
-  speed: -500
-  torque: 1500
-  leanTorque: 15
+  maxMotorSpeed: 1200
+  motorAcceleration: 2400
+  driveTorque: 800
+  brakeTorque: 400
+  driveDirection: -1
+  maxLinearSpeed: 7
+  maxAngularSpeed: 400
+  airLeanTorque: 30
+  autoBalanceTorque: 25
+  autoBalanceDamping: 4
+  groundCheckDistance: 0.8
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  centerOfMass: {x: 0, y: -0.5}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
