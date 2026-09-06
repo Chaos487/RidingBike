@@ -41,8 +41,23 @@ public class BikeController : MonoBehaviour
     [Tooltip("调低重心可以避免车头一加速就翘起。")]
     public Vector2 centerOfMass = new Vector2(0f, -0.5f);
 
+    [Header("Jump / Spin")]
+    [Tooltip("跳跃瞬间冲量。")]
+    public float jumpForce = 8f;
+    [Tooltip("空中按住空格多久后触发 360 度旋转（秒）。")]
+    public float spinHoldThreshold = 0.15f;
+    [Tooltip("旋转时的角速度 (deg/s)，越大转得越快。")]
+    public float spinAngularSpeed = 720f;
+
     float currentMotorSpeed;
     float input;
+
+    bool spaceHeld;
+    float spaceHoldTime;
+    bool isSpinning;
+    bool hasSpunThisAirtime;
+    float spinRemaining;
+    float spinDirection;
 
     void Reset()
     {
@@ -58,13 +73,75 @@ public class BikeController : MonoBehaviour
     void Update()
     {
         input = Input.GetAxisRaw("Horizontal");
+        HandleJumpAndSpin();
+    }
+
+    void HandleJumpAndSpin()
+    {
+        bool grounded = IsGrounded();
+
+        if (grounded)
+        {
+            isSpinning = false;
+            hasSpunThisAirtime = false;
+            spaceHoldTime = 0f;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Space) && grounded && !isSpinning)
+        {
+            Jump();
+        }
+
+        spaceHeld = Input.GetKey(KeyCode.Space);
+        if (spaceHeld && !grounded && !isSpinning && !hasSpunThisAirtime)
+        {
+            spaceHoldTime += Time.deltaTime;
+            if (spaceHoldTime >= spinHoldThreshold)
+            {
+                StartSpin();
+            }
+        }
+        else if (!spaceHeld)
+        {
+            spaceHoldTime = 0f;
+        }
+    }
+
+    void Jump()
+    {
+        Vector2 v = bikeRigidbody.linearVelocity;
+        v.y = 0f;
+        bikeRigidbody.linearVelocity = v;
+        bikeRigidbody.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+    }
+
+    void StartSpin()
+    {
+        isSpinning = true;
+        hasSpunThisAirtime = true;
+        spinRemaining = 360f;
+        spinDirection = Mathf.Abs(input) > 0.01f ? -Mathf.Sign(input) * driveDirection : 1f;
     }
 
     void FixedUpdate()
     {
         DriveBackWheel();
+        ApplySpin();
         ApplyBalance();
         ClampVelocities();
+    }
+
+    void ApplySpin()
+    {
+        if (!isSpinning) return;
+
+        bikeRigidbody.angularVelocity = spinDirection * spinAngularSpeed;
+        spinRemaining -= spinAngularSpeed * Time.fixedDeltaTime;
+
+        if (spinRemaining <= 0f)
+        {
+            isSpinning = false;
+        }
     }
 
     void DriveBackWheel()
@@ -98,6 +175,8 @@ public class BikeController : MonoBehaviour
 
     void ApplyBalance()
     {
+        if (isSpinning) return;
+
         bool grounded = IsGrounded();
 
         // 空中按方向键 → 压头 / 抬头
@@ -122,11 +201,14 @@ public class BikeController : MonoBehaviour
         v.x = Mathf.Clamp(v.x, -maxLinearSpeed, maxLinearSpeed);
         bikeRigidbody.linearVelocity = v;
 
-        bikeRigidbody.angularVelocity = Mathf.Clamp(
-            bikeRigidbody.angularVelocity,
-            -maxAngularSpeed,
-            maxAngularSpeed
-        );
+        if (!isSpinning)
+        {
+            bikeRigidbody.angularVelocity = Mathf.Clamp(
+                bikeRigidbody.angularVelocity,
+                -maxAngularSpeed,
+                maxAngularSpeed
+            );
+        }
     }
 
     bool IsGrounded()
