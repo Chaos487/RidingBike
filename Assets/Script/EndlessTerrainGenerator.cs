@@ -38,6 +38,12 @@ public class EndlessTerrainGenerator : MonoBehaviour
     [Tooltip("同方向坡度最多连续出现几段,超过后强制切换方向,避免地形无限爬升/下沉。")]
     public int maxConsecutiveSameDirection = 2;
 
+    [Header("Smoothing")]
+    [Tooltip("相邻两段坡度角最多能变化多少度。限制这个值可以避免陡下坡紧接陡上坡这种尖锐 V 形坑/尖峰——轮子撞进这种没有过渡的尖角会被物理引擎解算出巨大冲量,把悬挂瞬间拉爆、轮子看起来像飞出去了。")]
+    public float maxAngleChangePerSegment = 14f;
+    [Tooltip("地面碰撞体的圆角半径,给尖角再加一层缓冲。")]
+    public float edgeRadius = 0.1f;
+
     [Header("Elevation Band (相对起点)")]
     public float minElevation = -5f;
     public float maxElevation = 3f;
@@ -58,10 +64,12 @@ public class EndlessTerrainGenerator : MonoBehaviour
     float originY;
     SegmentType lastType = SegmentType.Flat;
     int consecutiveCount;
+    float lastAngleDeg;
 
     void Awake()
     {
         edgeCollider = GetComponent<EdgeCollider2D>();
+        edgeCollider.edgeRadius = edgeRadius;
 
         meshFilter = gameObject.AddComponent<MeshFilter>();
         meshRenderer = gameObject.AddComponent<MeshRenderer>();
@@ -78,6 +86,9 @@ public class EndlessTerrainGenerator : MonoBehaviour
         points.Clear();
         cursor = startPoint;
         originY = startPoint.y;
+        lastType = SegmentType.Flat;
+        lastAngleDeg = 0f;
+        consecutiveCount = 0;
         points.Add(cursor);
 
         Vector2 flatEnd = cursor + Vector2.right * startFlatLength;
@@ -118,23 +129,24 @@ public class EndlessTerrainGenerator : MonoBehaviour
         SegmentType type = PickNextType();
         float length = UnityEngine.Random.Range(minSegmentLength, maxSegmentLength);
 
-        Vector2 end = ComputeSegmentEnd(type, length);
+        (Vector2 end, float angleDeg) = ComputeSegmentEnd(type, length);
 
         float relativeElevation = end.y - originY;
         if (relativeElevation > maxElevation && type != SegmentType.Downhill)
         {
             type = SegmentType.Downhill;
-            end = ComputeSegmentEnd(type, length);
+            (end, angleDeg) = ComputeSegmentEnd(type, length);
         }
         else if (relativeElevation < minElevation && type != SegmentType.Uphill)
         {
             type = SegmentType.Uphill;
-            end = ComputeSegmentEnd(type, length);
+            (end, angleDeg) = ComputeSegmentEnd(type, length);
         }
 
         Vector2 start = cursor;
         points.Add(end);
         cursor = end;
+        lastAngleDeg = angleDeg;
 
         consecutiveCount = (type == lastType && type != SegmentType.Flat) ? consecutiveCount + 1 : 1;
         lastType = type;
@@ -142,16 +154,20 @@ public class EndlessTerrainGenerator : MonoBehaviour
         OnSegmentGenerated?.Invoke(start, end, type);
     }
 
-    Vector2 ComputeSegmentEnd(SegmentType type, float length)
+    (Vector2 end, float angleDeg) ComputeSegmentEnd(SegmentType type, float length)
     {
-        float angleDeg = type switch
+        float targetAngleDeg = type switch
         {
             SegmentType.Uphill => UnityEngine.Random.Range(minSlopeAngle, maxSlopeAngle),
             SegmentType.Downhill => -UnityEngine.Random.Range(minSlopeAngle, maxSlopeAngle),
             _ => 0f,
         };
+
+        // 限制相对上一段的角度变化,避免陡下坡紧接陡上坡这类没有过渡的尖角。
+        float angleDeg = Mathf.Clamp(targetAngleDeg, lastAngleDeg - maxAngleChangePerSegment, lastAngleDeg + maxAngleChangePerSegment);
+
         Vector2 dir = new Vector2(Mathf.Cos(angleDeg * Mathf.Deg2Rad), Mathf.Sin(angleDeg * Mathf.Deg2Rad));
-        return cursor + dir * length;
+        return (cursor + dir * length, angleDeg);
     }
 
     SegmentType PickNextType()
