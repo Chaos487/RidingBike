@@ -18,6 +18,8 @@ public class ObstacleSpawner : MonoBehaviour
     [Header("Obstacle Shape")]
     public Vector2 obstacleSize = new Vector2(0.6f, 0.4f);
     public Color obstacleColor = new Color(0.5f, 0.35f, 0.2f);
+    [Tooltip("碰撞体圆角半径。方块直角会让高速经过的轮子在棱角处被解算出巨大冲量,把悬挂拉爆,所以要把角磨圆。")]
+    public float edgeRadius = 0.08f;
 
     Material sharedMaterial;
     float lastObstacleX = float.NegativeInfinity;
@@ -57,6 +59,7 @@ public class ObstacleSpawner : MonoBehaviour
         BoxCollider2D box = obstacle.AddComponent<BoxCollider2D>();
         box.size = obstacleSize;
         box.offset = new Vector2(0f, obstacleSize.y * 0.5f);
+        box.edgeRadius = edgeRadius;
     }
 
     static Mesh BuildBoxMesh(Vector2 size)
