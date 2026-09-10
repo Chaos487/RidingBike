@@ -9,6 +9,8 @@ public class CrashDetector : MonoBehaviour
 {
     [Header("References")]
     public Rigidbody2D bikeRigidbody;
+    [Tooltip("用来排除主动触发的空中 360 旋转,避免转体过程中被误判成摔车。")]
+    public BikeController bikeController;
 
     [Header("Crash Rule")]
     [Tooltip("车身倾角超过该值(度)且触地时视为失控。")]
@@ -27,6 +29,12 @@ public class CrashDetector : MonoBehaviour
     void FixedUpdate()
     {
         if (crashed || bikeRigidbody == null) return;
+
+        if (bikeController != null && bikeController.IsSpinning)
+        {
+            overTiltTime = 0f;
+            return;
+        }
 
         bool grounded = Physics2D.Raycast(bikeRigidbody.position, Vector2.down, groundCheckDistance, groundLayer).collider != null;
         float tilt = Mathf.Abs(Mathf.DeltaAngle(bikeRigidbody.rotation, 0f));

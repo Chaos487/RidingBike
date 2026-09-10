@@ -59,6 +59,9 @@ public class BikeController : MonoBehaviour
     float spinRemaining;
     float spinDirection;
 
+    /// <summary>是否正在执行主动触发的空中 360 旋转。外部系统(比如摔车判定)据此排除这种合法的高倾角状态。</summary>
+    public bool IsSpinning => isSpinning;
+
     void Reset()
     {
         bikeRigidbody = GetComponent<Rigidbody2D>();
