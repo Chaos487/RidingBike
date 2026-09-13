@@ -1,10 +1,11 @@
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 运行时自动装配 endless run 所需的系统,不依赖手动编辑场景文件:
 /// 场景加载后自动找到 Bike,停用场景里原来那块静态地面,
-/// 在同一个高度接上程序化生成的无限地形 + 障碍物 + 摔车判定 + 结算 UI。
+/// 在同一个高度接上程序化生成的无限地形 + 障碍物 + 摔车判定 + 结算 UI + 速度反应式镜头。
 /// [RuntimeInitializeOnLoadMethod] 只在应用启动时触发一次,RunManager 重开是靠
 /// SceneManager.LoadScene 重载同一个场景,所以额外订阅 sceneLoaded 让每次重开都能重新装配。
 /// </summary>
@@ -33,16 +34,16 @@ public static class EndlessRunBootstrap
 
         Vector2 startPoint = new Vector2(bike.transform.position.x - 5f, startY);
 
-        EndlessRunSettings settings = FindSettings();
+        EndlessRunSettings runSettings = FindSettings<EndlessRunSettings>();
 
         GameObject systems = new GameObject("EndlessRunSystems");
 
         EndlessTerrainGenerator terrain = systems.AddComponent<EndlessTerrainGenerator>();
         terrain.trackTarget = bike.transform;
-        terrain.ApplySettings(settings);
+        terrain.ApplySettings(runSettings);
 
         ObstacleSpawner obstacleSpawner = systems.AddComponent<ObstacleSpawner>();
-        obstacleSpawner.ApplySettings(settings);
+        obstacleSpawner.ApplySettings(runSettings);
         terrain.OnGroundSampled += obstacleSpawner.HandleGroundSampled;
 
         terrain.Initialize(startPoint);
@@ -55,21 +56,42 @@ public static class EndlessRunBootstrap
 
         RunManager runManager = systems.AddComponent<RunManager>();
         runManager.Initialize(bike.transform, crashDetector, bike);
+
+        SetupCamera(bike, crashDetector);
+    }
+
+    static void SetupCamera(BikeController bike, CrashDetector crashDetector)
+    {
+        CinemachineCamera cmCamera = Object.FindFirstObjectByType<CinemachineCamera>();
+        if (cmCamera == null) return;
+
+        CinemachineImpulseSource impulseSource = bike.GetComponent<CinemachineImpulseSource>();
+        if (impulseSource == null) impulseSource = bike.gameObject.AddComponent<CinemachineImpulseSource>();
+
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null && mainCamera.GetComponent<CinemachineImpulseListener>() == null)
+        {
+            mainCamera.gameObject.AddComponent<CinemachineImpulseListener>();
+        }
+
+        CameraDirector cameraDirector = cmCamera.gameObject.AddComponent<CameraDirector>();
+        cameraDirector.ApplySettings(FindSettings<CameraDirectorSettings>());
+        cameraDirector.Initialize(bike, crashDetector, impulseSource);
     }
 
     // 优先在编辑器里按类型搜整个 Assets(不要求放在 Resources 目录下,创建在哪里都能找到);
     // 找不到就退回 Resources.Load,给打包后的版本留一条路。没有资产的话直接用脚本里的默认值。
-    static EndlessRunSettings FindSettings()
+    static T FindSettings<T>() where T : ScriptableObject
     {
 #if UNITY_EDITOR
-        string[] guids = UnityEditor.AssetDatabase.FindAssets("t:EndlessRunSettings");
+        string[] guids = UnityEditor.AssetDatabase.FindAssets($"t:{typeof(T).Name}");
         if (guids.Length > 0)
         {
             string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
-            EndlessRunSettings asset = UnityEditor.AssetDatabase.LoadAssetAtPath<EndlessRunSettings>(path);
+            T asset = UnityEditor.AssetDatabase.LoadAssetAtPath<T>(path);
             if (asset != null) return asset;
         }
 #endif
-        return Resources.Load<EndlessRunSettings>("EndlessRunSettings");
+        return Resources.Load<T>(typeof(T).Name);
     }
 }

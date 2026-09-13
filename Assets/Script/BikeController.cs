@@ -91,6 +91,9 @@ public class BikeController : MonoBehaviour
     /// <summary>是否正在执行主动触发的空中 360 旋转。外部系统(比如摔车判定)据此排除这种合法的高倾角状态。</summary>
     public bool IsSpinning => isSpinning;
 
+    /// <summary>是否按住加速键(Shift)。外部系统(比如镜头)据此做出反应。</summary>
+    public bool IsBoosting => boostHeld;
+
     void Reset()
     {
         bikeRigidbody = GetComponent<Rigidbody2D>();
@@ -301,7 +304,8 @@ public class BikeController : MonoBehaviour
         }
     }
 
-    bool IsGrounded()
+    /// <summary>车轮是否触地。外部系统(比如镜头的空中/落地反应)据此复用同一套判定。</summary>
+    public bool IsGrounded()
     {
         if (bikeRigidbody == null) return false;
         RaycastHit2D hit = Physics2D.Raycast(
