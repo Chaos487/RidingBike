@@ -96,13 +96,20 @@ public class BikeController : MonoBehaviour
     /// <summary>是否按住加速键(Shift)。外部系统(比如镜头)据此做出反应。</summary>
     public bool IsBoosting => boostHeld;
 
+    /// <summary>前 / 后轮各自的触地传感器，供落地质量判定读取接触顺序等信息。</summary>
+    public WheelContactSensor FrontWheelContact { get; private set; }
+    public WheelContactSensor BackWheelContact { get; private set; }
+
     void Reset()
     {
         bikeRigidbody = GetComponent<Rigidbody2D>();
     }
 
-    void Start()
+    void Awake()
     {
+        // 这里必须用 Awake 而不是 Start——EndlessRunBootstrap 是在
+        // [RuntimeInitializeOnLoadMethod(AfterSceneLoad)] 里读 FrontWheelContact/BackWheelContact 的，
+        // 这个回调发生在 Awake 之后、但不保证在 Start 之前，用 Start 的话可能读到还没赋值的 null。
         if (bikeRigidbody == null) bikeRigidbody = GetComponent<Rigidbody2D>();
         bikeRigidbody.centerOfMass = centerOfMass;
 
@@ -120,6 +127,19 @@ public class BikeController : MonoBehaviour
         // 所以另起一个只挂贴图、没有物理组件的子物体，只转它，物理轮子的旋转完全不碰。
         frontSpinVisual = CreateSpinVisual(frontWheelVisual);
         backSpinVisual = CreateSpinVisual(backWheelVisual);
+
+        FrontWheelContact = AttachContactSensor(frontWheelVisual);
+        BackWheelContact = AttachContactSensor(backWheelVisual);
+    }
+
+    WheelContactSensor AttachContactSensor(Transform wheel)
+    {
+        if (wheel == null) return null;
+
+        WheelContactSensor sensor = wheel.GetComponent<WheelContactSensor>();
+        if (sensor == null) sensor = wheel.gameObject.AddComponent<WheelContactSensor>();
+        sensor.groundLayer = groundLayer;
+        return sensor;
     }
 
     static Transform CreateSpinVisual(Transform wheel)
@@ -312,7 +332,8 @@ public class BikeController : MonoBehaviour
         }
     }
 
-    float GetGroundSlopeAngle()
+    /// <summary>探测当前车身前后所在的地面坡度角(度)。触地判定不到时返回 0。外部系统(比如落地质量判定)据此复用同一套探测。</summary>
+    public float GetGroundSlopeAngle()
     {
         Vector2 origin = bikeRigidbody.position;
         Vector2 forward = transform.right;

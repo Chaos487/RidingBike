@@ -40,6 +40,12 @@ public class CameraDirectorSettings : ScriptableObject
     public float landingPunchAmount = 0.12f;
     public float landingPunchInDuration = 0.08f;
     public float landingPunchOutDuration = 0.22f;
+    [Tooltip("Perfect 落地的回弹幅度倍率，建议远小于 1，突出\"稳\"。")]
+    public float perfectLandingPunchScale = 0.2f;
+    [Tooltip("Good 落地的回弹幅度倍率。")]
+    public float goodLandingPunchScale = 1f;
+    [Tooltip("Bad 落地(但还没到摔车)的回弹幅度倍率，建议大于 1。")]
+    public float badLandingPunchScale = 1.8f;
 
     [Header("前瞻偏移 (Look-ahead)")]
     [Tooltip("满速时镜头目标点相对车身往前偏移多少米。")]

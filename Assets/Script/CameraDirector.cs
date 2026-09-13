@@ -19,6 +19,7 @@ public class CameraDirector : MonoBehaviour
     CinemachineImpulseSource impulseSource;
     BikeController bike;
     CrashDetector crashDetector;
+    LandingDetector landingDetector;
 
     float minOrthoSize = 2.4f;
     float maxOrthoSize = 4.2f;
@@ -37,6 +38,9 @@ public class CameraDirector : MonoBehaviour
     float landingPunchAmount = 0.12f;
     float landingPunchInDuration = 0.08f;
     float landingPunchOutDuration = 0.22f;
+    float perfectLandingPunchScale = 0.2f;
+    float goodLandingPunchScale = 1f;
+    float badLandingPunchScale = 1.8f;
 
     float maxLookaheadOffset = 1.6f;
     float lookaheadDuration = 0.6f;
@@ -50,7 +54,6 @@ public class CameraDirector : MonoBehaviour
 
     bool isCrashed;
     bool punchInProgress;
-    bool wasGrounded = true;
     float lastZoomTarget;
     float lastLookaheadTarget;
     float lookaheadDirection = 1f;
@@ -62,13 +65,14 @@ public class CameraDirector : MonoBehaviour
         lastZoomTarget = cmCamera.Lens.OrthographicSize;
     }
 
-    public void Initialize(BikeController bikeController, CrashDetector detector, CinemachineImpulseSource impulse)
+    public void Initialize(BikeController bikeController, CrashDetector detector, CinemachineImpulseSource impulse, LandingDetector landing)
     {
         bike = bikeController;
         crashDetector = detector;
         impulseSource = impulse;
-        wasGrounded = bike.IsGrounded();
+        landingDetector = landing;
         crashDetector.OnCrash += HandleCrash;
+        landingDetector.OnLanded += HandleLanded;
     }
 
     public void ApplySettings(CameraDirectorSettings settings)
@@ -89,6 +93,9 @@ public class CameraDirector : MonoBehaviour
         landingPunchAmount = settings.landingPunchAmount;
         landingPunchInDuration = settings.landingPunchInDuration;
         landingPunchOutDuration = settings.landingPunchOutDuration;
+        perfectLandingPunchScale = settings.perfectLandingPunchScale;
+        goodLandingPunchScale = settings.goodLandingPunchScale;
+        badLandingPunchScale = settings.badLandingPunchScale;
         maxLookaheadOffset = settings.maxLookaheadOffset;
         lookaheadDuration = settings.lookaheadDuration;
         lookaheadEase = settings.lookaheadEase;
@@ -99,16 +106,11 @@ public class CameraDirector : MonoBehaviour
     {
         if (bike == null || isCrashed) return;
 
-        bool grounded = bike.IsGrounded();
-        if (!wasGrounded && grounded)
-        {
-            PlayLandingPunch();
-        }
-        wasGrounded = grounded;
-
+        // 落地那一刻的回弹改成订阅 LandingDetector 抛出的事件，不再自己单独判一遍
+        // "上一帧空中、这一帧触地"——避免两套系统各判一次、逻辑重复。
         if (!punchInProgress)
         {
-            UpdateZoom(grounded);
+            UpdateZoom(bike.IsGrounded());
         }
         UpdateLookahead();
     }
@@ -184,13 +186,27 @@ public class CameraDirector : MonoBehaviour
         composer.TargetOffset = offset;
     }
 
-    void PlayLandingPunch()
+    void HandleLanded(LandingDetector.Quality quality, LandingDetector.ContactOrder order)
+    {
+        if (isCrashed) return;
+
+        // 落地质量越差,回弹越明显;Perfect 落地几乎感觉不到回弹,突出"稳"。
+        float scale = quality switch
+        {
+            LandingDetector.Quality.Perfect => perfectLandingPunchScale,
+            LandingDetector.Quality.Good => goodLandingPunchScale,
+            _ => badLandingPunchScale,
+        };
+        PlayLandingPunch(landingPunchAmount * scale);
+    }
+
+    void PlayLandingPunch(float punchAmount)
     {
         punchInProgress = true;
         zoomTweener?.Kill();
 
         float baseSize = GetOrthoSize();
-        float punchTarget = Mathf.Max(minOrthoSize, baseSize - landingPunchAmount);
+        float punchTarget = Mathf.Max(minOrthoSize, baseSize - punchAmount);
 
         landingPunchSequence?.Kill();
         landingPunchSequence = DOTween.Sequence();
@@ -227,5 +243,6 @@ public class CameraDirector : MonoBehaviour
         lookaheadTweener?.Kill();
         landingPunchSequence?.Kill();
         if (crashDetector != null) crashDetector.OnCrash -= HandleCrash;
+        if (landingDetector != null) landingDetector.OnLanded -= HandleLanded;
     }
 }

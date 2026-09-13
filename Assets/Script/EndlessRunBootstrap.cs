@@ -57,10 +57,14 @@ public static class EndlessRunBootstrap
         RunManager runManager = systems.AddComponent<RunManager>();
         runManager.Initialize(bike.transform, crashDetector, bike);
 
-        SetupCamera(bike, crashDetector);
+        LandingDetector landingDetector = systems.AddComponent<LandingDetector>();
+        landingDetector.ApplySettings(FindSettings<LandingDetectorSettings>());
+        landingDetector.Initialize(bike, bike.FrontWheelContact, bike.BackWheelContact);
+
+        SetupCamera(bike, crashDetector, landingDetector);
     }
 
-    static void SetupCamera(BikeController bike, CrashDetector crashDetector)
+    static void SetupCamera(BikeController bike, CrashDetector crashDetector, LandingDetector landingDetector)
     {
         CinemachineCamera cmCamera = Object.FindFirstObjectByType<CinemachineCamera>();
         if (cmCamera == null) return;
@@ -76,7 +80,7 @@ public static class EndlessRunBootstrap
 
         CameraDirector cameraDirector = cmCamera.gameObject.AddComponent<CameraDirector>();
         cameraDirector.ApplySettings(FindSettings<CameraDirectorSettings>());
-        cameraDirector.Initialize(bike, crashDetector, impulseSource);
+        cameraDirector.Initialize(bike, crashDetector, impulseSource, landingDetector);
     }
 
     // 优先在编辑器里按类型搜整个 Assets(不要求放在 Resources 目录下,创建在哪里都能找到);
