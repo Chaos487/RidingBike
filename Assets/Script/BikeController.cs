@@ -87,6 +87,8 @@ public class BikeController : MonoBehaviour
     float backWheelRadius;
     float frontWheelSpinDeg;
     float backWheelSpinDeg;
+    Transform frontSpinVisual;
+    Transform backSpinVisual;
 
     /// <summary>是否正在执行主动触发的空中 360 旋转。外部系统(比如摔车判定)据此排除这种合法的高倾角状态。</summary>
     public bool IsSpinning => isSpinning;
@@ -112,6 +114,38 @@ public class BikeController : MonoBehaviour
 
         frontWheelRadius = GetWheelRadius(frontWheelVisual);
         backWheelRadius = GetWheelRadius(backWheelVisual);
+
+        // 转速视觉不能直接改物理轮子自己的 Transform——Rigidbody2D 会把它当成瞬移同步回内部状态，
+        // 干扰轮子和地面之间靠摩擦力驱动的滚动，上坡时扭矩本来就紧张，一点干扰就可能把车憋停。
+        // 所以另起一个只挂贴图、没有物理组件的子物体，只转它，物理轮子的旋转完全不碰。
+        frontSpinVisual = CreateSpinVisual(frontWheelVisual);
+        backSpinVisual = CreateSpinVisual(backWheelVisual);
+    }
+
+    static Transform CreateSpinVisual(Transform wheel)
+    {
+        if (wheel == null) return null;
+
+        SpriteRenderer source = wheel.GetComponent<SpriteRenderer>();
+        if (source == null) return wheel; // 没有精灵可分离，退回直接转物理轮子本身
+
+        GameObject visual = new GameObject(wheel.name + "_SpinVisual");
+        visual.transform.SetParent(wheel, false);
+
+        SpriteRenderer copy = visual.AddComponent<SpriteRenderer>();
+        copy.sprite = source.sprite;
+        copy.color = source.color;
+        copy.flipX = source.flipX;
+        copy.flipY = source.flipY;
+        copy.sortingLayerID = source.sortingLayerID;
+        copy.sortingOrder = source.sortingOrder;
+        copy.drawMode = source.drawMode;
+        copy.size = source.size;
+        copy.sharedMaterial = source.sharedMaterial;
+
+        source.enabled = false; // 物理轮子自己不再显示，改由这个跟随子物体显示
+
+        return visual.transform;
     }
 
     void Update()
@@ -125,19 +159,23 @@ public class BikeController : MonoBehaviour
     {
         // 轮子贴图旋转和物理完全解耦：物理只负责悬挂/驱动，这里单独按实际车速算出该转多少度，
         // 保证前后轮视觉上转速一致，不受电机转速上限或摩擦力是否跟得上的影响。
-        SpinWheelVisual(frontWheelVisual, frontWheelRadius, ref frontWheelSpinDeg);
-        SpinWheelVisual(backWheelVisual, backWheelRadius, ref backWheelSpinDeg);
+        // 只转 SpinVisual 子物体，物理轮子自己的 Transform/Rigidbody2D 完全不碰。
+        SpinWheelVisual(frontWheelVisual, frontSpinVisual, frontWheelRadius, ref frontWheelSpinDeg);
+        SpinWheelVisual(backWheelVisual, backSpinVisual, backWheelRadius, ref backWheelSpinDeg);
     }
 
-    void SpinWheelVisual(Transform wheel, float radius, ref float accumulatedDeg)
+    void SpinWheelVisual(Transform wheel, Transform spinVisual, float radius, ref float accumulatedDeg)
     {
-        if (wheel == null || radius <= 0f) return;
+        if (wheel == null || spinVisual == null || radius <= 0f) return;
 
         float rollSpeed = Vector2.Dot(bikeRigidbody.linearVelocity, transform.right);
         float angularSpeedDeg = (rollSpeed / radius) * Mathf.Rad2Deg;
         accumulatedDeg -= angularSpeedDeg * wheelSpinDirection * Time.deltaTime;
 
-        wheel.rotation = Quaternion.Euler(0f, 0f, accumulatedDeg);
+        // spinVisual 是 wheel 的子物体，世界旋转 = wheel 的物理旋转 + 这里设的本地旋转，
+        // 所以要用本地旋转把 wheel 自己的物理旋转抵消掉，才能让贴图显示的角度完全由 accumulatedDeg 决定。
+        float localZ = accumulatedDeg - wheel.eulerAngles.z;
+        spinVisual.localRotation = Quaternion.Euler(0f, 0f, localZ);
     }
 
     static float GetWheelRadius(Transform wheel)
