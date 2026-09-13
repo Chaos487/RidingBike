@@ -39,7 +39,7 @@ public static class EndlessRunBootstrap
         terrain.trackTarget = bike.transform;
 
         ObstacleSpawner obstacleSpawner = systems.AddComponent<ObstacleSpawner>();
-        terrain.OnSegmentGenerated += obstacleSpawner.HandleSegmentGenerated;
+        terrain.OnGroundSampled += obstacleSpawner.HandleGroundSampled;
 
         terrain.Initialize(startPoint);
 

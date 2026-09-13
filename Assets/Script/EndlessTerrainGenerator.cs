@@ -2,10 +2,21 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// 无限滚动地形,用正弦波叠加生成一条连续光滑的地形曲线(类似《滑雪大冒险》的做法),
+/// 而不是随机拼接直线段——这样天然没有衔接尖角,长长的上/下坡是连续的一整条曲线。
+/// </summary>
 [RequireComponent(typeof(EdgeCollider2D))]
 public class EndlessTerrainGenerator : MonoBehaviour
 {
-    public enum SegmentType { Flat, Uphill, Downhill }
+    public enum SlopeDirection { Flat, Uphill, Downhill }
+
+    [Serializable]
+    public struct Wave
+    {
+        public float wavelength;
+        public float amplitude;
+    }
 
     [Header("Reference")]
     [Tooltip("跟随生成的目标,通常是骑行者。")]
@@ -13,46 +24,40 @@ public class EndlessTerrainGenerator : MonoBehaviour
 
     [Header("Generation Range")]
     [Tooltip("目标前方保持多远的已生成地形。")]
-    public float generateAheadDistance = 40f;
+    public float generateAheadDistance = 50f;
     [Tooltip("目标身后超过这个距离的地形会被回收。")]
     public float despawnBehindDistance = 25f;
+    [Tooltip("地形采样点间距,越小曲线越平滑,但点数越多。")]
+    public float sampleSpacing = 0.4f;
 
     [Header("Start")]
-    [Tooltip("起点前方的安全平地长度,避免一开始就上坡/下坡。")]
-    public float startFlatLength = 18f;
+    [Tooltip("起点前方的安全过渡长度:坡度振幅会在这段距离内从 0 平滑过渡到完整幅度,不是硬切的平地。")]
+    public float startFlatLength = 20f;
     [Tooltip("地面视觉网格的厚度。")]
     public float groundThickness = 3f;
 
-    [Header("Segment Length")]
-    public float minSegmentLength = 5f;
-    public float maxSegmentLength = 12f;
+    [Header("Rolling Hills")]
+    [Tooltip("主波:决定又长又连续的大坡度起伏,波长越大坡越长、越平缓。")]
+    public Wave primaryWave = new Wave { wavelength = 80f, amplitude = 4.5f };
+    [Tooltip("次波:叠加在主波上增加细节变化,幅度明显小于主波,否则会打散主波的连续感。")]
+    public Wave secondaryWave = new Wave { wavelength = 24f, amplitude = 1f };
 
-    [Header("Slope Angles (deg)")]
-    public float minSlopeAngle = 8f;
-    public float maxSlopeAngle = 20f;
+    [Header("Obstacle Hook")]
+    [Tooltip("大约每隔多远对地形采样一次,供障碍物生成使用。")]
+    public float obstacleCheckIntervalMin = 6f;
+    public float obstacleCheckIntervalMax = 12f;
+    [Tooltip("坡度角小于这个值(度)视为平地。")]
+    public float flatAngleThreshold = 5f;
 
-    [Header("Weights")]
-    public float flatWeight = 1f;
-    public float uphillWeight = 1f;
-    public float downhillWeight = 1f;
-    [Tooltip("同方向坡度最多连续出现几段,超过后强制切换方向,避免地形无限爬升/下沉。")]
-    public int maxConsecutiveSameDirection = 2;
-
-    [Header("Smoothing")]
-    [Tooltip("相邻两段坡度角最多能变化多少度。限制这个值可以避免陡下坡紧接陡上坡这种尖锐 V 形坑/尖峰——轮子撞进这种没有过渡的尖角会被物理引擎解算出巨大冲量,把悬挂瞬间拉爆、轮子看起来像飞出去了。")]
-    public float maxAngleChangePerSegment = 14f;
-    [Tooltip("地面碰撞体的圆角半径,给尖角再加一层缓冲。")]
+    [Header("Collider")]
+    [Tooltip("地面碰撞体的圆角半径,给极少数陡峭处再加一层缓冲。")]
     public float edgeRadius = 0.1f;
-
-    [Header("Elevation Band (相对起点)")]
-    public float minElevation = -5f;
-    public float maxElevation = 3f;
 
     [Header("Visual")]
     public Color groundColor = new Color(0.35f, 0.6f, 0.25f);
 
-    /// <summary>每生成一段新地形时触发,供障碍物生成等系统订阅。</summary>
-    public event Action<Vector2, Vector2, SegmentType> OnSegmentGenerated;
+    /// <summary>沿地形按一定间距采样时触发,供障碍物生成等系统订阅。</summary>
+    public event Action<Vector2, float, SlopeDirection> OnGroundSampled;
 
     readonly List<Vector2> points = new List<Vector2>();
     EdgeCollider2D edgeCollider;
@@ -60,11 +65,12 @@ public class EndlessTerrainGenerator : MonoBehaviour
     MeshRenderer meshRenderer;
     Mesh mesh;
 
-    Vector2 cursor;
-    float originY;
-    SegmentType lastType = SegmentType.Flat;
-    int consecutiveCount;
-    float lastAngleDeg;
+    float startX;
+    float startY;
+    float frontX;
+    float nextObstacleCheckX;
+    float primaryPhase;
+    float secondaryPhase;
 
     void Awake()
     {
@@ -83,21 +89,20 @@ public class EndlessTerrainGenerator : MonoBehaviour
 
     public void Initialize(Vector2 startPoint)
     {
+        startX = startPoint.x;
+        startY = startPoint.y;
+        primaryPhase = UnityEngine.Random.Range(0f, 1000f);
+        secondaryPhase = UnityEngine.Random.Range(0f, 1000f);
+
         points.Clear();
-        cursor = startPoint;
-        originY = startPoint.y;
-        lastType = SegmentType.Flat;
-        lastAngleDeg = 0f;
-        consecutiveCount = 0;
-        points.Add(cursor);
+        frontX = startX;
+        points.Add(new Vector2(frontX, ComputeHeight(frontX)));
 
-        Vector2 flatEnd = cursor + Vector2.right * startFlatLength;
-        points.Add(flatEnd);
-        cursor = flatEnd;
+        nextObstacleCheckX = startX + startFlatLength + UnityEngine.Random.Range(obstacleCheckIntervalMin, obstacleCheckIntervalMax);
 
-        while (cursor.x < startPoint.x + generateAheadDistance)
+        while (frontX < startX + generateAheadDistance)
         {
-            GenerateNextSegment();
+            ExtendFront();
         }
 
         RebuildCollider();
@@ -109,9 +114,9 @@ public class EndlessTerrainGenerator : MonoBehaviour
         if (trackTarget == null || points.Count == 0) return;
 
         bool changed = false;
-        while (cursor.x - trackTarget.position.x < generateAheadDistance)
+        while (frontX - trackTarget.position.x < generateAheadDistance)
         {
-            GenerateNextSegment();
+            ExtendFront();
             changed = true;
         }
 
@@ -124,69 +129,48 @@ public class EndlessTerrainGenerator : MonoBehaviour
         }
     }
 
-    void GenerateNextSegment()
+    void ExtendFront()
     {
-        SegmentType type = PickNextType();
-        float length = UnityEngine.Random.Range(minSegmentLength, maxSegmentLength);
+        frontX += sampleSpacing;
+        points.Add(new Vector2(frontX, ComputeHeight(frontX)));
 
-        (Vector2 end, float angleDeg) = ComputeSegmentEnd(type, length);
-
-        float relativeElevation = end.y - originY;
-        if (relativeElevation > maxElevation && type != SegmentType.Downhill)
+        if (frontX >= nextObstacleCheckX)
         {
-            type = SegmentType.Downhill;
-            (end, angleDeg) = ComputeSegmentEnd(type, length);
+            float slopeDeg = GetSlopeAngle(frontX);
+            SlopeDirection direction = ClassifySlope(slopeDeg);
+            OnGroundSampled?.Invoke(new Vector2(frontX, ComputeHeight(frontX)), slopeDeg, direction);
+            nextObstacleCheckX = frontX + UnityEngine.Random.Range(obstacleCheckIntervalMin, obstacleCheckIntervalMax);
         }
-        else if (relativeElevation < minElevation && type != SegmentType.Uphill)
-        {
-            type = SegmentType.Uphill;
-            (end, angleDeg) = ComputeSegmentEnd(type, length);
-        }
-
-        Vector2 start = cursor;
-        points.Add(end);
-        cursor = end;
-        lastAngleDeg = angleDeg;
-
-        consecutiveCount = (type == lastType && type != SegmentType.Flat) ? consecutiveCount + 1 : 1;
-        lastType = type;
-
-        OnSegmentGenerated?.Invoke(start, end, type);
     }
 
-    (Vector2 end, float angleDeg) ComputeSegmentEnd(SegmentType type, float length)
+    float ComputeHeight(float x)
     {
-        float targetAngleDeg = type switch
-        {
-            SegmentType.Uphill => UnityEngine.Random.Range(minSlopeAngle, maxSlopeAngle),
-            SegmentType.Downhill => -UnityEngine.Random.Range(minSlopeAngle, maxSlopeAngle),
-            _ => 0f,
-        };
+        float local = x - startX;
+        float ramp = Mathf.SmoothStep(0f, 1f, local / Mathf.Max(startFlatLength, 0.01f));
 
-        // 限制相对上一段的角度变化,避免陡下坡紧接陡上坡这类没有过渡的尖角。
-        float angleDeg = Mathf.Clamp(targetAngleDeg, lastAngleDeg - maxAngleChangePerSegment, lastAngleDeg + maxAngleChangePerSegment);
-
-        Vector2 dir = new Vector2(Mathf.Cos(angleDeg * Mathf.Deg2Rad), Mathf.Sin(angleDeg * Mathf.Deg2Rad));
-        return (cursor + dir * length, angleDeg);
+        float h = WaveHeight(primaryWave, local, primaryPhase) + WaveHeight(secondaryWave, local, secondaryPhase);
+        return startY + h * ramp;
     }
 
-    SegmentType PickNextType()
+    static float WaveHeight(Wave wave, float x, float phase)
     {
-        float fw = flatWeight;
-        float uw = uphillWeight;
-        float dw = downhillWeight;
+        if (wave.wavelength <= 0f) return 0f;
+        float angularFreq = 2f * Mathf.PI / wave.wavelength;
+        return wave.amplitude * Mathf.Sin(x * angularFreq + phase);
+    }
 
-        if (consecutiveCount >= maxConsecutiveSameDirection)
-        {
-            if (lastType == SegmentType.Uphill) uw = 0f;
-            else if (lastType == SegmentType.Downhill) dw = 0f;
-        }
+    float GetSlopeAngle(float x)
+    {
+        const float eps = 0.5f;
+        float slope = (ComputeHeight(x + eps) - ComputeHeight(x - eps)) / (2f * eps);
+        return Mathf.Atan(slope) * Mathf.Rad2Deg;
+    }
 
-        float total = fw + uw + dw;
-        float r = UnityEngine.Random.Range(0f, total);
-        if (r < fw) return SegmentType.Flat;
-        r -= fw;
-        return r < uw ? SegmentType.Uphill : SegmentType.Downhill;
+    SlopeDirection ClassifySlope(float slopeDeg)
+    {
+        if (slopeDeg > flatAngleThreshold) return SlopeDirection.Uphill;
+        if (slopeDeg < -flatAngleThreshold) return SlopeDirection.Downhill;
+        return SlopeDirection.Flat;
     }
 
     bool TrimBehind(float xThreshold)

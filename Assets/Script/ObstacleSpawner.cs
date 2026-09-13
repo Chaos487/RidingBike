@@ -1,14 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// 订阅 EndlessTerrainGenerator.OnSegmentGenerated,在新生成的地形段上按概率放置障碍物。
+/// 订阅 EndlessTerrainGenerator.OnGroundSampled,按概率在采样点上放置障碍物。
 /// 障碍物是普通的实心 2D 碰撞体,摔车与否完全交给物理引擎和 CrashDetector 判定,这里不做任何脚本化的冲量。
 /// </summary>
 public class ObstacleSpawner : MonoBehaviour
 {
     [Header("Spawn Rules")]
     [Range(0f, 1f)]
-    [Tooltip("每个符合条件的地形段生成障碍物的概率。")]
+    [Tooltip("每个符合条件的采样点生成障碍物的概率。")]
     public float spawnChance = 0.5f;
     [Tooltip("两个障碍物之间的最小水平间距,避免连续两个挤在一起。")]
     public float minGapFromLastObstacle = 6f;
@@ -30,19 +30,14 @@ public class ObstacleSpawner : MonoBehaviour
         sharedMaterial = new Material(shader) { color = obstacleColor };
     }
 
-    public void HandleSegmentGenerated(Vector2 start, Vector2 end, EndlessTerrainGenerator.SegmentType type)
+    public void HandleGroundSampled(Vector2 groundPoint, float slopeAngleDeg, EndlessTerrainGenerator.SlopeDirection direction)
     {
-        if (skipUphill && type == EndlessTerrainGenerator.SegmentType.Uphill) return;
-        if (end.x - lastObstacleX < minGapFromLastObstacle) return;
+        if (skipUphill && direction == EndlessTerrainGenerator.SlopeDirection.Uphill) return;
+        if (groundPoint.x - lastObstacleX < minGapFromLastObstacle) return;
         if (Random.value > spawnChance) return;
 
-        float t = Random.Range(0.3f, 0.7f);
-        Vector2 groundPos = Vector2.Lerp(start, end, t);
-        Vector2 dir = (end - start).normalized;
-        float angleDeg = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-
-        SpawnObstacle(groundPos, angleDeg);
-        lastObstacleX = groundPos.x;
+        SpawnObstacle(groundPoint, slopeAngleDeg);
+        lastObstacleX = groundPoint.x;
     }
 
     void SpawnObstacle(Vector2 groundPos, float groundAngleDeg)
