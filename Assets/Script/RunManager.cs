@@ -12,6 +12,7 @@ public class RunManager : MonoBehaviour
     BikeController bikeController;
 
     Text distanceText;
+    Text speedText;
     Text statusText;
     float startX;
     bool runEnded;
@@ -43,6 +44,9 @@ public class RunManager : MonoBehaviour
 
         float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
         distanceText.text = $"距离: {distance:0} m";
+
+        float speedKmh = bikeController != null ? Mathf.Abs(bikeController.bikeRigidbody.linearVelocity.x) * 3.6f : 0f;
+        speedText.text = $"时速: {speedKmh:0} km/h";
     }
 
     void HandleCrash()
@@ -74,13 +78,14 @@ public class RunManager : MonoBehaviour
         canvasGO.AddComponent<CanvasScaler>();
         canvasGO.AddComponent<GraphicRaycaster>();
 
-        distanceText = CreateText(canvasGO.transform, "DistanceText", new Vector2(0f, 1f), new Vector2(20f, -20f), 24, TextAnchor.UpperLeft);
+        distanceText = CreateText(canvasGO.transform, "DistanceText", new Vector2(0f, 1f), new Vector2(20f, -20f), 220f, 24, TextAnchor.UpperLeft);
+        speedText = CreateText(canvasGO.transform, "SpeedText", new Vector2(0f, 1f), new Vector2(240f, -20f), 220f, 24, TextAnchor.UpperLeft);
 
-        statusText = CreateText(canvasGO.transform, "StatusText", new Vector2(0.5f, 0.5f), Vector2.zero, 32, TextAnchor.MiddleCenter);
+        statusText = CreateText(canvasGO.transform, "StatusText", new Vector2(0.5f, 0.5f), Vector2.zero, 500f, 32, TextAnchor.MiddleCenter);
         statusText.gameObject.SetActive(false);
     }
 
-    static Text CreateText(Transform parent, string name, Vector2 anchor, Vector2 anchoredPos, int fontSize, TextAnchor alignment)
+    static Text CreateText(Transform parent, string name, Vector2 anchor, Vector2 anchoredPos, float width, int fontSize, TextAnchor alignment)
     {
         GameObject go = new GameObject(name);
         go.transform.SetParent(parent, false);
@@ -90,7 +95,7 @@ public class RunManager : MonoBehaviour
         rt.anchorMax = anchor;
         rt.pivot = anchor;
         rt.anchoredPosition = anchoredPos;
-        rt.sizeDelta = new Vector2(500f, 120f);
+        rt.sizeDelta = new Vector2(width, 120f);
 
         Text text = go.AddComponent<Text>();
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");

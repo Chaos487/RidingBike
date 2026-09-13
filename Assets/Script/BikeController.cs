@@ -9,22 +9,31 @@ public class BikeController : MonoBehaviour
     public Rigidbody2D bikeRigidbody;
 
     [Header("Drive")]
-    [Tooltip("最大电机角速度 (deg/s)。绝对值越大极速越高。")]
-    public float maxMotorSpeed = 1200f;
+    [Tooltip("最大电机角速度 (deg/s)。绝对值越大极速越高，需要大于\"按轮径换算出 maxSpeedKmh 所需的角速度\"，否则电机转速会先于车速封顶。")]
+    public float maxMotorSpeed = 2800f;
     [Tooltip("电机角加速度 (deg/s^2)，控制起步/加速的平滑度。")]
-    public float motorAcceleration = 2400f;
-    [Tooltip("驱动时电机最大扭矩。过大会让车头翘起、轮子甩飞。")]
-    public float driveTorque = 800f;
+    public float motorAcceleration = 3000f;
+    [Tooltip("驱动时电机最大扭矩，决定按住前进键时的加速快慢。过大会让车头翘起、轮子甩飞。")]
+    public float driveTorque = 2000f;
     [Tooltip("松开按键时的刹车扭矩，让车滑行减速而不是猛停。")]
     public float brakeTorque = 400f;
     [Tooltip("电机方向，+1 或 -1。如果按 D 反而向左请改成 -1。")]
     public float driveDirection = -1f;
 
+    [Header("Boost (Shift 加速)")]
+    [Tooltip("按住加速键(Shift)时使用的驱动扭矩，应明显大于 driveTorque，让加速比平时更快；最高速度不受影响，统一由 maxSpeedKmh 封顶。")]
+    public float boostDriveTorque = 3600f;
+    [Tooltip("按住加速键时的电机角加速度，通常也要比 motorAcceleration 大，避免电机转速追不上多出来的扭矩。")]
+    public float boostMotorAcceleration = 6000f;
+
     [Header("Speed / Stability Limits")]
-    [Tooltip("车身水平速度上限 (m/s)。")]
-    public float maxLinearSpeed = 7f;
+    [Tooltip("车身速度上限 (km/h)，模拟现实骑行速度，达到后车速不再增加。")]
+    public float maxSpeedKmh = 100f;
     [Tooltip("车身最大角速度 (deg/s)，防止失控空翻。")]
     public float maxAngularSpeed = 400f;
+
+    /// <summary>车身速度上限，换算成物理用的 m/s。</summary>
+    public float MaxLinearSpeed => maxSpeedKmh / 3.6f;
 
     [Header("Balance")]
     [Tooltip("空中按 A/D 时给车身施加的压头/抬头力矩。")]
@@ -65,6 +74,7 @@ public class BikeController : MonoBehaviour
 
     float currentMotorSpeed;
     float input;
+    bool boostHeld;
 
     bool spaceHeld;
     float spaceHoldTime;
@@ -104,6 +114,7 @@ public class BikeController : MonoBehaviour
     void Update()
     {
         input = Input.GetAxisRaw("Horizontal");
+        boostHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
         HandleJumpAndSpin();
     }
 
@@ -207,8 +218,9 @@ public class BikeController : MonoBehaviour
 
         float targetSpeed = input * driveDirection * maxMotorSpeed;
 
-        // 已经到达水平极速时不再加速 —— 否则轮子继续狂转、车身被限速，
+        // 已经到达速度上限时不再加速 —— 否则轮子继续狂转、车身被限速，
         // 二者速度不匹配会把 WheelJoint 的悬挂拉到极限，视觉上轮子飞出去。
+        float maxLinearSpeed = MaxLinearSpeed;
         float bikeSpeed = bikeRigidbody.linearVelocity.x;
         if (Mathf.Abs(input) > 0.01f && Mathf.Abs(bikeSpeed) >= maxLinearSpeed
             && Mathf.Sign(bikeSpeed) == Mathf.Sign(input * driveDirection))
@@ -216,16 +228,20 @@ public class BikeController : MonoBehaviour
             targetSpeed = currentMotorSpeed; // 维持当前转速，不再往上加
         }
 
+        // 按住加速键(Shift)时用更大的扭矩/电机加速度，跑得更快到达同一个速度上限。
+        float accel = boostHeld ? boostMotorAcceleration : motorAcceleration;
+        float torque = boostHeld ? boostDriveTorque : driveTorque;
+
         // 平滑过渡到目标转速，避免瞬时冲击让轮子飞出
         currentMotorSpeed = Mathf.MoveTowards(
             currentMotorSpeed,
             targetSpeed,
-            motorAcceleration * Time.fixedDeltaTime
+            accel * Time.fixedDeltaTime
         );
 
         JointMotor2D motor = backWheelJoint.motor;
         motor.motorSpeed = currentMotorSpeed;
-        motor.maxMotorTorque = Mathf.Abs(input) > 0.01f ? driveTorque : brakeTorque;
+        motor.maxMotorTorque = Mathf.Abs(input) > 0.01f ? torque : brakeTorque;
         backWheelJoint.motor = motor;
         backWheelJoint.useMotor = true; // 始终保留 motor，无输入时作为刹车
     }
@@ -272,7 +288,7 @@ public class BikeController : MonoBehaviour
     void ClampVelocities()
     {
         Vector2 v = bikeRigidbody.linearVelocity;
-        v.x = Mathf.Clamp(v.x, -maxLinearSpeed, maxLinearSpeed);
+        v.x = Mathf.Clamp(v.x, -MaxLinearSpeed, MaxLinearSpeed);
         bikeRigidbody.linearVelocity = v;
 
         if (!isSpinning)
