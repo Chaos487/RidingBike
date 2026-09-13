@@ -87,7 +87,12 @@ public class LandingDetector : MonoBehaviour
             quality = Quality.Bad;
         }
 
-        OnLanded?.Invoke(quality, DetermineContactOrder());
+        ContactOrder order = DetermineContactOrder();
+
+        // 临时验证用:后面接了 UI/ScoreSystem 展示这个结果之后可以删掉。
+        Debug.Log($"[LandingDetector] {quality} order={order} angleError={angleError:0.0} angularSpeed={angularSpeed:0.0} verticalSpeed={verticalSpeed:0.0}");
+
+        OnLanded?.Invoke(quality, order);
     }
 
     ContactOrder DetermineContactOrder()
