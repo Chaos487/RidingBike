@@ -3,54 +3,52 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 无限滚动地形,用正弦波叠加生成一条连续光滑的地形曲线(类似《滑雪大冒险》的做法),
-/// 而不是随机拼接直线段——这样天然没有衔接尖角,长长的上/下坡是连续的一整条曲线。
+/// 无限滚动地形:按"平地 -> 上坡 -> 下坡 -> 平地 -> ..."的顺序循环生成,
+/// 每个阶段的长度、坡的高度差都可以单独配置(见 EndlessRunSettings)。
+/// 阶段之间用 SmoothStep 过渡(两端导数为 0),所以任意相邻阶段衔接处都不会有尖角,
+/// 地形整体是一条连续光滑的曲线,不是拼接直线段。
 /// </summary>
 [RequireComponent(typeof(EdgeCollider2D))]
 public class EndlessTerrainGenerator : MonoBehaviour
 {
     public enum SlopeDirection { Flat, Uphill, Downhill }
-
-    [Serializable]
-    public struct Wave
-    {
-        public float wavelength;
-        public float amplitude;
-    }
+    enum Phase { Flat, Rising, Falling }
 
     [Header("Reference")]
     [Tooltip("跟随生成的目标,通常是骑行者。")]
     public Transform trackTarget;
 
     [Header("Generation Range")]
-    [Tooltip("目标前方保持多远的已生成地形。")]
     public float generateAheadDistance = 50f;
-    [Tooltip("目标身后超过这个距离的地形会被回收。")]
     public float despawnBehindDistance = 25f;
-    [Tooltip("地形采样点间距,越小曲线越平滑,但点数越多。")]
     public float sampleSpacing = 0.4f;
 
     [Header("Start")]
-    [Tooltip("起点前方的安全过渡长度:坡度振幅会在这段距离内从 0 平滑过渡到完整幅度,不是硬切的平地。")]
     public float startFlatLength = 20f;
-    [Tooltip("地面视觉网格的厚度。")]
     public float groundThickness = 3f;
 
-    [Header("Rolling Hills")]
-    [Tooltip("主波:决定又长又连续的大坡度起伏,波长越大坡越长、越平缓。")]
-    public Wave primaryWave = new Wave { wavelength = 80f, amplitude = 4.5f };
-    [Tooltip("次波:叠加在主波上增加细节变化,幅度明显小于主波,否则会打散主波的连续感。")]
-    public Wave secondaryWave = new Wave { wavelength = 24f, amplitude = 1f };
+    [Header("平地段长度 (米)")]
+    public float minFlatLength = 4f;
+    public float maxFlatLength = 12f;
+
+    [Header("上坡段长度 (米)")]
+    public float minUphillLength = 15f;
+    public float maxUphillLength = 35f;
+
+    [Header("下坡段长度 (米)")]
+    public float minDownhillLength = 15f;
+    public float maxDownhillLength = 35f;
+
+    [Header("坡的高度差 (米)")]
+    public float minHillHeight = 2f;
+    public float maxHillHeight = 5f;
 
     [Header("Obstacle Hook")]
-    [Tooltip("大约每隔多远对地形采样一次,供障碍物生成使用。")]
     public float obstacleCheckIntervalMin = 6f;
     public float obstacleCheckIntervalMax = 12f;
-    [Tooltip("坡度角小于这个值(度)视为平地。")]
     public float flatAngleThreshold = 5f;
 
     [Header("Collider")]
-    [Tooltip("地面碰撞体的圆角半径,给极少数陡峭处再加一层缓冲。")]
     public float edgeRadius = 0.1f;
 
     [Header("Visual")]
@@ -65,12 +63,15 @@ public class EndlessTerrainGenerator : MonoBehaviour
     MeshRenderer meshRenderer;
     Mesh mesh;
 
-    float startX;
-    float startY;
     float frontX;
     float nextObstacleCheckX;
-    float primaryPhase;
-    float secondaryPhase;
+
+    Phase phase;
+    float phaseStartX;
+    float phaseLength;
+    float phaseStartHeight;
+    float phaseEndHeight;
+    float pendingHillHeight;
 
     void Awake()
     {
@@ -87,20 +88,49 @@ public class EndlessTerrainGenerator : MonoBehaviour
         meshRenderer.sortingOrder = -1;
     }
 
+    /// <summary>用 EndlessRunSettings 资产里的数值覆盖默认参数,方便在编辑器里手调。</summary>
+    public void ApplySettings(EndlessRunSettings settings)
+    {
+        if (settings == null) return;
+
+        generateAheadDistance = settings.generateAheadDistance;
+        despawnBehindDistance = settings.despawnBehindDistance;
+        sampleSpacing = settings.sampleSpacing;
+        startFlatLength = settings.startFlatLength;
+        groundThickness = settings.groundThickness;
+        minFlatLength = settings.minFlatLength;
+        maxFlatLength = settings.maxFlatLength;
+        minUphillLength = settings.minUphillLength;
+        maxUphillLength = settings.maxUphillLength;
+        minDownhillLength = settings.minDownhillLength;
+        maxDownhillLength = settings.maxDownhillLength;
+        minHillHeight = settings.minHillHeight;
+        maxHillHeight = settings.maxHillHeight;
+        obstacleCheckIntervalMin = settings.obstacleCheckIntervalMin;
+        obstacleCheckIntervalMax = settings.obstacleCheckIntervalMax;
+        flatAngleThreshold = settings.flatAngleThreshold;
+        edgeRadius = settings.edgeRadius;
+        groundColor = settings.groundColor;
+
+        edgeCollider.edgeRadius = edgeRadius;
+        meshRenderer.sharedMaterial.color = groundColor;
+    }
+
     public void Initialize(Vector2 startPoint)
     {
-        startX = startPoint.x;
-        startY = startPoint.y;
-        primaryPhase = UnityEngine.Random.Range(0f, 1000f);
-        secondaryPhase = UnityEngine.Random.Range(0f, 1000f);
-
         points.Clear();
-        frontX = startX;
-        points.Add(new Vector2(frontX, ComputeHeight(frontX)));
+        frontX = startPoint.x;
+        points.Add(startPoint);
 
-        nextObstacleCheckX = startX + startFlatLength + UnityEngine.Random.Range(obstacleCheckIntervalMin, obstacleCheckIntervalMax);
+        phase = Phase.Flat;
+        phaseStartX = frontX;
+        phaseLength = startFlatLength;
+        phaseStartHeight = startPoint.y;
+        phaseEndHeight = startPoint.y;
 
-        while (frontX < startX + generateAheadDistance)
+        nextObstacleCheckX = frontX + startFlatLength + UnityEngine.Random.Range(obstacleCheckIntervalMin, obstacleCheckIntervalMax);
+
+        while (frontX < startPoint.x + generateAheadDistance)
         {
             ExtendFront();
         }
@@ -132,37 +162,68 @@ public class EndlessTerrainGenerator : MonoBehaviour
     void ExtendFront()
     {
         frontX += sampleSpacing;
-        points.Add(new Vector2(frontX, ComputeHeight(frontX)));
+
+        while (frontX >= phaseStartX + phaseLength)
+        {
+            AdvancePhase();
+        }
+
+        float height = SampleHeight(frontX);
+        points.Add(new Vector2(frontX, height));
 
         if (frontX >= nextObstacleCheckX)
         {
             float slopeDeg = GetSlopeAngle(frontX);
             SlopeDirection direction = ClassifySlope(slopeDeg);
-            OnGroundSampled?.Invoke(new Vector2(frontX, ComputeHeight(frontX)), slopeDeg, direction);
+            OnGroundSampled?.Invoke(new Vector2(frontX, height), slopeDeg, direction);
             nextObstacleCheckX = frontX + UnityEngine.Random.Range(obstacleCheckIntervalMin, obstacleCheckIntervalMax);
         }
     }
 
-    float ComputeHeight(float x)
+    // 平地 -> 上坡 -> 下坡 -> 平地 -> ... 循环。下坡总是落回上坡爬升前的高度(用同一个
+    // pendingHillHeight),所以海拔不会累计漂移,不需要额外的海拔带修正逻辑。
+    void AdvancePhase()
     {
-        float local = x - startX;
-        float ramp = Mathf.SmoothStep(0f, 1f, local / Mathf.Max(startFlatLength, 0.01f));
+        float nextPhaseStartX = phaseStartX + phaseLength;
+        float baseHeight = phaseEndHeight;
 
-        float h = WaveHeight(primaryWave, local, primaryPhase) + WaveHeight(secondaryWave, local, secondaryPhase);
-        return startY + h * ramp;
+        switch (phase)
+        {
+            case Phase.Flat:
+                phase = Phase.Rising;
+                pendingHillHeight = UnityEngine.Random.Range(minHillHeight, maxHillHeight);
+                phaseLength = UnityEngine.Random.Range(minUphillLength, maxUphillLength);
+                phaseStartHeight = baseHeight;
+                phaseEndHeight = baseHeight + pendingHillHeight;
+                break;
+            case Phase.Rising:
+                phase = Phase.Falling;
+                phaseLength = UnityEngine.Random.Range(minDownhillLength, maxDownhillLength);
+                phaseStartHeight = baseHeight;
+                phaseEndHeight = baseHeight - pendingHillHeight;
+                break;
+            default:
+                phase = Phase.Flat;
+                phaseLength = UnityEngine.Random.Range(minFlatLength, maxFlatLength);
+                phaseStartHeight = baseHeight;
+                phaseEndHeight = baseHeight;
+                break;
+        }
+
+        phaseStartX = nextPhaseStartX;
     }
 
-    static float WaveHeight(Wave wave, float x, float phase)
+    float SampleHeight(float x)
     {
-        if (wave.wavelength <= 0f) return 0f;
-        float angularFreq = 2f * Mathf.PI / wave.wavelength;
-        return wave.amplitude * Mathf.Sin(x * angularFreq + phase);
+        float t = phaseLength > 0f ? Mathf.Clamp01((x - phaseStartX) / phaseLength) : 1f;
+        float smoothT = Mathf.SmoothStep(0f, 1f, t);
+        return Mathf.Lerp(phaseStartHeight, phaseEndHeight, smoothT);
     }
 
     float GetSlopeAngle(float x)
     {
         const float eps = 0.5f;
-        float slope = (ComputeHeight(x + eps) - ComputeHeight(x - eps)) / (2f * eps);
+        float slope = (SampleHeight(x + eps) - SampleHeight(x - eps)) / (2f * eps);
         return Mathf.Atan(slope) * Mathf.Rad2Deg;
     }
 

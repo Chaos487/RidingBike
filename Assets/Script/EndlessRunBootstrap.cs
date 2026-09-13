@@ -33,12 +33,16 @@ public static class EndlessRunBootstrap
 
         Vector2 startPoint = new Vector2(bike.transform.position.x - 5f, startY);
 
+        EndlessRunSettings settings = FindSettings();
+
         GameObject systems = new GameObject("EndlessRunSystems");
 
         EndlessTerrainGenerator terrain = systems.AddComponent<EndlessTerrainGenerator>();
         terrain.trackTarget = bike.transform;
+        terrain.ApplySettings(settings);
 
         ObstacleSpawner obstacleSpawner = systems.AddComponent<ObstacleSpawner>();
+        obstacleSpawner.ApplySettings(settings);
         terrain.OnGroundSampled += obstacleSpawner.HandleGroundSampled;
 
         terrain.Initialize(startPoint);
@@ -51,5 +55,21 @@ public static class EndlessRunBootstrap
 
         RunManager runManager = systems.AddComponent<RunManager>();
         runManager.Initialize(bike.transform, crashDetector, bike);
+    }
+
+    // 优先在编辑器里按类型搜整个 Assets(不要求放在 Resources 目录下,创建在哪里都能找到);
+    // 找不到就退回 Resources.Load,给打包后的版本留一条路。没有资产的话直接用脚本里的默认值。
+    static EndlessRunSettings FindSettings()
+    {
+#if UNITY_EDITOR
+        string[] guids = UnityEditor.AssetDatabase.FindAssets("t:EndlessRunSettings");
+        if (guids.Length > 0)
+        {
+            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
+            EndlessRunSettings asset = UnityEditor.AssetDatabase.LoadAssetAtPath<EndlessRunSettings>(path);
+            if (asset != null) return asset;
+        }
+#endif
+        return Resources.Load<EndlessRunSettings>("EndlessRunSettings");
     }
 }

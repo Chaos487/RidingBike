@@ -30,6 +30,21 @@ public class ObstacleSpawner : MonoBehaviour
         sharedMaterial = new Material(shader) { color = obstacleColor };
     }
 
+    /// <summary>用 EndlessRunSettings 资产里的数值覆盖默认参数,方便在编辑器里手调。</summary>
+    public void ApplySettings(EndlessRunSettings settings)
+    {
+        if (settings == null) return;
+
+        spawnChance = settings.obstacleSpawnChance;
+        minGapFromLastObstacle = settings.obstacleMinGap;
+        skipUphill = settings.skipObstaclesOnUphill;
+        obstacleSize = settings.obstacleSize;
+        obstacleColor = settings.obstacleColor;
+        edgeRadius = settings.obstacleEdgeRadius;
+
+        sharedMaterial.color = obstacleColor;
+    }
+
     public void HandleGroundSampled(Vector2 groundPoint, float slopeAngleDeg, EndlessTerrainGenerator.SlopeDirection direction)
     {
         if (skipUphill && direction == EndlessTerrainGenerator.SlopeDirection.Uphill) return;
