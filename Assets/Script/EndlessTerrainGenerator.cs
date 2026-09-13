@@ -144,10 +144,20 @@ public class EndlessTerrainGenerator : MonoBehaviour
         if (trackTarget == null || points.Count == 0) return;
 
         bool changed = false;
+        int safetyIterations = 0;
+        const int maxIterationsPerUpdate = 2000; // 200m 的余量，正常情况下远用不到——只用来防止目标位置异常跳变时死循环卡死
+
         while (frontX - trackTarget.position.x < generateAheadDistance)
         {
             ExtendFront();
             changed = true;
+
+            safetyIterations++;
+            if (safetyIterations >= maxIterationsPerUpdate)
+            {
+                Debug.LogWarning($"EndlessTerrainGenerator: 单帧生成地形段数超过安全上限，trackTarget.position.x={trackTarget.position.x}，可能发生了物理异常跳变，本帧提前结束生成。");
+                break;
+            }
         }
 
         changed |= TrimBehind(trackTarget.position.x - despawnBehindDistance);
