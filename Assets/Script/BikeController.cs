@@ -41,6 +41,20 @@ public class BikeController : MonoBehaviour
     [Tooltip("调低重心可以避免车头一加速就翘起。")]
     public Vector2 centerOfMass = new Vector2(0f, -0.5f);
 
+    [Header("Slope Probe")]
+    [Tooltip("坡度探测点相对车身中心的前后偏移距离，大致等于轮距的一半。")]
+    public float slopeProbeOffset = 0.8f;
+    [Tooltip("坡度探测射线的最大距离。")]
+    public float slopeProbeDistance = 2f;
+
+    [Header("Wheel Visual Spin")]
+    [Tooltip("前轮贴图变换。留空的话会自动从 frontWheelJoint 连接的车轮读取，不需要手动拖。")]
+    public Transform frontWheelVisual;
+    [Tooltip("后轮贴图变换。留空的话会自动从 backWheelJoint 连接的车轮读取，不需要手动拖。")]
+    public Transform backWheelVisual;
+    [Tooltip("轮子贴图的旋转方向，如果转起来是反的就改成 -1。这个只影响视觉，不影响驱动物理。")]
+    public float wheelSpinDirection = 1f;
+
     [Header("Jump / Spin")]
     [Tooltip("跳跃瞬间冲量。")]
     public float jumpForce = 8f;
@@ -59,6 +73,11 @@ public class BikeController : MonoBehaviour
     float spinRemaining;
     float spinDirection;
 
+    float frontWheelRadius;
+    float backWheelRadius;
+    float frontWheelSpinDeg;
+    float backWheelSpinDeg;
+
     /// <summary>是否正在执行主动触发的空中 360 旋转。外部系统(比如摔车判定)据此排除这种合法的高倾角状态。</summary>
     public bool IsSpinning => isSpinning;
 
@@ -71,12 +90,47 @@ public class BikeController : MonoBehaviour
     {
         if (bikeRigidbody == null) bikeRigidbody = GetComponent<Rigidbody2D>();
         bikeRigidbody.centerOfMass = centerOfMass;
+
+        // 没有手动指定的话，直接从关节连接的车轮上取，不需要在 Inspector 里额外拖引用。
+        if (frontWheelVisual == null && frontWheelJoint != null && frontWheelJoint.connectedBody != null)
+            frontWheelVisual = frontWheelJoint.connectedBody.transform;
+        if (backWheelVisual == null && backWheelJoint != null && backWheelJoint.connectedBody != null)
+            backWheelVisual = backWheelJoint.connectedBody.transform;
+
+        frontWheelRadius = GetWheelRadius(frontWheelVisual);
+        backWheelRadius = GetWheelRadius(backWheelVisual);
     }
 
     void Update()
     {
         input = Input.GetAxisRaw("Horizontal");
         HandleJumpAndSpin();
+    }
+
+    void LateUpdate()
+    {
+        // 轮子贴图旋转和物理完全解耦：物理只负责悬挂/驱动，这里单独按实际车速算出该转多少度，
+        // 保证前后轮视觉上转速一致，不受电机转速上限或摩擦力是否跟得上的影响。
+        SpinWheelVisual(frontWheelVisual, frontWheelRadius, ref frontWheelSpinDeg);
+        SpinWheelVisual(backWheelVisual, backWheelRadius, ref backWheelSpinDeg);
+    }
+
+    void SpinWheelVisual(Transform wheel, float radius, ref float accumulatedDeg)
+    {
+        if (wheel == null || radius <= 0f) return;
+
+        float rollSpeed = Vector2.Dot(bikeRigidbody.linearVelocity, transform.right);
+        float angularSpeedDeg = (rollSpeed / radius) * Mathf.Rad2Deg;
+        accumulatedDeg -= angularSpeedDeg * wheelSpinDirection * Time.deltaTime;
+
+        wheel.rotation = Quaternion.Euler(0f, 0f, accumulatedDeg);
+    }
+
+    static float GetWheelRadius(Transform wheel)
+    {
+        if (wheel == null) return 0f;
+        CircleCollider2D wheelCollider = wheel.GetComponent<CircleCollider2D>();
+        return wheelCollider != null ? wheelCollider.radius * wheel.lossyScale.x : 0f;
     }
 
     void HandleJumpAndSpin()
@@ -188,14 +242,31 @@ public class BikeController : MonoBehaviour
             bikeRigidbody.AddTorque(-input * driveDirection * airLeanTorque);
         }
 
-        // 自动回正（PD 控制：弹簧拉回水平 + 阻尼抑制摆动）
+        // 自动回正（PD 控制：弹簧拉回目标角度 + 阻尼抑制摆动）。
+        // 触地时目标角度是当地坡度，不是死磕水平——不然会跟悬挂的天然贴合坡面打架；
+        // 空中没有坡度参考，退回水平，方便落地时姿态可控。
         if (autoBalanceTorque > 0f)
         {
-            float angle = Mathf.DeltaAngle(bikeRigidbody.rotation, 0f);
+            float targetAngle = grounded ? GetGroundSlopeAngle() : 0f;
+            float angle = Mathf.DeltaAngle(bikeRigidbody.rotation, targetAngle);
             float spring = angle * autoBalanceTorque;
             float damping = -bikeRigidbody.angularVelocity * autoBalanceDamping;
             bikeRigidbody.AddTorque((spring + damping) * Time.fixedDeltaTime);
         }
+    }
+
+    float GetGroundSlopeAngle()
+    {
+        Vector2 origin = bikeRigidbody.position;
+        Vector2 forward = transform.right;
+
+        RaycastHit2D backHit = Physics2D.Raycast(origin - forward * slopeProbeOffset, Vector2.down, slopeProbeDistance, groundLayer);
+        RaycastHit2D frontHit = Physics2D.Raycast(origin + forward * slopeProbeOffset, Vector2.down, slopeProbeDistance, groundLayer);
+
+        if (backHit.collider == null || frontHit.collider == null) return 0f;
+
+        Vector2 delta = frontHit.point - backHit.point;
+        return Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
     }
 
     void ClampVelocities()
