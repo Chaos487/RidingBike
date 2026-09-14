@@ -26,6 +26,8 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   摔车结算画面信息不全——目前只显示距离，第 16 节要求的 Score / Best Distance / Highest Combo / Best Trick 都还没有
 -   已知 bug：空中长按空格触发不了旋转、A/D 也不能控制空中姿态，直接卡住"空中特技"这条 P0 核心体验，跟踪在 [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2)
 
+**多条命损毁系统**（`BikeDamageSystem.cs`，不在原设计文档范围内，玩法上的额外改动）：失控判定不再直接结束一局，默认能扛 3 次——第 1 次卸前轮(飞出去)、第 2 次卸 rack，第 3 次才是真摔车结算。**代码已写完并推送，还没有实机测试过**，前轮飞走后的手感、无敌时间/回正参数是否合适都待验证。
+
 **P1 —— 内容与风险**：Event/Landmark Chunk、障碍物组合、Speed Risk、难度曲线，均未开始。上次讨论定了 Chunk 地形的方向（`TerrainChunkData` 复用现有阶段原语拼接；缺口用假谷代替，不做真断开），但还没写代码。
 
 **P2 —— Roguelike**：三选一 Upgrade、Speed/Trick/Control Build、自行车部件构筑、局外 Meta Progression，均未开始。
