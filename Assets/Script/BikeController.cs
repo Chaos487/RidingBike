@@ -42,8 +42,8 @@ public class BikeController : MonoBehaviour
     public float autoBalanceTorque = 25f;
     [Tooltip("回正阻尼，抑制摇摆震荡。")]
     public float autoBalanceDamping = 4f;
-    [Tooltip("地面检测距离（从车身中心向下）。")]
-    public float groundCheckDistance = 0.8f;
+    [Tooltip("地面检测距离（从车身中心向下）。车身静止时车身中心到地面实测大约 0.95 米，这个值必须明显大于它，不然 IsGrounded 永远判定为空中——跳跃、坡度贴合、摔车判定、落地质量全都依赖这个方法。")]
+    public float groundCheckDistance = 1.2f;
     public LayerMask groundLayer = ~0;
 
     [Header("Center Of Mass")]
@@ -222,17 +222,9 @@ public class BikeController : MonoBehaviour
             spaceHoldTime = 0f;
         }
 
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Input.GetKeyDown(KeyCode.Space) && grounded && !isSpinning)
         {
-            // 临时诊断日志:把每次按空格当下的状态都打出来，不管这次跳没跳成——
-            // 方便排查"同时按前进键"时跳跃偶尔不生效，是 grounded 判定在那一帧恰好是 false，
-            // 还是别的原因（比如 isSpinning 意外还是 true）。确认问题后可以删掉。
-            Debug.Log($"[Jump] pressed grounded={grounded} isSpinning={isSpinning} input={input:0.00} rotation={bikeRigidbody.rotation:0.0} angularVel={bikeRigidbody.angularVelocity:0.0} posY={bikeRigidbody.position.y:0.00} velY={bikeRigidbody.linearVelocity.y:0.00}");
-
-            if (grounded && !isSpinning)
-            {
-                Jump();
-            }
+            Jump();
         }
 
         spaceHeld = Input.GetKey(KeyCode.Space);
