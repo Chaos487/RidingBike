@@ -15,9 +15,16 @@ Unity 6 (`6000.0.63f1`) + URP + 2D 物理，目前是 PC
 **P0 —— 核心体验**
 
 -   [x] Landing Quality —— 已实现，见 4.1 节更新
--   [ ] Trick Score
--   [ ] Combo
--   [ ] Near Miss
+-   [x] Trick Score —— 已实现，`TrickSystem.cs` + `TrickSystemSettings`
+-   [x] Combo —— 已实现，`ComboSystem.cs` + `ComboSystemSettings`
+-   [x] Near Miss —— 已实现，`NearMissDetector.cs`（挂在 `ObstacleSpawner` 生成的每个障碍物上）
+
+P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunManager` 已能弹字/显示 Combo 数），但还有几块明确的欠账，暂不算已完成：
+
+-   没有统一的 `ScoreSystem`——Distance、Trick 分数各自独立显示，Combo 目前只是个计数器，并没有像第 6 节要求的那样真正乘到 Trick 分数上
+-   没有"PERFECT!"落地专属弹字——当前只有 Trick 分数弹字，为了不跟它抢显示，落地质量本身暂时没有单独反馈
+-   摔车结算画面信息不全——目前只显示距离，第 16 节要求的 Score / Best Distance / Highest Combo / Best Trick 都还没有
+-   已知 bug：空中长按空格触发不了旋转、A/D 也不能控制空中姿态，直接卡住"空中特技"这条 P0 核心体验，跟踪在 [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2)
 
 **P1 —— 内容与风险**：Event/Landmark Chunk、障碍物组合、Speed Risk、难度曲线，均未开始。上次讨论定了 Chunk 地形的方向（`TerrainChunkData` 复用现有阶段原语拼接；缺口用假谷代替，不做真断开），但还没写代码。
 
@@ -32,7 +39,9 @@ Unity 6 (`6000.0.63f1`) + URP + 2D 物理，目前是 PC
 -   轮子转速视觉与物理解耦，修掉了上坡被顶停的问题
 -   100km/h 提速相关的一系列物理再校准（电机转速上限、驱动扭矩、悬挂稳定性、Fixed Timestep 提到 200Hz）
 -   跳跃力度不够高、車速/坡度对起跳的加成（现在起跳力度会随车速和下坡角度动态变化，见 3.1 节）
--   `IsGrounded()` 的地面检测射线长度不够，导致跳跃/坡度贴合/摔车判定/落地质量在车身静止时全部误判为"在空中"——已推送修复，**还未实机验证**，跟踪在 [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)
+-   `IsGrounded()` 的地面检测射线长度不够，导致跳跃/坡度贴合/摔车判定/落地质量在车身静止时全部误判为"在空中"——已修复并实机验证
+-   摔车判定从距离射线换成前后轮真实物理接触，且要求两轮都触地才判定——修掉了"空中被判摔车"的一批误判（相关背景见 [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)）
+-   `WheelContactSensor` 从 Enter/Exit 配对计数改成按物理步判定，避免地形碰撞体频繁重建导致触地状态卡死——但空中旋转触发/空中姿态控制的问题仍未解决，另开 [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2) 跟踪
 
 ------------------------------------------------------------------------
 
@@ -941,9 +950,9 @@ UpgradeData.cs
 优先完成：
 
 1.  ~~Landing Quality~~ **已完成**
-2.  Trick Score
-3.  Combo
-4.  Near Miss
+2.  ~~Trick Score~~ **已完成**
+3.  ~~Combo~~ **已完成**
+4.  ~~Near Miss~~ **已完成**
 
 目标：
 
@@ -997,15 +1006,21 @@ UpgradeData.cs
 
 # 24. 暂未完成 / Roadmap
 
-已完成（见 4.1 节）：
+已完成（见 0 节、4.1 节）：
 
 -   Landing Quality
-
-目前尚未完成：
-
 -   Trick Score
 -   Combo
 -   Near Miss
+
+P0 范围内仍欠账（见 0 节展开）：
+
+-   统一的 ScoreSystem（Combo 真正影响 Score Multiplier）
+-   "PERFECT!" 落地专属弹字
+-   摔车结算画面的 Score / Best Distance / Highest Combo / Best Trick
+
+目前尚未完成：
+
 -   Event / Landmark Terrain
 -   Speed Risk
 -   Roguelike 三选一 Upgrade
@@ -1019,7 +1034,8 @@ UpgradeData.cs
 
 已知问题（跟踪在 GitHub Issues）：
 
--   [#1](https://github.com/Chaos487/RidingBike/issues/1) `IsGrounded()` 地面检测射线不够长，车身静止时误判为空中——已推送修复，待实机验证
+-   [#1](https://github.com/Chaos487/RidingBike/issues/1) `IsGrounded()` 地面检测射线不够长，车身静止时误判为空中——已修复并实机验证，issue 待手动关闭
+-   [#2](https://github.com/Chaos487/RidingBike/issues/2) 空中长按空格无法触发旋转，A/D 也无法控制空中姿态——待排查
 
 ------------------------------------------------------------------------
 
