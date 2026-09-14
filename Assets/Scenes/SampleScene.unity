@@ -1184,26 +1184,40 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a10d59204f23344d8bf54a1bb0692b0c, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   backWheelJoint: {fileID: 1623591421}
   frontWheelJoint: {fileID: 1623591422}
   bikeRigidbody: {fileID: 1623591423}
-  maxMotorSpeed: 1200
-  motorAcceleration: 2400
-  driveTorque: 800
-  brakeTorque: 400
+  maxMotorSpeed: 2800
+  cruiseMotorAcceleration: 3000
+  cruiseTorque: 2000
   driveDirection: -1
-  maxLinearSpeed: 7
+  baselineSpeedKmh: 25
+  boostRechargeDistance: 150
+  boostSpeedBonusKmh: 40
+  boostDecayPerSecondKmh: 30
+  maxSpeedKmh: 100
   maxAngularSpeed: 400
   airLeanTorque: 30
   autoBalanceTorque: 25
   autoBalanceDamping: 4
-  groundCheckDistance: 0.8
+  groundCheckDistance: 1.2
   groundLayer:
     serializedVersion: 2
     m_Bits: 4294967295
   centerOfMass: {x: 0, y: -0.5}
+  slopeProbeOffset: 0.8
+  slopeProbeDistance: 2
+  frontWheelVisual: {fileID: 0}
+  backWheelVisual: {fileID: 0}
+  wheelSpinDirection: 1
+  jumpForce: 18
+  speedJumpBonus: 8
+  downhillJumpBonus: 6
+  maxDownhillAngleForBonus: 20
+  spinHoldThreshold: 0.15
+  spinAngularSpeed: 720
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
