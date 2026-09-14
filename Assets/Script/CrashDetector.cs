@@ -2,22 +2,23 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// 摔车判定:车身触地且倾角超过阈值、并持续一小段时间后判定为摔车。
-/// 触地用 BikeController.IsWheelGrounded(前后轮真实物理接触),不用距离射线——
-/// 射线只代表"车身中心离地面够近",滞空高度不够大时会在还没真正落地前就先报"触地",
-/// 从而在飞行中被误判成摔车;真实轮胎接触则不存在这个问题,没碰到就是没碰到。
+/// 摔车判定:前后轮都真实触地、且车身倾角超过阈值、并持续一小段时间后判定为摔车。
+/// 触地用真实物理接触(WheelContactSensor),不用距离射线——射线只代表"车身中心离地面够近",
+/// 滞空高度不够大时会在还没真正落地前就先报"触地",从而在飞行中被误判成摔车。
+/// 必须两个轮子都触地才开始判定,只有一个轮子(比如起跳瞬间后轮还没离地、或落地时前轮先/后轮先着地)
+/// 是正常的过渡姿态,车身倾角本来就会比较大,不代表摔车。
 /// </summary>
 public class CrashDetector : MonoBehaviour
 {
     [Header("References")]
     public Rigidbody2D bikeRigidbody;
-    [Tooltip("用来读取真实轮胎接触状态(IsWheelGrounded),以及排除主动触发的空中 360 旋转,避免转体过程中被误判成摔车。")]
+    [Tooltip("用来读取前后轮真实触地状态,以及排除主动触发的空中 360 旋转,避免转体过程中被误判成摔车。")]
     public BikeController bikeController;
 
     [Header("Crash Rule")]
-    [Tooltip("车身倾角超过该值(度)且触地时视为失控。")]
+    [Tooltip("车身倾角超过该值(度)且两轮都触地时视为失控。")]
     public float tiltThreshold = 65f;
-    [Tooltip("触地状态需要连续保持这么久才开始看倾角,防止落地瞬间轮胎接触碰撞体的单帧抖动被误判。")]
+    [Tooltip("两轮都触地的状态需要连续保持这么久才开始看倾角,防止接触碰撞体的单帧抖动被误判。")]
     public float groundSettleTime = 0.05f;
     [Tooltip("落地之后，倾角超限需要再持续这么久才真正判定摔车,给玩家一点救车的余地。")]
     public float crashConfirmTime = 0.15f;
@@ -39,11 +40,13 @@ public class CrashDetector : MonoBehaviour
             return;
         }
 
-        bool grounded = bikeController != null && bikeController.IsWheelGrounded;
+        bool bothWheelsGrounded = bikeController != null
+            && bikeController.FrontWheelContact != null && bikeController.FrontWheelContact.IsGrounded
+            && bikeController.BackWheelContact != null && bikeController.BackWheelContact.IsGrounded;
 
-        if (!grounded)
+        if (!bothWheelsGrounded)
         {
-            // 空中完全不判定摔车——轮胎没真的碰到地面,不管倾角多大都放行(比如主动出的空翻)。
+            // 只要有一个轮子还没触地——空中,或者起跳/落地的单轮过渡瞬间——都不判定摔车。
             groundedTime = 0f;
             overTiltTime = 0f;
             return;
