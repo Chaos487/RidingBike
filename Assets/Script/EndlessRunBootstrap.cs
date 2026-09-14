@@ -59,12 +59,16 @@ public static class EndlessRunBootstrap
         crashDetector.bikeRigidbody = bike.bikeRigidbody != null ? bike.bikeRigidbody : bike.GetComponent<Rigidbody2D>();
         crashDetector.bikeController = bike;
 
+        BikeDamageSystem damageSystem = systems.AddComponent<BikeDamageSystem>();
+        damageSystem.ApplySettings(FindSettings<BikeDamageSettings>());
+        damageSystem.Initialize(bike, crashDetector);
+
         RunManager runManager = systems.AddComponent<RunManager>();
-        runManager.Initialize(bike.transform, crashDetector, bike);
+        runManager.Initialize(bike.transform, damageSystem, bike);
 
         LandingDetector landingDetector = systems.AddComponent<LandingDetector>();
         landingDetector.ApplySettings(FindSettings<LandingDetectorSettings>());
-        landingDetector.Initialize(bike, bike.FrontWheelContact, bike.BackWheelContact);
+        landingDetector.Initialize(bike);
 
         TrickSystem trickSystem = systems.AddComponent<TrickSystem>();
         trickSystem.ApplySettings(FindSettings<TrickSystemSettings>());
@@ -76,10 +80,10 @@ public static class EndlessRunBootstrap
 
         runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner);
 
-        SetupCamera(bike, crashDetector, landingDetector);
+        SetupCamera(bike, damageSystem, landingDetector);
     }
 
-    static void SetupCamera(BikeController bike, CrashDetector crashDetector, LandingDetector landingDetector)
+    static void SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)
     {
         CinemachineCamera cmCamera = Object.FindFirstObjectByType<CinemachineCamera>();
         if (cmCamera == null) return;
@@ -95,7 +99,7 @@ public static class EndlessRunBootstrap
 
         CameraDirector cameraDirector = cmCamera.gameObject.AddComponent<CameraDirector>();
         cameraDirector.ApplySettings(FindSettings<CameraDirectorSettings>());
-        cameraDirector.Initialize(bike, crashDetector, impulseSource, landingDetector);
+        cameraDirector.Initialize(bike, damageSystem, impulseSource, landingDetector);
     }
 
     // 优先在编辑器里按类型搜整个 Assets(不要求放在 Resources 目录下,创建在哪里都能找到);

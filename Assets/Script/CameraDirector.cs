@@ -18,7 +18,7 @@ public class CameraDirector : MonoBehaviour
     CinemachinePositionComposer composer;
     CinemachineImpulseSource impulseSource;
     BikeController bike;
-    CrashDetector crashDetector;
+    BikeDamageSystem damageSystem;
     LandingDetector landingDetector;
 
     float minOrthoSize = 2.4f;
@@ -34,6 +34,7 @@ public class CameraDirector : MonoBehaviour
     float crashZoomDuration = 0.12f;
     Ease crashZoomEase = Ease.OutBack;
     float crashShakeAmplitude = 0.6f;
+    float partialDamageShakeAmplitude = 0.25f;
 
     float landingPunchAmount = 0.12f;
     float landingPunchInDuration = 0.08f;
@@ -65,13 +66,14 @@ public class CameraDirector : MonoBehaviour
         lastZoomTarget = cmCamera.Lens.OrthographicSize;
     }
 
-    public void Initialize(BikeController bikeController, CrashDetector detector, CinemachineImpulseSource impulse, LandingDetector landing)
+    public void Initialize(BikeController bikeController, BikeDamageSystem bikeDamageSystem, CinemachineImpulseSource impulse, LandingDetector landing)
     {
         bike = bikeController;
-        crashDetector = detector;
+        damageSystem = bikeDamageSystem;
         impulseSource = impulse;
         landingDetector = landing;
-        crashDetector.OnCrash += HandleCrash;
+        damageSystem.OnFinalCrash += HandleFinalCrash;
+        damageSystem.OnPartialDamage += HandlePartialDamage;
         landingDetector.OnLanded += HandleLanded;
     }
 
@@ -90,6 +92,7 @@ public class CameraDirector : MonoBehaviour
         crashZoomDuration = settings.crashZoomDuration;
         crashZoomEase = settings.crashZoomEase;
         crashShakeAmplitude = settings.crashShakeAmplitude;
+        partialDamageShakeAmplitude = settings.partialDamageShakeAmplitude;
         landingPunchAmount = settings.landingPunchAmount;
         landingPunchInDuration = settings.landingPunchInDuration;
         landingPunchOutDuration = settings.landingPunchOutDuration;
@@ -219,7 +222,7 @@ public class CameraDirector : MonoBehaviour
         });
     }
 
-    void HandleCrash()
+    void HandleFinalCrash()
     {
         isCrashed = true;
 
@@ -237,12 +240,26 @@ public class CameraDirector : MonoBehaviour
         }
     }
 
+    // 部分损毁(掉零件但没结束这一局)只给一次轻微震动，镜头照常跟随/缩放，
+    // 不做上面那套"接管定格"——玩家需要立刻感觉到自己还能继续骑。
+    void HandlePartialDamage(BikeDamageSystem.DamagedPart part, int livesRemaining)
+    {
+        if (impulseSource != null)
+        {
+            impulseSource.GenerateImpulse(partialDamageShakeAmplitude);
+        }
+    }
+
     void OnDestroy()
     {
         zoomTweener?.Kill();
         lookaheadTweener?.Kill();
         landingPunchSequence?.Kill();
-        if (crashDetector != null) crashDetector.OnCrash -= HandleCrash;
+        if (damageSystem != null)
+        {
+            damageSystem.OnFinalCrash -= HandleFinalCrash;
+            damageSystem.OnPartialDamage -= HandlePartialDamage;
+        }
         if (landingDetector != null) landingDetector.OnLanded -= HandleLanded;
     }
 }

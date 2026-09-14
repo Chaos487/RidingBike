@@ -14,7 +14,7 @@ public class RunManager : MonoBehaviour
     public float toastFadeSeconds = 0.4f;
 
     Transform bikeTransform;
-    CrashDetector crashDetector;
+    BikeDamageSystem damageSystem;
     BikeController bikeController;
     TrickSystem trickSystem;
     ComboSystem comboSystem;
@@ -36,13 +36,14 @@ public class RunManager : MonoBehaviour
         BuildUI();
     }
 
-    public void Initialize(Transform bike, CrashDetector detector, BikeController controller)
+    public void Initialize(Transform bike, BikeDamageSystem bikeDamageSystem, BikeController controller)
     {
         bikeTransform = bike;
-        crashDetector = detector;
+        damageSystem = bikeDamageSystem;
         bikeController = controller;
         startX = bikeTransform.position.x;
-        crashDetector.OnCrash += HandleCrash;
+        damageSystem.OnFinalCrash += HandleCrash;
+        damageSystem.OnPartialDamage += HandlePartialDamage;
     }
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
@@ -97,6 +98,12 @@ public class RunManager : MonoBehaviour
     void HandleNearMiss()
     {
         ShowToast("NEAR MISS!");
+    }
+
+    void HandlePartialDamage(BikeDamageSystem.DamagedPart part, int livesRemaining)
+    {
+        string partName = part == BikeDamageSystem.DamagedPart.FrontWheel ? "前轮飞了" : "货架掉了";
+        ShowToast($"{partName}! 还剩 {livesRemaining} 条命");
     }
 
     void HandleComboChanged(int comboCount)

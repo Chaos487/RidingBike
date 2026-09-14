@@ -23,19 +23,15 @@ public class LandingDetector : MonoBehaviour
     float simultaneousContactWindow = 0.05f;
 
     BikeController bike;
-    WheelContactSensor frontSensor;
-    WheelContactSensor backSensor;
 
     bool wasGrounded = true;
 
     /// <summary>每次判定出一次"刚落地"时触发,带质量分级和前后轮接触顺序。</summary>
     public event Action<Quality, ContactOrder> OnLanded;
 
-    public void Initialize(BikeController bikeController, WheelContactSensor front, WheelContactSensor back)
+    public void Initialize(BikeController bikeController)
     {
         bike = bikeController;
-        frontSensor = front;
-        backSensor = back;
         wasGrounded = bike.IsWheelGrounded;
     }
 
@@ -95,8 +91,12 @@ public class LandingDetector : MonoBehaviour
         OnLanded?.Invoke(quality, order);
     }
 
+    // 实时读 bike.FrontWheelContact/BackWheelContact,不缓存——前轮被 BikeDamageSystem
+    // 卸掉之后这个引用会变成 null,缓存的话会一直拿着已经飞出去的旧轮子的接触记录判定顺序。
     ContactOrder DetermineContactOrder()
     {
+        WheelContactSensor frontSensor = bike.FrontWheelContact;
+        WheelContactSensor backSensor = bike.BackWheelContact;
         if (frontSensor == null || backSensor == null) return ContactOrder.Simultaneous;
 
         float diff = frontSensor.LastGroundedTime - backSensor.LastGroundedTime;

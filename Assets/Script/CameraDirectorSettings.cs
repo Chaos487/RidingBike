@@ -34,6 +34,8 @@ public class CameraDirectorSettings : ScriptableObject
     public Ease crashZoomEase = Ease.OutBack;
     [Tooltip("摔车瞬间叠加的镜头抖动强度(传给 CinemachineImpulseSource.GenerateImpulse 的 force)。建议偏小，太猛会让玩家看不清发生了什么，具体的抖动时长/频率在 Impulse Source 组件自己的默认曲线上调。")]
     public float crashShakeAmplitude = 0.6f;
+    [Tooltip("部分损毁(掉零件但没结束这一局)时的镜头抖动强度，建议明显小于 crashShakeAmplitude，突出\"这次比真摔车轻\"。")]
+    public float partialDamageShakeAmplitude = 0.25f;
 
     [Header("落地回弹")]
     [Tooltip("非摔车的正常落地，给一个很小的镜头回弹表示冲击。")]
