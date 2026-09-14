@@ -238,6 +238,11 @@ public class BikeController : MonoBehaviour
 
     void Jump()
     {
+        // 车身完全静止一段时间后 Rigidbody2D 会休眠(Time To Sleep 默认 0.5 秒)，
+        // 休眠状态下设置 linearVelocity/AddForce 不一定能可靠唤醒它，导致跳跃冲量没有效果。
+        // 显式唤醒一下，不管是不是真的在睡，零开销零副作用。
+        bikeRigidbody.WakeUp();
+
         Vector2 v = bikeRigidbody.linearVelocity;
         v.y = 0f;
         bikeRigidbody.linearVelocity = v;
