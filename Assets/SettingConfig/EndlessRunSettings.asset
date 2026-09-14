@@ -17,20 +17,20 @@ MonoBehaviour:
   sampleSpacing: 0.4
   startFlatLength: 20
   groundThickness: 3
-  minFlatLength: 4
-  maxFlatLength: 12
+  minFlatLength: 5
+  maxFlatLength: 20
   minUphillLength: 15
   maxUphillLength: 35
-  minDownhillLength: 15
-  maxDownhillLength: 35
-  minHillHeight: 2
-  maxHillHeight: 5
+  minDownhillLength: 50
+  maxDownhillLength: 100
+  minHillHeight: 3
+  maxHillHeight: 20
   obstacleCheckIntervalMin: 6
   obstacleCheckIntervalMax: 12
   flatAngleThreshold: 5
   edgeRadius: 0.1
   groundColor: {r: 0.35, g: 0.6, b: 0.25, a: 1}
-  obstacleSpawnChance: 0.5
+  obstacleSpawnChance: 0.42
   obstacleMinGap: 6
   skipObstaclesOnUphill: 1
   obstacleSize: {x: 0.6, y: 0.4}
