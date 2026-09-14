@@ -65,8 +65,14 @@ public class BikeController : MonoBehaviour
     public float wheelSpinDirection = 1f;
 
     [Header("Jump / Spin")]
-    [Tooltip("跳跃瞬间冲量。这个值算出来的跳跃高度必须明显超过 groundCheckDistance，不然 IsGrounded 全程判定为触地，跳跃等于没发生。")]
+    [Tooltip("起跳基础冲量(静止、平地起跳时的力度)。这个值算出来的跳跃高度必须明显超过 groundCheckDistance，不然 IsGrounded 全程判定为触地，跳跃等于没发生。")]
     public float jumpForce = 18f;
+    [Tooltip("车速对起跳力度的加成上限，满速起跳时在基础值上加这么多——车越快，跳得越高。")]
+    public float speedJumpBonus = 8f;
+    [Tooltip("下坡起跳的额外加成上限，坡度达到/超过 maxDownhillAngleForBonus 时在(基础值+车速加成)上再加这么多——模拟冲下坡道被\"弹\"得更高更远、滞空更久的感觉；水平速度本来就是保留的，跳得越高滞空越久，自然就冲得越远。")]
+    public float downhillJumpBonus = 6f;
+    [Tooltip("下坡角度(度)达到这个值就算\"满额\"下坡加成，0 到这个值之间线性插值；只在下坡时生效，平地/上坡起跳没有这份加成。")]
+    public float maxDownhillAngleForBonus = 20f;
     [Tooltip("空中按住空格多久后触发 360 度旋转（秒）。")]
     public float spinHoldThreshold = 0.15f;
     [Tooltip("旋转时的角速度 (deg/s)，越大转得越快。")]
@@ -243,10 +249,17 @@ public class BikeController : MonoBehaviour
         // 显式唤醒一下，不管是不是真的在睡，零开销零副作用。
         bikeRigidbody.WakeUp();
 
+        // 车速越快、下坡越陡，起跳力度越大——水平速度全程保留不变，跳得越高就滞空越久，
+        // 同样的水平速度乘上更长的滞空时间，自然就冲得更远，不需要额外再加一套"滞空时间"逻辑。
+        float speedRatio = Mathf.Clamp01(Mathf.Abs(bikeRigidbody.linearVelocity.x) / Mathf.Max(MaxLinearSpeed, 0.01f));
+        float slopeAngle = GetGroundSlopeAngle(); // 正值=上坡，负值=下坡
+        float downhillRatio = Mathf.Clamp01(-slopeAngle / Mathf.Max(maxDownhillAngleForBonus, 0.01f));
+        float effectiveJumpForce = jumpForce + speedJumpBonus * speedRatio + downhillJumpBonus * downhillRatio;
+
         Vector2 v = bikeRigidbody.linearVelocity;
         v.y = 0f;
         bikeRigidbody.linearVelocity = v;
-        bikeRigidbody.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+        bikeRigidbody.AddForce(Vector2.up * effectiveJumpForce, ForceMode2D.Impulse);
     }
 
     void StartSpin()
