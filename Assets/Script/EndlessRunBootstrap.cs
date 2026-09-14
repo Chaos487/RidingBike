@@ -58,8 +58,6 @@ public static class EndlessRunBootstrap
         CrashDetector crashDetector = systems.AddComponent<CrashDetector>();
         crashDetector.bikeRigidbody = bike.bikeRigidbody != null ? bike.bikeRigidbody : bike.GetComponent<Rigidbody2D>();
         crashDetector.bikeController = bike;
-        crashDetector.groundCheckDistance = bike.groundCheckDistance;
-        crashDetector.groundLayer = bike.groundLayer;
 
         RunManager runManager = systems.AddComponent<RunManager>();
         runManager.Initialize(bike.transform, crashDetector, bike);

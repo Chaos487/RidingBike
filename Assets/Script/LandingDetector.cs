@@ -36,7 +36,7 @@ public class LandingDetector : MonoBehaviour
         bike = bikeController;
         frontSensor = front;
         backSensor = back;
-        wasGrounded = bike.IsGrounded();
+        wasGrounded = bike.IsWheelGrounded;
     }
 
     public void ApplySettings(LandingDetectorSettings settings)
@@ -56,7 +56,7 @@ public class LandingDetector : MonoBehaviour
     {
         if (bike == null) return;
 
-        bool grounded = bike.IsGrounded();
+        bool grounded = bike.IsWheelGrounded;
         if (!wasGrounded && grounded)
         {
             EvaluateLanding();

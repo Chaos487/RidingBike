@@ -122,6 +122,13 @@ public class BikeController : MonoBehaviour
     public WheelContactSensor FrontWheelContact { get; private set; }
     public WheelContactSensor BackWheelContact { get; private set; }
 
+    /// <summary>前后轮是否有任意一个真的物理接触到地面。跳跃/旋转的滞空状态机、落地判定、摔车判定都应该用这个，
+    /// 不要用下面 IsGrounded() 的距离射线——射线只代表"车身中心离地面够近"，滞空高度不够高时
+    /// 射线在还没真正腾空/落地的时候就会先报"触地"，导致旋转被提前打断、摔车在空中被误判。</summary>
+    public bool IsWheelGrounded =>
+        (FrontWheelContact != null && FrontWheelContact.IsGrounded) ||
+        (BackWheelContact != null && BackWheelContact.IsGrounded);
+
     /// <summary>本次滞空期间已经累计转了多少度(持续按空格会一直累加，松手或落地才停)。外部系统(比如特技计分)据此判定转出了哪一档。</summary>
     public float SpinAccumulatedDegrees => spinAccumulatedDeg;
 
@@ -247,9 +254,13 @@ public class BikeController : MonoBehaviour
 
     void HandleJumpAndSpin()
     {
-        bool grounded = IsGrounded();
+        // 起跳判定继续用射线：容忍度高，手感响应快，误判方向是"以为还在地上"，最多多给一次跳跃机会，不危险。
+        bool groundedForJump = IsGrounded();
+        // 旋转/滞空状态机改用真实轮胎接触：这里误判方向必须是"以为还在空中"才安全——
+        // 用射线的话，滞空高度不够大时会在真正腾空/落地前就先报"触地"，把旋转提前打断。
+        bool groundedForAirtime = IsWheelGrounded;
 
-        if (grounded)
+        if (groundedForAirtime)
         {
             isSpinning = false;
             hasSpunThisAirtime = false;
@@ -260,15 +271,15 @@ public class BikeController : MonoBehaviour
             // 刚离地，开始新一次滞空——清零上次的旋转计数，避免特技系统读到上一次滞空的残留角度。
             spinAccumulatedDeg = 0f;
         }
-        wasGroundedForSpin = grounded;
+        wasGroundedForSpin = groundedForAirtime;
 
-        if (Input.GetKeyDown(KeyCode.Space) && grounded && !isSpinning)
+        if (Input.GetKeyDown(KeyCode.Space) && groundedForJump && !isSpinning)
         {
             Jump();
         }
 
         spaceHeld = Input.GetKey(KeyCode.Space);
-        if (spaceHeld && !grounded && !isSpinning && !hasSpunThisAirtime)
+        if (spaceHeld && !groundedForAirtime && !isSpinning && !hasSpunThisAirtime)
         {
             spaceHoldTime += Time.deltaTime;
             if (spaceHoldTime >= spinHoldThreshold)
