@@ -65,8 +65,8 @@ public class BikeController : MonoBehaviour
     public float wheelSpinDirection = 1f;
 
     [Header("Jump / Spin")]
-    [Tooltip("跳跃瞬间冲量。")]
-    public float jumpForce = 8f;
+    [Tooltip("跳跃瞬间冲量。这个值算出来的跳跃高度必须明显超过 groundCheckDistance，不然 IsGrounded 全程判定为触地，跳跃等于没发生。")]
+    public float jumpForce = 18f;
     [Tooltip("空中按住空格多久后触发 360 度旋转（秒）。")]
     public float spinHoldThreshold = 0.15f;
     [Tooltip("旋转时的角速度 (deg/s)，越大转得越快。")]
