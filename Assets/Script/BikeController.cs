@@ -21,6 +21,10 @@ public class BikeController : MonoBehaviour
     [Header("保底前进速度")]
     [Tooltip("车速永远不会低于这个值 (km/h)——不管坡多陡，ClampVelocities 里会直接把速度钳在这个值以上。")]
     public float baselineSpeedKmh = 25f;
+    [Tooltip("车速低于保底时，每秒最多把速度往回拉这么多 (m/s²)。不能直接每步瞬间钉死在保底值——" +
+             "物理算出来的实际速度经常在保底附近小幅波动，硬 Clamp 会导致有的步什么都不做、有的步瞬间拉回一截，" +
+             "这种来回横跳就是前进感觉\"一卡一卡\"的根源；改成限速追赶后，追回保底的过程本身也是平滑的。")]
+    public float floorRecoverAcceleration = 60f;
 
     [Header("Boost (Shift 氮气加速，一次性瞬间加速+随时间衰减，按行驶距离充能)")]
     [Tooltip("充能一次需要行驶多远 (米)。从上次使用/游戏开始算起，累计前进这么远才能再按 Shift。")]
@@ -455,12 +459,19 @@ public class BikeController : MonoBehaviour
     {
         float maxLinearSpeed = MaxLinearSpeed;
 
-        // 保底前进速度是硬下限：不管坡多陡、有没有被撞得一时减速，只要游戏还在继续就直接把速度钳回这个值以上。
+        // 保底前进速度是硬下限：不管坡多陡、有没有被撞得一时减速，最终都不会低于这个值。
         // boost 加成叠加在保底之上、一起被 maxLinearSpeed 封顶，衰减到 0 之后自然回落到纯保底速度。
         float floorSpeed = Mathf.Min(((baselineSpeedKmh + currentBoostBonusKmh) / 3.6f), maxLinearSpeed);
 
         Vector2 v = bikeRigidbody.linearVelocity;
-        v.x = Mathf.Clamp(v.x, floorSpeed, maxLinearSpeed);
+        // 上限直接封顶没问题——很少触发，且是"多余速度被削掉"，不会有回弹感。
+        // 下限不能直接 Clamp：物理算出来的速度经常在保底附近小幅波动，硬 Clamp 每步要么不做要么瞬间拉回一截，
+        // 这种来回横跳正是前进"一卡一卡"的根源，改成按 floorRecoverAcceleration 限速追赶。
+        v.x = Mathf.Min(v.x, maxLinearSpeed);
+        if (v.x < floorSpeed)
+        {
+            v.x = Mathf.MoveTowards(v.x, floorSpeed, floorRecoverAcceleration * Time.fixedDeltaTime);
+        }
         bikeRigidbody.linearVelocity = v;
 
         if (!isSpinning)

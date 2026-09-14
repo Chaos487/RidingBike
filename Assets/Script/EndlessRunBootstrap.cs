@@ -93,7 +93,12 @@ public static class EndlessRunBootstrap
         GameObject backgroundGO = new GameObject("Background");
         BackgroundScroller scroller = backgroundGO.AddComponent<BackgroundScroller>();
         scroller.backgroundSprite = backgroundSprite;
-        scroller.trackTarget = bike.transform;
+
+        // 跟摄像机而不是车身:Cinemachine 的 Follow 阻尼本来就会把车身物理位置的抖动
+        // 平滑掉,背景跟摄像机走等于免费继承这份平滑,不需要另外搭一个"平滑锚点"。
+        // 摄像机的 look-ahead 偏移也会跟着算进去,背景对齐视野中心反而更准。
+        Camera mainCamera = Camera.main;
+        scroller.trackTarget = mainCamera != null ? mainCamera.transform : bike.transform;
     }
 
     static void SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)

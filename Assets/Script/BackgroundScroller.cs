@@ -14,7 +14,9 @@ public class BackgroundScroller : MonoBehaviour
 {
     [Tooltip("背景图,一张不透明的天空+远景一体图。")]
     public Sprite backgroundSprite;
-    [Tooltip("跟随的目标,通常是 Bike——镜头本来就是跟它走的，直接用它避免额外的更新时序问题。")]
+    [Tooltip("跟随的目标,推荐用主摄像机的 Transform 而不是车身——Cinemachine 的 Follow 阻尼本来就会" +
+             "把车身物理位置的小幅波动/抖动平滑掉，背景跟摄像机走等于免费继承这份平滑，" +
+             "不需要额外搭一个\"平滑锚点\"；摄像机的 look-ahead 偏移也会被自然带进来，背景对齐视野中心更准。")]
     public Transform trackTarget;
     [Tooltip("整块背景图额外放大的倍数。放大是为了保证在最大缩放(空中+加速镜头拉到最远)时，" +
              "背景的高度依然能盖满整个可视区域，不会在画面上下露出空白——需要大于等于" +
