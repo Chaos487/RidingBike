@@ -1,8 +1,10 @@
+using System;
 using UnityEngine;
 
 /// <summary>
 /// 订阅 EndlessTerrainGenerator.OnGroundSampled,按概率在采样点上放置障碍物。
 /// 障碍物是普通的实心 2D 碰撞体,摔车与否完全交给物理引擎和 CrashDetector 判定,这里不做任何脚本化的冲量。
+/// 每个障碍物还会附带一个比实心碰撞体大一圈的触发区(NearMissDetector),用来判定"贴身擦过"。
 /// </summary>
 public class ObstacleSpawner : MonoBehaviour
 {
@@ -20,6 +22,13 @@ public class ObstacleSpawner : MonoBehaviour
     public Color obstacleColor = new Color(0.5f, 0.35f, 0.2f);
     [Tooltip("碰撞体圆角半径。方块直角会让高速经过的轮子在棱角处被解算出巨大冲量,把悬挂拉爆,所以要把角磨圆。")]
     public float edgeRadius = 0.08f;
+
+    [Header("Near Miss")]
+    [Tooltip("贴身擦过判定区比实心碰撞体各边多出多少(米)，车轮进这个区又出去、期间没真的撞上实心碰撞体就算一次 Near Miss。")]
+    public float nearMissMargin = 0.5f;
+
+    /// <summary>任意一个障碍物判定出一次贴身擦过时触发。</summary>
+    public event Action OnNearMiss;
 
     Material sharedMaterial;
     float lastObstacleX = float.NegativeInfinity;
@@ -70,6 +79,14 @@ public class ObstacleSpawner : MonoBehaviour
         box.size = obstacleSize;
         box.offset = new Vector2(0f, obstacleSize.y * 0.5f);
         box.edgeRadius = edgeRadius;
+
+        BoxCollider2D nearMissBox = obstacle.AddComponent<BoxCollider2D>();
+        nearMissBox.isTrigger = true;
+        nearMissBox.size = obstacleSize + new Vector2(nearMissMargin * 2f, nearMissMargin * 2f);
+        nearMissBox.offset = box.offset;
+
+        NearMissDetector detector = obstacle.AddComponent<NearMissDetector>();
+        detector.OnNearMiss += () => OnNearMiss?.Invoke();
     }
 
     static Mesh BuildBoxMesh(Vector2 size)

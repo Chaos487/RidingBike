@@ -20,6 +20,13 @@ public static class EndlessRunBootstrap
 
     static void Setup()
     {
+        // Near Miss 判定区比实心碰撞体大一圈、用 isTrigger 实现；这个项目里 Physics2D 的
+        // queriesHitTriggers 是开着的(项目默认)，不关掉的话 IsGrounded/坡度探测这些射线
+        // 会把"贴近但没撞到"的触发区也当成地面命中，产生假阳性的触地判定。
+        // 这个开关只影响 Raycast/Overlap 这类主动查询，不影响 OnTriggerEnter/Exit 回调，
+        // 所以关掉之后 NearMissDetector 完全不受影响。
+        Physics2D.queriesHitTriggers = false;
+
         BikeController bike = Object.FindFirstObjectByType<BikeController>();
         if (bike == null) return;
 
@@ -60,6 +67,16 @@ public static class EndlessRunBootstrap
         LandingDetector landingDetector = systems.AddComponent<LandingDetector>();
         landingDetector.ApplySettings(FindSettings<LandingDetectorSettings>());
         landingDetector.Initialize(bike, bike.FrontWheelContact, bike.BackWheelContact);
+
+        TrickSystem trickSystem = systems.AddComponent<TrickSystem>();
+        trickSystem.ApplySettings(FindSettings<TrickSystemSettings>());
+        trickSystem.Initialize(bike, landingDetector);
+
+        ComboSystem comboSystem = systems.AddComponent<ComboSystem>();
+        comboSystem.ApplySettings(FindSettings<ComboSystemSettings>());
+        comboSystem.Initialize(landingDetector, obstacleSpawner, crashDetector);
+
+        runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner);
 
         SetupCamera(bike, crashDetector, landingDetector);
     }

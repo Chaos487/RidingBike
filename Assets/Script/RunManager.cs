@@ -1,20 +1,33 @@
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// 管理单局 endless run 的状态:显示距离、监听摔车、结算并支持按 R 重开。
+/// 管理单局 endless run 的状态:显示距离/时速/氮气就绪状态/连击数、弹出特技/贴身险提示、
+/// 监听摔车、结算并支持按 R 重开。
 /// </summary>
 public class RunManager : MonoBehaviour
 {
+    [Header("Toast")]
+    public float toastHoldSeconds = 1f;
+    public float toastFadeSeconds = 0.4f;
+
     Transform bikeTransform;
     CrashDetector crashDetector;
     BikeController bikeController;
+    TrickSystem trickSystem;
+    ComboSystem comboSystem;
+    ObstacleSpawner obstacleSpawner;
 
     Text distanceText;
     Text speedText;
     Text boostText;
+    Text comboText;
+    Text toastText;
     Text statusText;
+
+    Tweener toastTweener;
     float startX;
     bool runEnded;
 
@@ -30,6 +43,20 @@ public class RunManager : MonoBehaviour
         bikeController = controller;
         startX = bikeTransform.position.x;
         crashDetector.OnCrash += HandleCrash;
+    }
+
+    /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
+    /// EndlessRunBootstrap 里这两个系统要在 RunManager 之后才创建(它们依赖 LandingDetector)。</summary>
+    public void InitializeFeedback(TrickSystem trick, ComboSystem combo, ObstacleSpawner obstacles)
+    {
+        trickSystem = trick;
+        comboSystem = combo;
+        obstacleSpawner = obstacles;
+
+        trickSystem.OnTrickScored += HandleTrickScored;
+        trickSystem.OnTrickFailed += HandleTrickFailed;
+        comboSystem.OnComboChanged += HandleComboChanged;
+        obstacleSpawner.OnNearMiss += HandleNearMiss;
     }
 
     void Update()
@@ -55,6 +82,40 @@ public class RunManager : MonoBehaviour
                 ? "氮气: 就绪 (Shift)"
                 : $"氮气: 还差 {bikeController.DistanceUntilBoostReady:0} m";
         }
+    }
+
+    void HandleTrickScored(int score, float degrees)
+    {
+        ShowToast($"{degrees:0}°  +{score}");
+    }
+
+    void HandleTrickFailed(float degrees)
+    {
+        ShowToast($"特技失败 ({degrees:0}°)");
+    }
+
+    void HandleNearMiss()
+    {
+        ShowToast("NEAR MISS!");
+    }
+
+    void HandleComboChanged(int comboCount)
+    {
+        comboText.text = comboCount > 0 ? $"连击 x{comboCount}" : string.Empty;
+    }
+
+    void ShowToast(string message)
+    {
+        toastTweener?.Kill();
+
+        toastText.text = message;
+        Color c = toastText.color;
+        c.a = 1f;
+        toastText.color = c;
+
+        toastTweener = DOTween.Sequence()
+            .AppendInterval(toastHoldSeconds)
+            .Append(toastText.DOFade(0f, toastFadeSeconds));
     }
 
     void HandleCrash()
@@ -89,6 +150,10 @@ public class RunManager : MonoBehaviour
         distanceText = CreateText(canvasGO.transform, "DistanceText", new Vector2(0f, 1f), new Vector2(20f, -20f), 220f, 24, TextAnchor.UpperLeft);
         speedText = CreateText(canvasGO.transform, "SpeedText", new Vector2(0f, 1f), new Vector2(240f, -20f), 220f, 24, TextAnchor.UpperLeft);
         boostText = CreateText(canvasGO.transform, "BoostText", new Vector2(0f, 1f), new Vector2(20f, -50f), 300f, 22, TextAnchor.UpperLeft);
+        comboText = CreateText(canvasGO.transform, "ComboText", new Vector2(0f, 1f), new Vector2(20f, -80f), 300f, 22, TextAnchor.UpperLeft);
+
+        toastText = CreateText(canvasGO.transform, "ToastText", new Vector2(0.5f, 1f), new Vector2(0f, -140f), 600f, 36, TextAnchor.UpperCenter);
+        toastText.text = string.Empty;
 
         statusText = CreateText(canvasGO.transform, "StatusText", new Vector2(0.5f, 0.5f), Vector2.zero, 500f, 32, TextAnchor.MiddleCenter);
         statusText.gameObject.SetActive(false);

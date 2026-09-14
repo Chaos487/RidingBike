@@ -92,8 +92,9 @@ public class BikeController : MonoBehaviour
     float spaceHoldTime;
     bool isSpinning;
     bool hasSpunThisAirtime;
-    float spinRemaining;
     float spinDirection;
+    float spinAccumulatedDeg;
+    bool wasGroundedForSpin = true;
 
     float frontWheelRadius;
     float backWheelRadius;
@@ -120,6 +121,9 @@ public class BikeController : MonoBehaviour
     /// <summary>前 / 后轮各自的触地传感器，供落地质量判定读取接触顺序等信息。</summary>
     public WheelContactSensor FrontWheelContact { get; private set; }
     public WheelContactSensor BackWheelContact { get; private set; }
+
+    /// <summary>本次滞空期间已经累计转了多少度(持续按空格会一直累加，松手或落地才停)。外部系统(比如特技计分)据此判定转出了哪一档。</summary>
+    public float SpinAccumulatedDegrees => spinAccumulatedDeg;
 
     void Reset()
     {
@@ -251,6 +255,12 @@ public class BikeController : MonoBehaviour
             hasSpunThisAirtime = false;
             spaceHoldTime = 0f;
         }
+        else if (wasGroundedForSpin)
+        {
+            // 刚离地，开始新一次滞空——清零上次的旋转计数，避免特技系统读到上一次滞空的残留角度。
+            spinAccumulatedDeg = 0f;
+        }
+        wasGroundedForSpin = grounded;
 
         if (Input.GetKeyDown(KeyCode.Space) && grounded && !isSpinning)
         {
@@ -296,7 +306,6 @@ public class BikeController : MonoBehaviour
     {
         isSpinning = true;
         hasSpunThisAirtime = true;
-        spinRemaining = 360f;
         spinDirection = Mathf.Abs(input) > 0.01f ? -Mathf.Sign(input) * driveDirection : 1f;
     }
 
@@ -319,9 +328,11 @@ public class BikeController : MonoBehaviour
         if (!isSpinning) return;
 
         bikeRigidbody.angularVelocity = spinDirection * spinAngularSpeed;
-        spinRemaining -= spinAngularSpeed * Time.fixedDeltaTime;
+        spinAccumulatedDeg += spinAngularSpeed * Time.fixedDeltaTime;
 
-        if (spinRemaining <= 0f)
+        // 持续按住空格就一直转，可以转出 540°/720° 这种高风险档位；松手就停在当前角度，
+        // 剩下交给自动回正/玩家手感去调整落地姿态。
+        if (!spaceHeld)
         {
             isSpinning = false;
         }
