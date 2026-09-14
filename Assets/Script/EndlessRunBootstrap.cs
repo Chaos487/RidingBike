@@ -43,6 +43,8 @@ public static class EndlessRunBootstrap
 
         EndlessRunSettings runSettings = FindSettings<EndlessRunSettings>();
 
+        SetupBackground(bike);
+
         GameObject systems = new GameObject("EndlessRunSystems");
 
         EndlessTerrainGenerator terrain = systems.AddComponent<EndlessTerrainGenerator>();
@@ -83,6 +85,17 @@ public static class EndlessRunBootstrap
         SetupCamera(bike, damageSystem, landingDetector);
     }
 
+    static void SetupBackground(BikeController bike)
+    {
+        Sprite backgroundSprite = FindBackgroundSprite();
+        if (backgroundSprite == null) return;
+
+        GameObject backgroundGO = new GameObject("Background");
+        BackgroundScroller scroller = backgroundGO.AddComponent<BackgroundScroller>();
+        scroller.backgroundSprite = backgroundSprite;
+        scroller.trackTarget = bike.transform;
+    }
+
     static void SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)
     {
         CinemachineCamera cmCamera = Object.FindFirstObjectByType<CinemachineCamera>();
@@ -116,5 +129,21 @@ public static class EndlessRunBootstrap
         }
 #endif
         return Resources.Load<T>(typeof(T).Name);
+    }
+
+    // 跟 FindSettings<T> 同一个思路:优先在编辑器里按名字搜整个 Assets(bg1.jpeg 放在
+    // Assets/Art 下,不要求在 Resources 目录);找不到就退回 Resources.Load,给打包后的版本留一条路。
+    static Sprite FindBackgroundSprite()
+    {
+#if UNITY_EDITOR
+        string[] guids = UnityEditor.AssetDatabase.FindAssets("bg1 t:Sprite");
+        if (guids.Length > 0)
+        {
+            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
+            Sprite sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sprite != null) return sprite;
+        }
+#endif
+        return Resources.Load<Sprite>("bg1");
     }
 }
