@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 /// <summary>
@@ -28,7 +27,7 @@ public class ObstacleSpawner : MonoBehaviour
     public float nearMissMargin = 0.5f;
 
     /// <summary>任意一个障碍物判定出一次贴身擦过时触发。</summary>
-    public event Action OnNearMiss;
+    public event System.Action OnNearMiss;
 
     Material sharedMaterial;
     float lastObstacleX = float.NegativeInfinity;

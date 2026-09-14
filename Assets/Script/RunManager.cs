@@ -27,7 +27,7 @@ public class RunManager : MonoBehaviour
     Text toastText;
     Text statusText;
 
-    Tweener toastTweener;
+    Sequence toastTweener;
     float startX;
     bool runEnded;
 
