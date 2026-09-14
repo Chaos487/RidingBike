@@ -8,26 +8,30 @@ public class BikeController : MonoBehaviour
     public WheelJoint2D frontWheelJoint;
     public Rigidbody2D bikeRigidbody;
 
-    [Header("Drive")]
-    [Tooltip("最大电机角速度 (deg/s)。绝对值越大极速越高，需要大于\"按轮径换算出 maxSpeedKmh 所需的角速度\"，否则电机转速会先于车速封顶。")]
+    [Header("Drive (自动巡航，玩家不再手动控制前进/后退)")]
+    [Tooltip("最大电机角速度 (deg/s)。绝对值越大极速越高，需要大于\"按轮径换算出 maxSpeedKmh 所需的角速度\"，否则电机转速会先于车速封顶。电机始终朝这个转速全力驱动，实际车速由地形坡度和下面的保底/封顶共同决定。")]
     public float maxMotorSpeed = 2800f;
-    [Tooltip("电机角加速度 (deg/s^2)，控制起步/加速的平滑度。")]
-    public float motorAcceleration = 3000f;
-    [Tooltip("驱动时电机最大扭矩，决定按住前进键时的加速快慢。过大会让车头翘起、轮子甩飞。")]
-    public float driveTorque = 2000f;
-    [Tooltip("松开按键时的刹车扭矩，让车滑行减速而不是猛停。")]
-    public float brakeTorque = 400f;
-    [Tooltip("电机方向，+1 或 -1。如果按 D 反而向左请改成 -1。")]
+    [Tooltip("电机角加速度 (deg/s^2)，控制起步/爬坡时电机转速追赶目标值的平滑度。")]
+    public float cruiseMotorAcceleration = 3000f;
+    [Tooltip("巡航扭矩，决定电机能扛住多陡的坡、多快追回保底速度。过大会让车头翘起、轮子甩飞。")]
+    public float cruiseTorque = 2000f;
+    [Tooltip("电机方向，+1 或 -1。如果车反而往左开请改成 -1。")]
     public float driveDirection = -1f;
 
-    [Header("Boost (Shift 加速)")]
-    [Tooltip("按住加速键(Shift)时使用的驱动扭矩，应明显大于 driveTorque，让加速比平时更快；最高速度不受影响，统一由 maxSpeedKmh 封顶。")]
-    public float boostDriveTorque = 3600f;
-    [Tooltip("按住加速键时的电机角加速度，通常也要比 motorAcceleration 大，避免电机转速追不上多出来的扭矩。")]
-    public float boostMotorAcceleration = 6000f;
+    [Header("保底前进速度")]
+    [Tooltip("车速永远不会低于这个值 (km/h)——不管坡多陡，ClampVelocities 里会直接把速度钳在这个值以上。")]
+    public float baselineSpeedKmh = 25f;
+
+    [Header("Boost (Shift 氮气加速，一次性瞬间加速+随时间衰减，按行驶距离充能)")]
+    [Tooltip("充能一次需要行驶多远 (米)。从上次使用/游戏开始算起，累计前进这么远才能再按 Shift。")]
+    public float boostRechargeDistance = 150f;
+    [Tooltip("触发瞬间给保底速度叠加多少 (km/h)，之后按 boostDecayPerSecondKmh 逐渐衰减回 0。")]
+    public float boostSpeedBonusKmh = 40f;
+    [Tooltip("boost 加成每秒衰减多少 (km/h/s)。")]
+    public float boostDecayPerSecondKmh = 30f;
 
     [Header("Speed / Stability Limits")]
-    [Tooltip("车身速度上限 (km/h)，模拟现实骑行速度，达到后车速不再增加。")]
+    [Tooltip("车身速度上限 (km/h)，模拟现实骑行速度，达到后车速不再增加，boost 也不能突破这个封顶。")]
     public float maxSpeedKmh = 100f;
     [Tooltip("车身最大角速度 (deg/s)，防止失控空翻。")]
     public float maxAngularSpeed = 400f;
@@ -80,7 +84,9 @@ public class BikeController : MonoBehaviour
 
     float currentMotorSpeed;
     float input;
-    bool boostHeld;
+
+    float currentBoostBonusKmh;
+    float xAtLastBoost;
 
     bool spaceHeld;
     float spaceHoldTime;
@@ -99,8 +105,17 @@ public class BikeController : MonoBehaviour
     /// <summary>是否正在执行主动触发的空中 360 旋转。外部系统(比如摔车判定)据此排除这种合法的高倾角状态。</summary>
     public bool IsSpinning => isSpinning;
 
-    /// <summary>是否按住加速键(Shift)。外部系统(比如镜头)据此做出反应。</summary>
-    public bool IsBoosting => boostHeld;
+    /// <summary>boost 加成是否还没衰减完。外部系统(比如镜头)据此做出反应。</summary>
+    public bool IsBoosting => currentBoostBonusKmh > 0.01f;
+
+    /// <summary>从上次触发 boost(或游戏开始)到现在，车身净前进了多少米。</summary>
+    public float DistanceSinceLastBoost => bikeRigidbody != null ? bikeRigidbody.position.x - xAtLastBoost : 0f;
+
+    /// <summary>boost 是否已经充能完毕，可以再次触发。</summary>
+    public bool IsBoostReady => DistanceSinceLastBoost >= boostRechargeDistance;
+
+    /// <summary>距离下一次 boost 充能完毕还差多少米，已就绪时为 0。外部系统(比如 UI 提示)据此显示。</summary>
+    public float DistanceUntilBoostReady => Mathf.Max(0f, boostRechargeDistance - DistanceSinceLastBoost);
 
     /// <summary>前 / 后轮各自的触地传感器，供落地质量判定读取接触顺序等信息。</summary>
     public WheelContactSensor FrontWheelContact { get; private set; }
@@ -118,6 +133,7 @@ public class BikeController : MonoBehaviour
         // 这个回调发生在 Awake 之后、但不保证在 Start 之前，用 Start 的话可能读到还没赋值的 null。
         if (bikeRigidbody == null) bikeRigidbody = GetComponent<Rigidbody2D>();
         bikeRigidbody.centerOfMass = centerOfMass;
+        xAtLastBoost = bikeRigidbody.position.x;
 
         // 没有手动指定的话，直接从关节连接的车轮上取，不需要在 Inspector 里额外拖引用。
         if (frontWheelVisual == null && frontWheelJoint != null && frontWheelJoint.connectedBody != null)
@@ -176,9 +192,23 @@ public class BikeController : MonoBehaviour
 
     void Update()
     {
+        // 地面上不再响应 A/D 驱动，只在空中用于压头/抬头（见 ApplyBalance）。
         input = Input.GetAxisRaw("Horizontal");
-        boostHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+
+        if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
+        {
+            TryTriggerBoost();
+        }
+
         HandleJumpAndSpin();
+    }
+
+    void TryTriggerBoost()
+    {
+        if (!IsBoostReady) return;
+
+        currentBoostBonusKmh = boostSpeedBonusKmh;
+        xAtLastBoost = bikeRigidbody.position.x;
     }
 
     void LateUpdate()
@@ -272,10 +302,16 @@ public class BikeController : MonoBehaviour
 
     void FixedUpdate()
     {
+        DecayBoost();
         DriveBackWheel();
         ApplySpin();
         ApplyBalance();
         ClampVelocities();
+    }
+
+    void DecayBoost()
+    {
+        currentBoostBonusKmh = Mathf.Max(0f, currentBoostBonusKmh - boostDecayPerSecondKmh * Time.fixedDeltaTime);
     }
 
     void ApplySpin()
@@ -295,34 +331,28 @@ public class BikeController : MonoBehaviour
     {
         if (backWheelJoint == null) return;
 
-        float targetSpeed = input * driveDirection * maxMotorSpeed;
+        // 始终全力朝前巡航，不再读玩家输入——实际车速由地形坡度、保底下限、封顶上限共同决定。
+        float targetSpeed = driveDirection * maxMotorSpeed;
 
         // 已经到达速度上限时不再加速 —— 否则轮子继续狂转、车身被限速，
         // 二者速度不匹配会把 WheelJoint 的悬挂拉到极限，视觉上轮子飞出去。
-        float maxLinearSpeed = MaxLinearSpeed;
-        float bikeSpeed = bikeRigidbody.linearVelocity.x;
-        if (Mathf.Abs(input) > 0.01f && Mathf.Abs(bikeSpeed) >= maxLinearSpeed
-            && Mathf.Sign(bikeSpeed) == Mathf.Sign(input * driveDirection))
+        if (bikeRigidbody.linearVelocity.x >= MaxLinearSpeed)
         {
             targetSpeed = currentMotorSpeed; // 维持当前转速，不再往上加
         }
-
-        // 按住加速键(Shift)时用更大的扭矩/电机加速度，跑得更快到达同一个速度上限。
-        float accel = boostHeld ? boostMotorAcceleration : motorAcceleration;
-        float torque = boostHeld ? boostDriveTorque : driveTorque;
 
         // 平滑过渡到目标转速，避免瞬时冲击让轮子飞出
         currentMotorSpeed = Mathf.MoveTowards(
             currentMotorSpeed,
             targetSpeed,
-            accel * Time.fixedDeltaTime
+            cruiseMotorAcceleration * Time.fixedDeltaTime
         );
 
         JointMotor2D motor = backWheelJoint.motor;
         motor.motorSpeed = currentMotorSpeed;
-        motor.maxMotorTorque = Mathf.Abs(input) > 0.01f ? torque : brakeTorque;
+        motor.maxMotorTorque = cruiseTorque;
         backWheelJoint.motor = motor;
-        backWheelJoint.useMotor = true; // 始终保留 motor，无输入时作为刹车
+        backWheelJoint.useMotor = true;
     }
 
     void ApplyBalance()
@@ -367,8 +397,14 @@ public class BikeController : MonoBehaviour
 
     void ClampVelocities()
     {
+        float maxLinearSpeed = MaxLinearSpeed;
+
+        // 保底前进速度是硬下限：不管坡多陡、有没有被撞得一时减速，只要游戏还在继续就直接把速度钳回这个值以上。
+        // boost 加成叠加在保底之上、一起被 maxLinearSpeed 封顶，衰减到 0 之后自然回落到纯保底速度。
+        float floorSpeed = Mathf.Min(((baselineSpeedKmh + currentBoostBonusKmh) / 3.6f), maxLinearSpeed);
+
         Vector2 v = bikeRigidbody.linearVelocity;
-        v.x = Mathf.Clamp(v.x, -MaxLinearSpeed, MaxLinearSpeed);
+        v.x = Mathf.Clamp(v.x, floorSpeed, maxLinearSpeed);
         bikeRigidbody.linearVelocity = v;
 
         if (!isSpinning)

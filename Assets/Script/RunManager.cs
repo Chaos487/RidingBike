@@ -13,6 +13,7 @@ public class RunManager : MonoBehaviour
 
     Text distanceText;
     Text speedText;
+    Text boostText;
     Text statusText;
     float startX;
     bool runEnded;
@@ -47,6 +48,13 @@ public class RunManager : MonoBehaviour
 
         float speedKmh = bikeController != null ? Mathf.Abs(bikeController.bikeRigidbody.linearVelocity.x) * 3.6f : 0f;
         speedText.text = $"时速: {speedKmh:0} km/h";
+
+        if (bikeController != null)
+        {
+            boostText.text = bikeController.IsBoostReady
+                ? "氮气: 就绪 (Shift)"
+                : $"氮气: 还差 {bikeController.DistanceUntilBoostReady:0} m";
+        }
     }
 
     void HandleCrash()
@@ -80,6 +88,7 @@ public class RunManager : MonoBehaviour
 
         distanceText = CreateText(canvasGO.transform, "DistanceText", new Vector2(0f, 1f), new Vector2(20f, -20f), 220f, 24, TextAnchor.UpperLeft);
         speedText = CreateText(canvasGO.transform, "SpeedText", new Vector2(0f, 1f), new Vector2(240f, -20f), 220f, 24, TextAnchor.UpperLeft);
+        boostText = CreateText(canvasGO.transform, "BoostText", new Vector2(0f, 1f), new Vector2(20f, -50f), 300f, 22, TextAnchor.UpperLeft);
 
         statusText = CreateText(canvasGO.transform, "StatusText", new Vector2(0.5f, 0.5f), Vector2.zero, 500f, 32, TextAnchor.MiddleCenter);
         statusText.gameObject.SetActive(false);
