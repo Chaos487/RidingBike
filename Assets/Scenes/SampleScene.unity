@@ -1212,7 +1212,7 @@ MonoBehaviour:
   frontWheelVisual: {fileID: 0}
   backWheelVisual: {fileID: 0}
   wheelSpinDirection: 1
-  jumpForce: 18
+  jumpForce: 50
   speedJumpBonus: 8
   downhillJumpBonus: 6
   maxDownhillAngleForBonus: 20
