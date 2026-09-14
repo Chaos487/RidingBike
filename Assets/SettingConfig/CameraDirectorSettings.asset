@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dd8e4faa9c05468d8b760c062dd3acd, type: 3}
+  m_Name: CameraDirectorSettings
+  m_EditorClassIdentifier: 
+  minOrthoSize: 7
+  maxOrthoSize: 12
+  crashOrthoSize: 6
+  airborneZoomOutBonus: 0.6
+  zoomInDuration: 0.5
+  zoomInEase: 6
+  zoomOutDuration: 1.1
+  zoomOutEase: 3
+  crashZoomDuration: 0.12
+  crashZoomEase: 27
+  crashShakeAmplitude: 0.6
+  landingPunchAmount: 0.12
+  landingPunchInDuration: 0.08
+  landingPunchOutDuration: 0.22
+  perfectLandingPunchScale: 0.2
+  goodLandingPunchScale: 1
+  badLandingPunchScale: 1.8
+  maxLookaheadOffset: 1.6
+  lookaheadDuration: 0.6
+  lookaheadEase: 3
+  retargetThreshold: 0.03
