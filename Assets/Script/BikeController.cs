@@ -222,9 +222,17 @@ public class BikeController : MonoBehaviour
             spaceHoldTime = 0f;
         }
 
-        if (Input.GetKeyDown(KeyCode.Space) && grounded && !isSpinning)
+        if (Input.GetKeyDown(KeyCode.Space))
         {
-            Jump();
+            // 临时诊断日志:把每次按空格当下的状态都打出来，不管这次跳没跳成——
+            // 方便排查"同时按前进键"时跳跃偶尔不生效，是 grounded 判定在那一帧恰好是 false，
+            // 还是别的原因（比如 isSpinning 意外还是 true）。确认问题后可以删掉。
+            Debug.Log($"[Jump] pressed grounded={grounded} isSpinning={isSpinning} input={input:0.00} rotation={bikeRigidbody.rotation:0.0} angularVel={bikeRigidbody.angularVelocity:0.0} posY={bikeRigidbody.position.y:0.00} velY={bikeRigidbody.linearVelocity.y:0.00}");
+
+            if (grounded && !isSpinning)
+            {
+                Jump();
+            }
         }
 
         spaceHeld = Input.GetKey(KeyCode.Space);
