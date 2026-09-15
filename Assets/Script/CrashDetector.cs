@@ -2,84 +2,160 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// 摔车判定:车身现有的每个轮子都真实触地、且车身倾角超过阈值、并持续一小段时间后判定为摔车。
-/// 触地用真实物理接触(WheelContactSensor),不用距离射线——射线只代表"车身中心离地面够近",
-/// 滞空高度不够大时会在还没真正落地前就先报"触地",从而在飞行中被误判成摔车。
-/// 必须现有的轮子都触地才开始判定,只有一个轮子(比如起跳瞬间后轮还没离地、或落地时前轮先/后轮先着地)
-/// 是正常的过渡姿态,车身倾角本来就会比较大,不代表摔车。前轮被 BikeDamageSystem 卸掉之后
-/// FrontWheelContact 会变成 null,这里跟着自动只看剩下的轮子,不会因为少了一个轮子就永远判不出摔车。
+/// 摔车判定:不是"车歪了就摔"，而是"自行车已经失去可恢复的骑行状态才摔车"。
+/// 四级状态机(Normal → Warning → Critical → Crashed)，只有 Critical 持续够久才真正摔车；
+/// Critical 期间如果车身倾角/角速度显示"正在回正"，会逐级降回 Warning → Normal，形成救车机制。
+/// 设计依据见 Desktop/RidingBike_Crash_Detection_Design.md。
+///
+/// 触地用真实物理接触(BikeController.FrontWheelContact/BackWheelContact)，不用距离射线——
+/// 射线只代表"车身中心离地面够近"，滞空高度不够大时会在还没真正落地前就先报"触地"。
+/// Critical/Crashed 都要求现有的每个轮子都触地(前轮被 BikeDamageSystem 卸掉之后自动只看剩下的轮子)；
+/// Warning 不要求触地——空中姿态失控也应该能看到"开始危险"，但不会真的摔车，只有落地才会往下判。
+///
+/// 车身本身现在还没有独立的碰撞体("Body Contact")，也没有做基于真实碰撞冲量的撞击强度判定——
+/// 这两项是文档里改动物理表现本身的部分，留到下一步单独验证，不在这一版里。
 /// </summary>
 public class CrashDetector : MonoBehaviour
 {
+    public enum CrashState { Normal, Warning, Critical, Crashed }
+
     [Header("References")]
     public Rigidbody2D bikeRigidbody;
-    [Tooltip("用来读取前后轮真实触地状态,以及排除主动触发的空中 360 旋转,避免转体过程中被误判成摔车。")]
+    [Tooltip("用来读取前后轮真实触地状态、地面坡度，以及排除主动触发的空中 360 旋转，避免转体过程中被误判成摔车。")]
     public BikeController bikeController;
 
-    [Header("Crash Rule")]
-    [Tooltip("车身倾角超过该值(度)且现有轮子都触地时视为失控。")]
-    public float tiltThreshold = 65f;
-    [Tooltip("现有轮子都触地的状态需要连续保持这么久才开始看倾角,防止接触碰撞体的单帧抖动被误判。")]
-    public float groundSettleTime = 0.05f;
-    [Tooltip("落地之后，倾角超限需要再持续这么久才真正判定摔车,给玩家一点救车的余地。")]
-    public float crashConfirmTime = 0.15f;
+    [Header("Angle (相对当前地面坡度算；空中没有坡度参考时按水平算)")]
+    public float warningAngle = 35f;
+    public float criticalAngle = 50f;
+    public float maxRecoverableAngle = 60f;
 
+    [Header("Timing")]
+    public float minimumDangerTime = 0.05f;
+    public float crashConfirmTime = 0.20f;
+    public float recoveryTime = 0.10f;
+
+    [Header("Recovery (角速度回正判定)")]
+    public float recoveringAngularSpeedThreshold = 30f;
+
+    /// <summary>真正摔车(Crashed)那一刻触发，语义跟之前完全一样——外部系统不需要关心中间状态。</summary>
     public event Action OnCrash;
+    /// <summary>每次状态变化时触发，供以后的 UI/镜头/音效按 Warning/Critical 做分级反馈用(这一版还没接)。</summary>
+    public event Action<CrashState> OnStateChanged;
 
-    float groundedTime;
+    public CrashState State { get; private set; } = CrashState.Normal;
+
+    float dangerTime;
     float overTiltTime;
+    float recoveryTimer;
     float invulnerableUntil;
-    bool crashed;
 
     /// <summary>供 BikeDamageSystem 在"部分损毁"(掉零件但没真的结束这一局)之后调用:
-    /// 复位摔车判定状态,并给一小段无敌时间,避免同一次摔倒的姿态在下一帧又立刻被判一次摔车。</summary>
+    /// 复位状态机，并给一小段无敌时间，避免同一次摔倒的姿态在下一帧又立刻被判一次摔车。</summary>
     public void Recover(float invulnerableSeconds)
     {
-        crashed = false;
-        groundedTime = 0f;
-        overTiltTime = 0f;
+        EnterState(CrashState.Normal);
         invulnerableUntil = Time.time + invulnerableSeconds;
+    }
+
+    public void ApplySettings(CrashDetectorSettings settings)
+    {
+        if (settings == null) return;
+
+        warningAngle = settings.warningAngle;
+        criticalAngle = settings.criticalAngle;
+        maxRecoverableAngle = settings.maxRecoverableAngle;
+        minimumDangerTime = settings.minimumDangerTime;
+        crashConfirmTime = settings.crashConfirmTime;
+        recoveryTime = settings.recoveryTime;
+        recoveringAngularSpeedThreshold = settings.recoveringAngularSpeedThreshold;
     }
 
     void FixedUpdate()
     {
-        if (crashed || bikeRigidbody == null) return;
+        if (State == CrashState.Crashed || bikeRigidbody == null) return;
         if (Time.time < invulnerableUntil) return;
 
         if (bikeController != null && bikeController.IsSpinning)
         {
-            groundedTime = 0f;
-            overTiltTime = 0f;
+            // 主动触发的空中旋转：不管转到多大角度都不计入危险状态。
+            if (State != CrashState.Normal) EnterState(CrashState.Normal);
             return;
         }
 
-        if (!AllExistingWheelsGrounded())
-        {
-            // 只要有一个还装着的轮子没触地——空中,或者起跳/落地的单轮过渡瞬间——都不判定摔车。
-            groundedTime = 0f;
-            overTiltTime = 0f;
-            return;
-        }
+        bool grounded = AllExistingWheelsGrounded();
+        float targetAngle = (bikeController != null && grounded) ? bikeController.GetGroundSlopeAngle() : 0f;
+        float angleError = Mathf.DeltaAngle(targetAngle, bikeRigidbody.rotation);
+        float tilt = Mathf.Abs(angleError);
+        float angularVelocity = bikeRigidbody.angularVelocity;
 
-        groundedTime += Time.fixedDeltaTime;
-        bool settled = groundedTime >= groundSettleTime;
+        // 正在回正:角速度的方向跟"倾角超出目标的方向"相反，且幅度不是噪声。
+        bool recovering = angleError * angularVelocity < 0f && Mathf.Abs(angularVelocity) > recoveringAngularSpeedThreshold;
+        // 倾角已经大到基本没救了的话，就算角速度显示在回正也不认。
+        bool stillFalling = tilt > maxRecoverableAngle || !recovering;
+        bool criticalConditionMet = grounded && tilt > criticalAngle && stillFalling;
 
-        float tilt = Mathf.Abs(Mathf.DeltaAngle(bikeRigidbody.rotation, 0f));
+        switch (State)
+        {
+            case CrashState.Normal:
+                if (tilt > warningAngle) EnterState(CrashState.Warning);
+                break;
 
-        if (settled && tilt > tiltThreshold)
-        {
-            overTiltTime += Time.fixedDeltaTime;
-            if (overTiltTime >= crashConfirmTime)
-            {
-                crashed = true;
-                LogCrashDiagnostics(tilt);
-                OnCrash?.Invoke();
-            }
+            case CrashState.Warning:
+                if (tilt <= warningAngle)
+                {
+                    recoveryTimer += Time.fixedDeltaTime;
+                    if (recoveryTimer >= recoveryTime) EnterState(CrashState.Normal);
+                }
+                else
+                {
+                    recoveryTimer = 0f;
+                    if (criticalConditionMet)
+                    {
+                        dangerTime += Time.fixedDeltaTime;
+                        if (dangerTime >= minimumDangerTime) EnterState(CrashState.Critical);
+                    }
+                    else
+                    {
+                        dangerTime = 0f;
+                    }
+                }
+                break;
+
+            case CrashState.Critical:
+                if (criticalConditionMet)
+                {
+                    recoveryTimer = 0f;
+                    overTiltTime += Time.fixedDeltaTime;
+                    if (overTiltTime >= crashConfirmTime)
+                    {
+                        ConfirmCrash(tilt);
+                    }
+                }
+                else
+                {
+                    overTiltTime = 0f;
+                    recoveryTimer += Time.fixedDeltaTime;
+                    if (recoveryTimer >= recoveryTime) EnterState(CrashState.Warning);
+                }
+                break;
         }
-        else
-        {
-            overTiltTime = 0f;
-        }
+    }
+
+    void EnterState(CrashState next)
+    {
+        State = next;
+        dangerTime = 0f;
+        overTiltTime = 0f;
+        recoveryTimer = 0f;
+        OnStateChanged?.Invoke(next);
+    }
+
+    void ConfirmCrash(float tilt)
+    {
+        State = CrashState.Crashed;
+        LogCrashDiagnostics(tilt);
+        OnStateChanged?.Invoke(CrashState.Crashed);
+        OnCrash?.Invoke();
     }
 
     /// <summary>车身现在实际装着的每一个轮子(FrontWheelContact/BackWheelContact 非 null 的那些)
@@ -100,7 +176,7 @@ public class CrashDetector : MonoBehaviour
         return anyWheelLeft && frontOk && backOk;
     }
 
-    /// <summary>摔车瞬间把判定用到的全部状态打成一条独立的 log,方便复现/排查误判(比如空中被判摔车)。</summary>
+    /// <summary>摔车瞬间把判定用到的全部状态打成一条独立的 log,方便复现/排查误判。</summary>
     void LogCrashDiagnostics(float tilt)
     {
         bool frontContact = bikeController != null && bikeController.FrontWheelContact != null && bikeController.FrontWheelContact.IsGrounded;
@@ -111,6 +187,6 @@ public class CrashDetector : MonoBehaviour
             $"vel={bikeRigidbody.linearVelocity} angVel={bikeRigidbody.angularVelocity:0.0} " +
             $"frontContact={frontContact} backContact={backContact} " +
             $"isSpinning={bikeController != null && bikeController.IsSpinning} spinDeg={(bikeController != null ? bikeController.SpinAccumulatedDegrees : 0f):0.0} " +
-            $"groundedTime={groundedTime:0.00} overTiltTime={overTiltTime:0.00}");
+            $"overTiltTime={overTiltTime:0.00}");
     }
 }

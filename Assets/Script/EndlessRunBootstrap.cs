@@ -60,6 +60,7 @@ public static class EndlessRunBootstrap
         CrashDetector crashDetector = systems.AddComponent<CrashDetector>();
         crashDetector.bikeRigidbody = bike.bikeRigidbody != null ? bike.bikeRigidbody : bike.GetComponent<Rigidbody2D>();
         crashDetector.bikeController = bike;
+        crashDetector.ApplySettings(FindSettings<CrashDetectorSettings>());
 
         BikeDamageSystem damageSystem = systems.AddComponent<BikeDamageSystem>();
         damageSystem.ApplySettings(FindSettings<BikeDamageSettings>());
