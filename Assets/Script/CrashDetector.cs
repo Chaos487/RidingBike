@@ -48,6 +48,7 @@ public class CrashDetector : MonoBehaviour
     float overTiltTime;
     float recoveryTimer;
     float invulnerableUntil;
+    float debugLogTimer;
 
     /// <summary>供 BikeDamageSystem 在"部分损毁"(掉零件但没真的结束这一局)之后调用:
     /// 复位状态机，并给一小段无敌时间，避免同一次摔倒的姿态在下一帧又立刻被判一次摔车。</summary>
@@ -93,6 +94,24 @@ public class CrashDetector : MonoBehaviour
         // 倾角已经大到基本没救了的话，就算角速度显示在回正也不认。
         bool stillFalling = tilt > maxRecoverableAngle || !recovering;
         bool criticalConditionMet = grounded && tilt > criticalAngle && stillFalling;
+
+        // 临时验证用:非 Normal 状态时每 0.5 秒打一条状态快照,排查"是不是卡在某个状态出不来"。
+        // 确认状态机行为没问题之后可以删掉。
+        if (State != CrashState.Normal)
+        {
+            debugLogTimer += Time.fixedDeltaTime;
+            if (debugLogTimer >= 0.5f)
+            {
+                debugLogTimer = 0f;
+                Debug.Log($"[CrashDetector] state={State} tilt={tilt:0.0} grounded={grounded} " +
+                          $"criticalConditionMet={criticalConditionMet} recovering={recovering} " +
+                          $"dangerTime={dangerTime:0.00} overTiltTime={overTiltTime:0.00} recoveryTimer={recoveryTimer:0.00}");
+            }
+        }
+        else
+        {
+            debugLogTimer = 0f;
+        }
 
         switch (State)
         {
@@ -143,6 +162,7 @@ public class CrashDetector : MonoBehaviour
 
     void EnterState(CrashState next)
     {
+        Debug.Log($"[CrashDetector] {State} -> {next}");
         State = next;
         dangerTime = 0f;
         overTiltTime = 0f;
