@@ -7,13 +7,15 @@ using UnityEngine;
 /// Critical 期间如果车身倾角/角速度显示"正在回正"，会逐级降回 Warning → Normal，形成救车机制。
 /// 设计依据见 Desktop/RidingBike_Crash_Detection_Design.md。
 ///
-/// 触地用真实物理接触(BikeController.FrontWheelContact/BackWheelContact)，不用距离射线——
-/// 射线只代表"车身中心离地面够近"，滞空高度不够大时会在还没真正落地前就先报"触地"。
-/// Critical/Crashed 都要求现有的每个轮子都触地(前轮被 BikeDamageSystem 卸掉之后自动只看剩下的轮子)；
+/// 触地用真实物理接触，不用距离射线——射线只代表"车身中心离地面够近"，滞空高度不够大时
+/// 会在还没真正落地前就先报"触地"。Critical/Crashed 现在同时看两个信号:
+/// 车架本身的碰撞体(BikeController.BodyContact，实打实的物理接触，车翻倒打滑时靠这个) 和
+/// 前后轮(AllExistingWheelsGrounded，正常骑行落地靠这个)——任意一个报"触地"就算数。
+/// 只用轮子的话，车身翻倒打滚时轮子经常翘空、凑不齐"两轮都触地"，永远判不出摔车，
+/// 这是实机测出来的真实问题，不是猜的。
 /// Warning 不要求触地——空中姿态失控也应该能看到"开始危险"，但不会真的摔车，只有落地才会往下判。
 ///
-/// 车身本身现在还没有独立的碰撞体("Body Contact")，也没有做基于真实碰撞冲量的撞击强度判定——
-/// 这两项是文档里改动物理表现本身的部分，留到下一步单独验证，不在这一版里。
+/// 还没做的:基于真实碰撞冲量的撞击强度判定(依赖 BodyContact 的碰撞事件，留到下一步)。
 /// </summary>
 public class CrashDetector : MonoBehaviour
 {
@@ -83,8 +85,11 @@ public class CrashDetector : MonoBehaviour
             return;
         }
 
-        bool grounded = AllExistingWheelsGrounded();
-        float targetAngle = (bikeController != null && grounded) ? bikeController.GetGroundSlopeAngle() : 0f;
+        bool wheelsGrounded = AllExistingWheelsGrounded();
+        bool bodyGrounded = bikeController != null && bikeController.BodyContact != null && bikeController.BodyContact.IsGrounded;
+        // 车架碰过东西 或者 轮子正常触地，任意一个算数——车翻倒时靠车架，正常落地靠轮子。
+        bool grounded = bodyGrounded || wheelsGrounded;
+        float targetAngle = (bikeController != null && wheelsGrounded) ? bikeController.GetGroundSlopeAngle() : 0f;
         float angleError = Mathf.DeltaAngle(targetAngle, bikeRigidbody.rotation);
         float tilt = Mathf.Abs(angleError);
         float angularVelocity = bikeRigidbody.angularVelocity;
@@ -107,7 +112,7 @@ public class CrashDetector : MonoBehaviour
             bool frontContact = bikeController != null && bikeController.FrontWheelContact != null && bikeController.FrontWheelContact.IsGrounded;
             bool backContact = bikeController != null && bikeController.BackWheelContact != null && bikeController.BackWheelContact.IsGrounded;
             Debug.Log($"[CrashDetector] state={State} rawRotation={bikeRigidbody.rotation:0.0} targetAngle={targetAngle:0.0} tilt={tilt:0.0} " +
-                      $"grounded={grounded} frontContact={frontContact} backContact={backContact} " +
+                      $"grounded={grounded} bodyContact={bodyGrounded} frontContact={frontContact} backContact={backContact} " +
                       $"criticalConditionMet={criticalConditionMet} recovering={recovering} angularVelocity={angularVelocity:0.0} " +
                       $"dangerTime={dangerTime:0.00} overTiltTime={overTiltTime:0.00} recoveryTimer={recoveryTimer:0.00}");
         }
@@ -200,11 +205,12 @@ public class CrashDetector : MonoBehaviour
     {
         bool frontContact = bikeController != null && bikeController.FrontWheelContact != null && bikeController.FrontWheelContact.IsGrounded;
         bool backContact = bikeController != null && bikeController.BackWheelContact != null && bikeController.BackWheelContact.IsGrounded;
+        bool bodyContact = bikeController != null && bikeController.BodyContact != null && bikeController.BodyContact.IsGrounded;
 
         Debug.LogWarning(
             $"[CrashDetector] 摔车 pos={bikeRigidbody.position} rot={bikeRigidbody.rotation:0.0} tilt={tilt:0.0} " +
             $"vel={bikeRigidbody.linearVelocity} angVel={bikeRigidbody.angularVelocity:0.0} " +
-            $"frontContact={frontContact} backContact={backContact} " +
+            $"bodyContact={bodyContact} frontContact={frontContact} backContact={backContact} " +
             $"isSpinning={bikeController != null && bikeController.IsSpinning} spinDeg={(bikeController != null ? bikeController.SpinAccumulatedDegrees : 0f):0.0} " +
             $"overTiltTime={overTiltTime:0.00}");
     }
