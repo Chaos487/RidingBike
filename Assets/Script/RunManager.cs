@@ -207,6 +207,10 @@ public class RunManager : MonoBehaviour
         fillRt.offsetMax = new Vector2(-2f, -2f);
 
         Image fill = fillGO.AddComponent<Image>();
+        // Image.Type.Filled 在没有指定 sprite 的时候会直接走"画整个矩形"的兜底逻辑，
+        // fillAmount 完全不生效(这点跟 Type.Simple 不一样，纯色矩形那个技巧对 Filled 不成立)，
+        // 所以这里必须给一张运行时生成的纯白 1x1 贴图，不能像背景那块一样留空。
+        fill.sprite = CreateSolidSprite();
         fill.color = new Color(0.85f, 0.2f, 0.2f);
         fill.type = Image.Type.Filled;
         fill.fillMethod = Image.FillMethod.Horizontal;
@@ -214,6 +218,14 @@ public class RunManager : MonoBehaviour
         fill.fillAmount = 1f;
 
         return fill;
+    }
+
+    static Sprite CreateSolidSprite()
+    {
+        Texture2D texture = new Texture2D(1, 1);
+        texture.SetPixel(0, 0, Color.white);
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f));
     }
 
     static Text CreateText(Transform parent, string name, Vector2 anchor, Vector2 anchoredPos, float width, int fontSize, TextAnchor alignment)
