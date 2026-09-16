@@ -58,6 +58,15 @@ public class EndlessTerrainGenerator : MonoBehaviour
     [Header("Visual")]
     [Tooltip("只在 Ground.prefab 的 MeshRenderer 没有手动指定材质时才会用到，直接在预制体上改。")]
     public Color groundColor = new Color(0.35f, 0.6f, 0.25f);
+    [Tooltip("地表(网格顶边)的顶点色，配合支持顶点色的材质(比如 Sprites/Default)可以做出上浅下深的渐变。" +
+             "材质本身的颜色要留白(白色)，不然会把顶点色再乘一遍色，混出奇怪的结果。")]
+    public Color gradientTopColor = new Color(0.86f, 0.72f, 0.5f);
+    [Tooltip("地表以下多深处过渡成纯色(米)。渐变只发生在地表到这个深度之间，" +
+             "再往下到 groundThickness 都是纯色——groundThickness 现在很深(填满屏幕用)，" +
+             "如果渐变覆盖整个深度会被拉得几乎看不出来。")]
+    public float gradientDepth = 6f;
+    [Tooltip("过渡完之后(以及一路到最深处)的纯色顶点色。")]
+    public Color gradientBottomColor = new Color(0.25f, 0.15f, 0.12f);
 
     /// <summary>沿地形按一定间距采样时触发,供障碍物生成等系统订阅。</summary>
     public event Action<Vector2, float, SlopeDirection> OnGroundSampled;
@@ -275,34 +284,55 @@ public class EndlessTerrainGenerator : MonoBehaviour
         edgeCollider.points = points.ToArray();
     }
 
+    // 每列 3 个顶点而不是 2 个:地表 -> gradientDepth 处的"过渡点" -> groundThickness 处的最深点。
+    // 顶点色只在地表->过渡点这一小段(gradientDepth，默认几米)里从 gradientTopColor 过渡到
+    // gradientBottomColor，过渡点往下到最深点整段都是纯色——不然如果只有地表/最深两个顶点，
+    // GPU 是按顶点直接线性插值整条边的，groundThickness 现在有 100 米深，渐变会被拉得几乎看不出来。
     void RebuildMesh()
     {
         int n = points.Count;
         if (n < 2) return;
 
-        Vector3[] verts = new Vector3[n * 2];
+        Vector3[] verts = new Vector3[n * 3];
+        Color[] colors = new Color[n * 3];
         for (int i = 0; i < n; i++)
         {
             Vector2 p = points[i];
-            verts[i * 2] = new Vector3(p.x, p.y, 0f);
-            verts[i * 2 + 1] = new Vector3(p.x, p.y - groundThickness, 0f);
+            int vi = i * 3;
+            verts[vi] = new Vector3(p.x, p.y, 0f);
+            verts[vi + 1] = new Vector3(p.x, p.y - gradientDepth, 0f);
+            verts[vi + 2] = new Vector3(p.x, p.y - groundThickness, 0f);
+            colors[vi] = gradientTopColor;
+            colors[vi + 1] = gradientBottomColor;
+            colors[vi + 2] = gradientBottomColor;
         }
 
-        // 每段两个三角形,正反两种绕序都写入,避免猜错渲染管线的三角形环绕方向导致地面不可见。
-        int[] tris = new int[(n - 1) * 12];
+        // 每列 3 个顶点、上下两段(地表->过渡点、过渡点->最深点)，每段都当成一个四边形来铺三角形。
+        int[] tris = new int[(n - 1) * 24];
+        int ti = 0;
         for (int i = 0; i < n - 1; i++)
         {
-            int vi = i * 2;
-            int ti = i * 12;
-            tris[ti] = vi; tris[ti + 1] = vi + 2; tris[ti + 2] = vi + 1;
-            tris[ti + 3] = vi + 1; tris[ti + 4] = vi + 2; tris[ti + 5] = vi + 3;
-            tris[ti + 6] = vi; tris[ti + 7] = vi + 1; tris[ti + 8] = vi + 2;
-            tris[ti + 9] = vi + 1; tris[ti + 10] = vi + 3; tris[ti + 11] = vi + 2;
+            int vi = i * 3;
+            int viNext = vi + 3;
+            AppendQuadTriangles(tris, ref ti, vi, viNext, vi + 1, viNext + 1);
+            AppendQuadTriangles(tris, ref ti, vi + 1, viNext + 1, vi + 2, viNext + 2);
         }
 
         mesh.Clear();
         mesh.vertices = verts;
+        mesh.colors = colors;
         mesh.triangles = tris;
         mesh.RecalculateBounds();
+    }
+
+    // 一个四边形(topLeft/topRight/bottomLeft/bottomRight 四个顶点索引)铺两个三角形，
+    // 正反两种绕序都写入，避免猜错渲染管线的三角形环绕方向导致地面不可见。
+    static void AppendQuadTriangles(int[] tris, ref int ti, int topLeft, int topRight, int bottomLeft, int bottomRight)
+    {
+        tris[ti] = topLeft; tris[ti + 1] = bottomLeft; tris[ti + 2] = topRight;
+        tris[ti + 3] = topRight; tris[ti + 4] = bottomLeft; tris[ti + 5] = bottomRight;
+        tris[ti + 6] = topLeft; tris[ti + 7] = topRight; tris[ti + 8] = bottomLeft;
+        tris[ti + 9] = topRight; tris[ti + 10] = bottomRight; tris[ti + 11] = bottomLeft;
+        ti += 12;
     }
 }

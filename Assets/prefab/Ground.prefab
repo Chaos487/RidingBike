@@ -158,3 +158,6 @@ MonoBehaviour:
   flatAngleThreshold: 5
   edgeRadius: 0.1
   groundColor: {r: 0.35, g: 0.6, b: 0.25, a: 1}
+  gradientTopColor: {r: 0.86, g: 0.72, b: 0.5, a: 1}
+  gradientDepth: 6
+  gradientBottomColor: {r: 0.25, g: 0.15, b: 0.12, a: 1}
