@@ -43,7 +43,7 @@ public static class EndlessRunBootstrap
 
         EndlessRunSettings runSettings = FindSettings<EndlessRunSettings>();
 
-        SetupBackground(bike);
+        SetupParallaxBackground(bike);
 
         GameObject systems = new GameObject("EndlessRunSystems");
 
@@ -122,20 +122,32 @@ public static class EndlessRunBootstrap
         return terrain;
     }
 
-    static void SetupBackground(BikeController bike)
+    // 多层视差背景:实例化 Assets/prefab/Background.prefab，里面有几层(BackgroundScroller
+    // 组件)、每层用哪张图、视差系数多少，全部交给预制体决定，这里只管把 trackTarget 接上去——
+    // 用 GetComponentsInChildren 找,不写死"必须是 3 层",以后在预制体里加/删层不用改代码。
+    static void SetupParallaxBackground(BikeController bike)
     {
-        Sprite backgroundSprite = FindBackgroundSprite();
-        if (backgroundSprite == null) return;
+        GameObject backgroundPrefab = FindPrefab("Background");
+        if (backgroundPrefab == null)
+        {
+            Debug.LogError("EndlessRunBootstrap: 找不到 Assets/prefab/Background.prefab，不显示视差背景。");
+            return;
+        }
 
-        GameObject backgroundGO = new GameObject("Background");
-        BackgroundScroller scroller = backgroundGO.AddComponent<BackgroundScroller>();
-        scroller.backgroundSprite = backgroundSprite;
+        GameObject backgroundInstance = Object.Instantiate(backgroundPrefab);
+        backgroundInstance.name = backgroundPrefab.name;
 
         // 跟摄像机而不是车身:Cinemachine 的 Follow 阻尼本来就会把车身物理位置的抖动
         // 平滑掉,背景跟摄像机走等于免费继承这份平滑,不需要另外搭一个"平滑锚点"。
         // 摄像机的 look-ahead 偏移也会跟着算进去,背景对齐视野中心反而更准。
         Camera mainCamera = Camera.main;
-        scroller.trackTarget = mainCamera != null ? mainCamera.transform : bike.transform;
+        Transform trackTarget = mainCamera != null ? mainCamera.transform : bike.transform;
+
+        BackgroundScroller[] layers = backgroundInstance.GetComponentsInChildren<BackgroundScroller>();
+        foreach (BackgroundScroller layer in layers)
+        {
+            layer.trackTarget = trackTarget;
+        }
     }
 
     static void SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)
@@ -173,28 +185,14 @@ public static class EndlessRunBootstrap
         return Resources.Load<T>(typeof(T).Name);
     }
 
-    // 跟 FindSettings<T> 同一个思路:优先在编辑器里按名字搜(限定在 Assets/Backgrounds 目录下，
-    // 避免"4"这种短名字在别的目录里撞到不相关的资产);找不到就退回 Resources.Load，给打包后的版本留一条路。
-    static Sprite FindBackgroundSprite()
-    {
-#if UNITY_EDITOR
-        string[] guids = UnityEditor.AssetDatabase.FindAssets("4 t:Sprite", new[] { "Assets/Backgrounds" });
-        if (guids.Length > 0)
-        {
-            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
-            Sprite sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
-            if (sprite != null) return sprite;
-        }
-#endif
-        return Resources.Load<Sprite>("4");
-    }
-
-    // 跟 FindBackgroundSprite 同一个思路:优先在编辑器里按名字搜整个 Assets(预制体放在
-    // Assets/prefab 下,不要求在 Resources 目录);找不到就退回 Resources.Load，给打包后的版本留一条路。
+    // 优先在编辑器里按名字搜——限定在 Assets/prefab 目录下,不搜整个 Assets。项目里导入的
+    // 美术素材包经常自带同名的 Prefab(比如 Nature Backgrounds Pixel Art 这个包自己就有一份
+    // Ground.prefab、一堆 Background_1.."8".prefab),不限定目录的话很容易搜到别人的东西,
+    // 而且完全没有报错、静默地用错预制体。找不到就退回 Resources.Load，给打包后的版本留一条路。
     static GameObject FindPrefab(string name)
     {
 #if UNITY_EDITOR
-        string[] guids = UnityEditor.AssetDatabase.FindAssets($"{name} t:Prefab");
+        string[] guids = UnityEditor.AssetDatabase.FindAssets($"{name} t:Prefab", new[] { "Assets/prefab" });
         if (guids.Length > 0)
         {
             string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
