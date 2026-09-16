@@ -102,6 +102,7 @@ public class BikeController : MonoBehaviour
     float spaceHoldTime;
     bool isSpinning;
     bool hasSpunThisAirtime;
+    bool hasJumpedThisAirtime;
     float spinDirection;
     float spinAccumulatedDeg;
     bool wasGroundedForSpin = true;
@@ -350,6 +351,7 @@ public class BikeController : MonoBehaviour
         {
             isSpinning = false;
             hasSpunThisAirtime = false;
+            hasJumpedThisAirtime = false;
             spaceHoldTime = 0f;
         }
         else if (wasGroundedForSpin)
@@ -359,7 +361,10 @@ public class BikeController : MonoBehaviour
         }
         wasGroundedForSpin = groundedForAirtime;
 
-        if (Input.GetKeyDown(KeyCode.Space) && groundedForJump && !isSpinning)
+        // hasJumpedThisAirtime 用真实轮胎接触(groundedForAirtime)才清零，不依赖上面那条容忍度很高的
+        // 射线——射线在起跳后一小段时间内可能还没读到"离地"，之前只靠它判断"能不能起跳"，
+        // 松手再按一下空格就能在同一次滞空里再跳一次；现在必须真正落地一次才能解锁下一次跳跃。
+        if (Input.GetKeyDown(KeyCode.Space) && groundedForJump && !isSpinning && !hasJumpedThisAirtime)
         {
             Jump();
         }
@@ -381,6 +386,8 @@ public class BikeController : MonoBehaviour
 
     void Jump()
     {
+        hasJumpedThisAirtime = true;
+
         // 车身完全静止一段时间后 Rigidbody2D 会休眠(Time To Sleep 默认 0.5 秒)，
         // 休眠状态下设置 linearVelocity/AddForce 不一定能可靠唤醒它，导致跳跃冲量没有效果。
         // 显式唤醒一下，不管是不是真的在睡，零开销零副作用。
