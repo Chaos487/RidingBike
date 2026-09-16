@@ -64,17 +64,6 @@ public class BikeController : MonoBehaviour
     [Tooltip("坡度探测射线的最大距离。")]
     public float slopeProbeDistance = 2f;
 
-    [Header("Body Contact")]
-    [Tooltip("车架碰撞体的尺寸(宽, 高)。刻意做得比轮距窄、比车身正常离地间隙(约 0.86~0.95m)高，" +
-             "正常骑行不会碰到地面，只有车身歪倒到相当角度才会真的接触——这是给 CrashDetector 用的" +
-             "\"车身触地\"信号，不是靠轮子拼凑出来的。默认尺寸没有实机验证过，需要在 Scene 视图里" +
-             "看碰撞体轮廓、结合实际摔车表现调。")]
-    public Vector2 bodyColliderSize = new Vector2(0.8f, 0.35f);
-    [Tooltip("车架碰撞体的中心偏移。默认往下偏，避开 IsGrounded()/GetGroundSlopeAngle() 的射线起点" +
-             "(车身原点)和探测点(±slopeProbeOffset)，不然射线会在车身内部起步，直接报一个无意义的" +
-             "零距离命中，把地面检测全部搞乱。")]
-    public Vector2 bodyColliderOffset = new Vector2(0f, -0.3f);
-
     [Header("Wheel Visual Spin")]
     [Tooltip("前轮贴图变换。留空的话会自动从 frontWheelJoint 连接的车轮读取，不需要手动拖。")]
     public Transform frontWheelVisual;
@@ -192,19 +181,17 @@ public class BikeController : MonoBehaviour
         FrontWheelContact = AttachContactSensor(frontWheelVisual);
         BackWheelContact = AttachContactSensor(backWheelVisual);
 
-        SetupBodyCollider();
+        SetupBodyContact();
     }
 
-    void SetupBodyCollider()
+    /// <summary>车架本身的碰撞体不在这里创建——直接在 Scene 里手动加/调，形状比代码里定几个数字直观。
+    /// 这里只负责:不管 Inspector 里挂的是什么形状的碰撞体，都关掉它跟自己两个轮子的物理碰撞
+    /// (不然车架碰撞体只要跟悬挂行程内的轮子有一点重叠，就会被当成真碰撞去解算，天天跟
+    /// WheelJoint2D 的悬挂力打架，把车晃得站不住)，并把 WheelContactSensor 接上去。</summary>
+    void SetupBodyContact()
     {
-        // 车架和自己的轮子不参与物理碰撞——不然新加的车身碰撞体一旦跟悬挂行程内的轮子重叠，
-        // 会被当成真实碰撞去解算，天天跟 WheelJoint2D 的悬挂力打架，把车晃得站不住。
         if (frontWheelJoint != null) frontWheelJoint.enableCollision = false;
         if (backWheelJoint != null) backWheelJoint.enableCollision = false;
-
-        BoxCollider2D bodyCollider = gameObject.AddComponent<BoxCollider2D>();
-        bodyCollider.size = bodyColliderSize;
-        bodyCollider.offset = bodyColliderOffset;
 
         BodyContact = AttachContactSensor(transform);
     }
