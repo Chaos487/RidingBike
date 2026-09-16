@@ -187,15 +187,20 @@ public static class EndlessRunBootstrap
 
     // 优先在编辑器里按名字搜——限定在 Assets/prefab 目录下,不搜整个 Assets。项目里导入的
     // 美术素材包经常自带同名的 Prefab(比如 Nature Backgrounds Pixel Art 这个包自己就有一份
-    // Ground.prefab、一堆 Background_1.."8".prefab),不限定目录的话很容易搜到别人的东西,
-    // 而且完全没有报错、静默地用错预制体。找不到就退回 Resources.Load，给打包后的版本留一条路。
+    // Ground.prefab、一堆 Background_1.."8".prefab),不限定目录的话很容易搜到别人的东西。
+    // AssetDatabase.FindAssets 的文本搜索是模糊子串匹配,不是精确文件名匹配——哪怕限定了目录,
+    // "Ground" 也会命中同目录下的 "Background.prefab"(Back-Ground 本身就包含这个子串),
+    // 之前就因为这个把地形错误地实例化成了 Background 预制体。所以这里手动按精确文件名过滤,
+    // 不依赖搜索结果的顺序。找不到就退回 Resources.Load，给打包后的版本留一条路。
     static GameObject FindPrefab(string name)
     {
 #if UNITY_EDITOR
-        string[] guids = UnityEditor.AssetDatabase.FindAssets($"{name} t:Prefab", new[] { "Assets/prefab" });
-        if (guids.Length > 0)
+        string[] guids = UnityEditor.AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/prefab" });
+        foreach (string guid in guids)
         {
-            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
+            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+            if (System.IO.Path.GetFileNameWithoutExtension(path) != name) continue;
+
             GameObject prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (prefab != null) return prefab;
         }
