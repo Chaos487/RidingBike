@@ -29,8 +29,7 @@ MonoBehaviour:
   obstacleCheckIntervalMax: 12
   flatAngleThreshold: 5
   edgeRadius: 0.1
-  groundColor: {r: 0.35, g: 0.6, b: 0.25, a: 1}
-  obstacleSpawnChance: 0.42
+  obstacleSpawnChance: 0.15
   obstacleMinGap: 6
   skipObstaclesOnUphill: 1
   obstacleSize: {x: 0.6, y: 0.4}
