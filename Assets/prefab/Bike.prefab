@@ -447,12 +447,13 @@ MonoBehaviour:
   frontWheelVisual: {fileID: 0}
   backWheelVisual: {fileID: 0}
   wheelSpinDirection: 1
-  jumpForce: 15
+  jumpForce: 45
   speedJumpBonus: 8
   downhillJumpBonus: 6
   maxDownhillAngleForBonus: 20
-  spinHoldThreshold: 0.15
-  spinAngularSpeed: 720
+  spinHoldThreshold: 0.1
+  spinAngularSpeed: 360
+  invulnerabilityFlashInterval: 0.1
 --- !u!1 &8921212775599145840
 GameObject:
   m_ObjectHideFlags: 0
