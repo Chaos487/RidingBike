@@ -110,7 +110,10 @@ public class RunManager : MonoBehaviour
 
     void UpdateHpBar(float currentHp, float maxHp)
     {
-        if (hpBarFill != null) hpBarFill.fillAmount = maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) : 0f;
+        float fill = maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) : 0f;
+        // 临时验证用:排查"血条不掉血"的问题。确认没问题之后可以删掉。
+        Debug.Log($"[RunManager] UpdateHpBar currentHp={currentHp} maxHp={maxHp} fill={fill} hpBarFillIsNull={hpBarFill == null}");
+        if (hpBarFill != null) hpBarFill.fillAmount = fill;
     }
 
     void HandleComboChanged(int comboCount)

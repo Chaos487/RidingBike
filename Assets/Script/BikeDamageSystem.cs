@@ -50,7 +50,12 @@ public class BikeDamageSystem : MonoBehaviour
 
     void HandleCrash()
     {
+        float hpBefore = currentHp;
         currentHp = Mathf.Max(0f, currentHp - damagePerCrash);
+
+        // 临时验证用:排查"血条不掉血"的问题，确认扣血数值本身是不是符合预期。
+        // 确认没问题之后可以删掉。
+        Debug.Log($"[BikeDamageSystem] 摔车扣血 maxHp={maxHp} damagePerCrash={damagePerCrash} hpBefore={hpBefore} hpAfter={currentHp}");
 
         if (currentHp <= 0f)
         {
