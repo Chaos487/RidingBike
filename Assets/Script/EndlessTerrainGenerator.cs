@@ -284,38 +284,52 @@ public class EndlessTerrainGenerator : MonoBehaviour
         edgeCollider.points = points.ToArray();
     }
 
-    // 每列 3 个顶点而不是 2 个:地表 -> gradientDepth 处的"过渡点" -> groundThickness 处的最深点。
-    // 顶点色只在地表->过渡点这一小段(gradientDepth，默认几米)里从 gradientTopColor 过渡到
-    // gradientBottomColor，过渡点往下到最深点整段都是纯色——不然如果只有地表/最深两个顶点，
-    // GPU 是按顶点直接线性插值整条边的，groundThickness 现在有 100 米深，渐变会被拉得几乎看不出来。
+    // 渐变过渡段(地表 -> gradientDepth)内部再细分成几段，每段用 SmoothStep 算颜色，
+    // 不是只在地表/过渡点两个顶点之间直接线性插值——纯线性插值只有 2 个点，GPU 在这两点间
+    // 只能是恒定斜率，过渡段末尾突然接上后面纯色的最深段，会有一道能看出来的"折角"。
+    // SmoothStep 两端导数都是 0，分的段数够多时曲线本身平滑，而且过渡段末尾(t=1)的斜率
+    // 正好是 0，跟后面纯色段(斜率也是 0)平滑衔接，不会有折角。
+    const int GradientSteps = 4;
+
     void RebuildMesh()
     {
         int n = points.Count;
         if (n < 2) return;
 
-        Vector3[] verts = new Vector3[n * 3];
-        Color[] colors = new Color[n * 3];
+        int vertsPerColumn = GradientSteps + 2; // 过渡段 GradientSteps+1 个采样点 + 最深点
+        int bandsPerColumn = vertsPerColumn - 1;
+
+        Vector3[] verts = new Vector3[n * vertsPerColumn];
+        Color[] colors = new Color[n * vertsPerColumn];
         for (int i = 0; i < n; i++)
         {
             Vector2 p = points[i];
-            int vi = i * 3;
-            verts[vi] = new Vector3(p.x, p.y, 0f);
-            verts[vi + 1] = new Vector3(p.x, p.y - gradientDepth, 0f);
-            verts[vi + 2] = new Vector3(p.x, p.y - groundThickness, 0f);
-            colors[vi] = gradientTopColor;
-            colors[vi + 1] = gradientBottomColor;
-            colors[vi + 2] = gradientBottomColor;
+            int vi = i * vertsPerColumn;
+
+            for (int s = 0; s <= GradientSteps; s++)
+            {
+                float t = (float)s / GradientSteps;
+                float depth = Mathf.Lerp(0f, gradientDepth, t);
+                float easedT = Mathf.SmoothStep(0f, 1f, t);
+                verts[vi + s] = new Vector3(p.x, p.y - depth, 0f);
+                colors[vi + s] = Color.Lerp(gradientTopColor, gradientBottomColor, easedT);
+            }
+
+            verts[vi + GradientSteps + 1] = new Vector3(p.x, p.y - groundThickness, 0f);
+            colors[vi + GradientSteps + 1] = gradientBottomColor;
         }
 
-        // 每列 3 个顶点、上下两段(地表->过渡点、过渡点->最深点)，每段都当成一个四边形来铺三角形。
-        int[] tris = new int[(n - 1) * 24];
+        // 每列 vertsPerColumn 个顶点、bandsPerColumn 段，每段当成一个四边形来铺三角形。
+        int[] tris = new int[(n - 1) * bandsPerColumn * 12];
         int ti = 0;
         for (int i = 0; i < n - 1; i++)
         {
-            int vi = i * 3;
-            int viNext = vi + 3;
-            AppendQuadTriangles(tris, ref ti, vi, viNext, vi + 1, viNext + 1);
-            AppendQuadTriangles(tris, ref ti, vi + 1, viNext + 1, vi + 2, viNext + 2);
+            int vi = i * vertsPerColumn;
+            int viNext = vi + vertsPerColumn;
+            for (int band = 0; band < bandsPerColumn; band++)
+            {
+                AppendQuadTriangles(tris, ref ti, vi + band, viNext + band, vi + band + 1, viNext + band + 1);
+            }
         }
 
         mesh.Clear();
