@@ -47,7 +47,7 @@ public static class EndlessRunBootstrap
 
         GameObject systems = new GameObject("EndlessRunSystems");
 
-        EndlessTerrainGenerator terrain = systems.AddComponent<EndlessTerrainGenerator>();
+        EndlessTerrainGenerator terrain = SetupGroundGenerator();
         terrain.trackTarget = bike.transform;
         terrain.ApplySettings(runSettings);
 
@@ -100,6 +100,26 @@ public static class EndlessRunBootstrap
         GameObject canvasInstance = Object.Instantiate(canvasPrefab);
         canvasInstance.name = canvasPrefab.name;
         return canvasInstance.AddComponent<RunManager>();
+    }
+
+    // 地形几何体是运行时按曲线生成的，没法预先摆好，但视觉(材质/贴图)可以在 Editor 里调——
+    // 实例化 Assets/prefab/Ground.prefab，把 EndlessTerrainGenerator 挂在它上面，
+    // 脚本只管生成 Mesh 数据，MeshRenderer 用哪个材质完全交给预制体。
+    static EndlessTerrainGenerator SetupGroundGenerator()
+    {
+        GameObject groundPrefab = FindPrefab("Ground");
+        if (groundPrefab == null)
+        {
+            Debug.LogError("EndlessRunBootstrap: 找不到 Assets/prefab/Ground.prefab，用纯代码兜底生成地形(没有自定义材质)。");
+            return new GameObject("EndlessTerrainGenerator (missing Ground prefab)").AddComponent<EndlessTerrainGenerator>();
+        }
+
+        GameObject groundInstance = Object.Instantiate(groundPrefab);
+        groundInstance.name = groundPrefab.name;
+
+        EndlessTerrainGenerator terrain = groundInstance.GetComponent<EndlessTerrainGenerator>();
+        if (terrain == null) terrain = groundInstance.AddComponent<EndlessTerrainGenerator>();
+        return terrain;
     }
 
     static void SetupBackground(BikeController bike)

@@ -7,6 +7,10 @@ using UnityEngine;
 /// 每个阶段的长度、坡的高度差都可以单独配置(见 EndlessRunSettings)。
 /// 阶段之间用 SmoothStep 过渡(两端导数为 0),所以任意相邻阶段衔接处都不会有尖角,
 /// 地形整体是一条连续光滑的曲线,不是拼接直线段。
+///
+/// 挂在 Assets/prefab/Ground.prefab 上——几何体是运行时按地形曲线生成的,没法预先在
+/// 编辑器里摆好,但视觉(材质/贴图)可以:MeshRenderer 上手动指定一个 Material 就会优先用它
+/// (什么贴图/渐变都行),不指定的话退回运行时生成的纯色材质(用 groundColor 这个字段)。
 /// </summary>
 [RequireComponent(typeof(EdgeCollider2D))]
 public class EndlessTerrainGenerator : MonoBehaviour
@@ -52,6 +56,7 @@ public class EndlessTerrainGenerator : MonoBehaviour
     public float edgeRadius = 0.1f;
 
     [Header("Visual")]
+    [Tooltip("只在 Ground.prefab 的 MeshRenderer 没有手动指定材质时才会用到，直接在预制体上改。")]
     public Color groundColor = new Color(0.35f, 0.6f, 0.25f);
 
     /// <summary>沿地形按一定间距采样时触发,供障碍物生成等系统订阅。</summary>
@@ -78,13 +83,23 @@ public class EndlessTerrainGenerator : MonoBehaviour
         edgeCollider = GetComponent<EdgeCollider2D>();
         edgeCollider.edgeRadius = edgeRadius;
 
-        meshFilter = gameObject.AddComponent<MeshFilter>();
-        meshRenderer = gameObject.AddComponent<MeshRenderer>();
+        // Ground.prefab 上应该已经挂好了这两个组件，这里 GetComponent 兜底一下，
+        // 万一哪天不是从预制体实例化出来的（比如临时测试）也不至于直接报错。
+        meshFilter = GetComponent<MeshFilter>();
+        if (meshFilter == null) meshFilter = gameObject.AddComponent<MeshFilter>();
+        meshRenderer = GetComponent<MeshRenderer>();
+        if (meshRenderer == null) meshRenderer = gameObject.AddComponent<MeshRenderer>();
+
         mesh = new Mesh { name = "GeneratedGround" };
         meshFilter.mesh = mesh;
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
-        meshRenderer.sharedMaterial = new Material(shader) { color = groundColor };
+        // 预制体的 MeshRenderer 上手动指定了材质就用那个（贴图/渐变随便做，这里不碰）；
+        // 没指定的话（sharedMaterial 是 null）退回运行时生成的纯色材质，保证没配置也能跑。
+        if (meshRenderer.sharedMaterial == null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
+            meshRenderer.sharedMaterial = new Material(shader) { color = groundColor };
+        }
         meshRenderer.sortingOrder = -1;
     }
 
@@ -110,10 +125,8 @@ public class EndlessTerrainGenerator : MonoBehaviour
         obstacleCheckIntervalMax = settings.obstacleCheckIntervalMax;
         flatAngleThreshold = settings.flatAngleThreshold;
         edgeRadius = settings.edgeRadius;
-        groundColor = settings.groundColor;
 
         edgeCollider.edgeRadius = edgeRadius;
-        meshRenderer.sharedMaterial.color = groundColor;
     }
 
     public void Initialize(Vector2 startPoint)

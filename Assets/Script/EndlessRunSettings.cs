@@ -51,7 +51,6 @@ public class EndlessRunSettings : ScriptableObject
 
     [Header("地面碰撞体")]
     public float edgeRadius = 0.1f;
-    public Color groundColor = new Color(0.35f, 0.6f, 0.25f);
 
     [Header("障碍物")]
     [Range(0f, 1f)]
