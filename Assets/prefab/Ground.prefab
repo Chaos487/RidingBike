@@ -161,3 +161,5 @@ MonoBehaviour:
   gradientTopColor: {r: 0.86, g: 0.72, b: 0.5, a: 1}
   gradientDepth: 6
   gradientBottomColor: {r: 0.25, g: 0.15, b: 0.12, a: 1}
+  colorNoiseAmount: 0.05
+  colorNoiseScale: 0.15

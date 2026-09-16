@@ -67,6 +67,15 @@ public class EndlessTerrainGenerator : MonoBehaviour
     public float gradientDepth = 6f;
     [Tooltip("过渡完之后(以及一路到最深处)的纯色顶点色。")]
     public Color gradientBottomColor = new Color(0.25f, 0.15f, 0.12f);
+    [Tooltip("颜色噪声强度，在渐变基础上给每个顶点叠加一点明暗抖动，打破纯色块的死板感。" +
+             "0 = 关闭。这个值是往 RGB 三个通道加同一个偏移(只改明暗，不改色相)，" +
+             "不会导致颜色发闷或者偏色。")]
+    [Range(0f, 0.3f)]
+    public float colorNoiseAmount = 0.05f;
+    [Tooltip("颜色噪声的空间频率——值越大，噪声看起来颗粒越细碎；值越小，越接近大片柔和的明暗过渡。" +
+             "噪声按顶点的世界坐标采样(Perlin Noise)，同一个位置每次重建网格都会算出同样的结果，" +
+             "不会因为地形持续生成/回收而一直闪烁。")]
+    public float colorNoiseScale = 0.15f;
 
     /// <summary>沿地形按一定间距采样时触发,供障碍物生成等系统订阅。</summary>
     public event Action<Vector2, float, SlopeDirection> OnGroundSampled;
@@ -311,12 +320,14 @@ public class EndlessTerrainGenerator : MonoBehaviour
                 float t = (float)s / GradientSteps;
                 float depth = Mathf.Lerp(0f, gradientDepth, t);
                 float easedT = Mathf.SmoothStep(0f, 1f, t);
-                verts[vi + s] = new Vector3(p.x, p.y - depth, 0f);
-                colors[vi + s] = Color.Lerp(gradientTopColor, gradientBottomColor, easedT);
+                float vertexY = p.y - depth;
+                verts[vi + s] = new Vector3(p.x, vertexY, 0f);
+                colors[vi + s] = ApplyColorNoise(Color.Lerp(gradientTopColor, gradientBottomColor, easedT), p.x, vertexY);
             }
 
-            verts[vi + GradientSteps + 1] = new Vector3(p.x, p.y - groundThickness, 0f);
-            colors[vi + GradientSteps + 1] = gradientBottomColor;
+            float deepY = p.y - groundThickness;
+            verts[vi + GradientSteps + 1] = new Vector3(p.x, deepY, 0f);
+            colors[vi + GradientSteps + 1] = ApplyColorNoise(gradientBottomColor, p.x, deepY);
         }
 
         // 每列 vertsPerColumn 个顶点、bandsPerColumn 段，每段当成一个四边形来铺三角形。
@@ -337,6 +348,22 @@ public class EndlessTerrainGenerator : MonoBehaviour
         mesh.colors = colors;
         mesh.triangles = tris;
         mesh.RecalculateBounds();
+    }
+
+    // 用 Perlin Noise 按顶点的世界坐标采样，给同一个明暗偏移量加到 RGB 三个通道上(不改色相，
+    // 只改明暗)。用世界坐标而不是顶点在数组里的序号，是因为地形一直在往前生成、往后回收，
+    // 同一个位置不管被重建过多少次，采样结果都一样，不会出现地面纹理跟着重建过程闪烁的问题。
+    Color ApplyColorNoise(Color baseColor, float worldX, float worldY)
+    {
+        if (colorNoiseAmount <= 0f) return baseColor;
+
+        float noise = Mathf.PerlinNoise(worldX * colorNoiseScale, worldY * colorNoiseScale);
+        float offset = (noise - 0.5f) * 2f * colorNoiseAmount;
+        return new Color(
+            Mathf.Clamp01(baseColor.r + offset),
+            Mathf.Clamp01(baseColor.g + offset),
+            Mathf.Clamp01(baseColor.b + offset),
+            baseColor.a);
     }
 
     // 一个四边形(topLeft/topRight/bottomLeft/bottomRight 四个顶点索引)铺两个三角形，
