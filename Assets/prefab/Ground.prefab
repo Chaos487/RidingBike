@@ -67,14 +67,17 @@ EdgeCollider2D:
     m_Bits: 4294967295
   m_IsTrigger: 0
   m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
   m_EdgeRadius: 0.1
-  m_UseAdjacentStartPoint: 0
-  m_UseAdjacentEndPoint: 0
-  m_AdjacentStartPoint: {x: 0, y: 0}
-  m_AdjacentEndPoint: {x: 0, y: 0}
   m_Points:
   - {x: -1, y: 0}
   - {x: 1, y: 0}
+  m_AdjacentStartPoint: {x: 0, y: 0}
+  m_AdjacentEndPoint: {x: 0, y: 0}
+  m_UseAdjacentStartPoint: 0
+  m_UseAdjacentEndPoint: 0
 --- !u!33 &1000000004
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -105,7 +108,8 @@ MeshRenderer:
   m_SmallMeshCulling: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
-  m_Materials: []
+  m_Materials:
+  - {fileID: 2100000, guid: 2cc90dba9ff484d099771dbb9431784a, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -137,8 +141,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4fab90fe697194ae7b1c2a0abacccf94, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   trackTarget: {fileID: 0}
   generateAheadDistance: 50
   despawnBehindDistance: 25
@@ -157,9 +161,9 @@ MonoBehaviour:
   obstacleCheckIntervalMax: 12
   flatAngleThreshold: 5
   edgeRadius: 0.1
-  groundColor: {r: 0.35, g: 0.6, b: 0.25, a: 1}
+  groundColor: {r: 0.8301887, g: 0.7865104, b: 0.71662515, a: 1}
   gradientTopColor: {r: 0.86, g: 0.72, b: 0.5, a: 1}
-  gradientDepth: 6
+  gradientDepth: 12
   gradientBottomColor: {r: 0.25, g: 0.15, b: 0.12, a: 1}
   colorNoiseAmount: 0.05
   colorNoiseScale: 0.15
