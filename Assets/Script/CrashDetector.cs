@@ -95,22 +95,21 @@ public class CrashDetector : MonoBehaviour
         bool stillFalling = tilt > maxRecoverableAngle || !recovering;
         bool criticalConditionMet = grounded && tilt > criticalAngle && stillFalling;
 
-        // 临时验证用:非 Normal 状态时每 0.5 秒打一条状态快照,排查"是不是卡在某个状态出不来"。
+        // 临时验证用:不管什么状态，每 0.5 秒都打一条快照——之前只在非 Normal 时打，
+        // 如果 bug 是"车身明显翻了但算出来的 tilt 却很小"，状态会一直停在 Normal，
+        // 那种情况反而完全看不到 log。这次把原始的车身角度、坡度探测角度分开打出来，
+        // 才能分清是"轮子没触地"(Body Contact 缺失)还是"坡度探测本身算错了角度"。
         // 确认状态机行为没问题之后可以删掉。
-        if (State != CrashState.Normal)
-        {
-            debugLogTimer += Time.fixedDeltaTime;
-            if (debugLogTimer >= 0.5f)
-            {
-                debugLogTimer = 0f;
-                Debug.Log($"[CrashDetector] state={State} tilt={tilt:0.0} grounded={grounded} " +
-                          $"criticalConditionMet={criticalConditionMet} recovering={recovering} " +
-                          $"dangerTime={dangerTime:0.00} overTiltTime={overTiltTime:0.00} recoveryTimer={recoveryTimer:0.00}");
-            }
-        }
-        else
+        debugLogTimer += Time.fixedDeltaTime;
+        if (debugLogTimer >= 0.5f)
         {
             debugLogTimer = 0f;
+            bool frontContact = bikeController != null && bikeController.FrontWheelContact != null && bikeController.FrontWheelContact.IsGrounded;
+            bool backContact = bikeController != null && bikeController.BackWheelContact != null && bikeController.BackWheelContact.IsGrounded;
+            Debug.Log($"[CrashDetector] state={State} rawRotation={bikeRigidbody.rotation:0.0} targetAngle={targetAngle:0.0} tilt={tilt:0.0} " +
+                      $"grounded={grounded} frontContact={frontContact} backContact={backContact} " +
+                      $"criticalConditionMet={criticalConditionMet} recovering={recovering} angularVelocity={angularVelocity:0.0} " +
+                      $"dangerTime={dangerTime:0.00} overTiltTime={overTiltTime:0.00} recoveryTimer={recoveryTimer:0.00}");
         }
 
         switch (State)
