@@ -46,8 +46,6 @@ public class BikeController : MonoBehaviour
     public float MaxLinearSpeed => maxSpeedKmh / 3.6f;
 
     [Header("Balance")]
-    [Tooltip("空中按 A/D 时给车身施加的压头/抬头力矩。")]
-    public float airLeanTorque = 30f;
     [Tooltip("自动回正强度，车身倾斜时把它拉回水平。0 = 关闭。")]
     public float autoBalanceTorque = 25f;
     [Tooltip("回正阻尼，抑制摇摆震荡。")]
@@ -290,7 +288,8 @@ public class BikeController : MonoBehaviour
 
     void Update()
     {
-        // 地面上不再响应 A/D 驱动，只在空中用于压头/抬头（见 ApplyBalance）。
+        // 不再驱动前进/后退，也不再控制空中姿态——现在唯一的用途是决定按住空格触发旋转时
+        // 转向哪一边（见 StartSpin），空中姿态完全交给自动回正和主动旋转（Space）。
         input = Input.GetAxisRaw("Horizontal");
 
         if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
@@ -475,15 +474,12 @@ public class BikeController : MonoBehaviour
         if (isSpinning) return;
 
         // 用真实轮胎接触，不用 IsGrounded() 的距离射线——射线容忍度很高，一次普通跳跃的
-        // 大半程都可能被它误判成"已经触地"，导致这里以为一直在地上：空中扳方向键的压头/抬头
-        // 不生效，自动回正也一直在追地面坡度而不是回正到水平，等于空中基本没有回正/控制这件事。
+        // 大半程都可能被它误判成"已经触地"，导致自动回正一直在追地面坡度而不是回正到水平，
+        // 等于空中基本没有回正这件事。
         bool grounded = IsWheelGrounded;
 
-        // 空中按方向键 → 压头 / 抬头
-        if (!grounded && Mathf.Abs(input) > 0.01f)
-        {
-            bikeRigidbody.AddTorque(-input * driveDirection * airLeanTorque);
-        }
+        // 空中不再响应方向键——姿态控制只留空格(特技旋转)一种手段，没按空格就交给下面的
+        // 自动回正去摆正，方向键在空中彻底不影响车身角度。
 
         // 自动回正（PD 控制：弹簧拉回目标角度 + 阻尼抑制摆动）。
         // 触地时目标角度是当地坡度，不是死磕水平——不然会跟悬挂的天然贴合坡面打架；
