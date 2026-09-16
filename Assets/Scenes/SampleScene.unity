@@ -632,8 +632,20 @@ PrefabInstance:
       value: 60
       objectReference: {fileID: 0}
     - target: {fileID: 59446433101252279, guid: 1d7ad02435f874d999f3dcffef263c9b, type: 3}
+      propertyPath: baselineSpeedKmh
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 59446433101252279, guid: 1d7ad02435f874d999f3dcffef263c9b, type: 3}
       propertyPath: spinAngularSpeed
       value: 360
+      objectReference: {fileID: 0}
+    - target: {fileID: 59446433101252279, guid: 1d7ad02435f874d999f3dcffef263c9b, type: 3}
+      propertyPath: boostSpeedBonusKmh
+      value: 60
+      objectReference: {fileID: 0}
+    - target: {fileID: 59446433101252279, guid: 1d7ad02435f874d999f3dcffef263c9b, type: 3}
+      propertyPath: boostDecayPerSecondKmh
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 7316531443551290128, guid: 1d7ad02435f874d999f3dcffef263c9b, type: 3}
       propertyPath: m_LocalPosition.x
