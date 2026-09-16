@@ -37,7 +37,9 @@ public class BackgroundScroller : MonoBehaviour
              "(镜头最大 OrthographicSize * 2) / 背景原始高度(米)。")]
     public float scale = 1.4f;
     [Tooltip("垂直方向的额外偏移(米)，背景图本身不会跟着地形起伏，只整体上下平移这一个固定值，" +
-             "用来把图里的地平线大致对到地形高度——需要在 Inspector 里手动试。")]
+             "用来把图里的地平线大致对到地形高度——需要在 Inspector 里手动试。" +
+             "跟 Background 根节点 Transform 的 Y 位置是相加关系：根节点管所有层一起挪的整体量，" +
+             "这个字段管这一层相对其他层的微调。")]
     public float verticalOffset = 3f;
     [Tooltip("trackTarget 左右各预铺多少块面板。面板本身很宽，1 通常已经有很大余量。")]
     public int panelsAheadBehind = 1;
@@ -48,6 +50,13 @@ public class BackgroundScroller : MonoBehaviour
     float panelWorldWidth;
     float lastTrackX;
     readonly List<SpriteRenderer> panels = new List<SpriteRenderer>();
+
+    // Background 根节点(这个组件所在的 LayerN 的父物体)自己的 Transform 从来没被摆放逻辑用过——
+    // 面板的世界坐标是每帧从 trackTarget 直接算出来再赋值的，根节点的 Position 挪了也没用。
+    // 这里把根节点的 Y 位置当成一个所有层共享的整体垂直偏移叠加进去，这样拖根节点的 Position.y
+    // 就能让所有层一起挪，每层自己的 verticalOffset 仍然保留用来做层间微调，两者相加。
+    // 根节点的 X 不接入——横向是无限滚动的，没有一个"正确的水平基准"，接入了也没意义。
+    float RootVerticalOffset => transform.parent != null ? transform.parent.position.y : 0f;
 
     void Start()
     {
@@ -60,7 +69,7 @@ public class BackgroundScroller : MonoBehaviour
         panelWorldWidth = backgroundSprite.bounds.size.x * scale;
         lastTrackX = trackTarget.position.x;
 
-        float anchorY = trackTarget.position.y + verticalOffset;
+        float anchorY = trackTarget.position.y + verticalOffset + RootVerticalOffset;
         for (int i = -panelsAheadBehind; i <= panelsAheadBehind; i++)
         {
             SpawnPanel(trackTarget.position.x + i * panelWorldWidth, anchorY, i);
@@ -73,7 +82,7 @@ public class BackgroundScroller : MonoBehaviour
         lastTrackX = trackTarget.position.x;
 
         float ownDeltaX = deltaX * (1f - parallaxFactor);
-        float anchorY = trackTarget.position.y + verticalOffset;
+        float anchorY = trackTarget.position.y + verticalOffset + RootVerticalOffset;
 
         foreach (SpriteRenderer panel in panels)
         {
