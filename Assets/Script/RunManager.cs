@@ -6,6 +6,10 @@ using UnityEngine.UI;
 /// <summary>
 /// 管理单局 endless run 的状态:显示距离/时速/氮气就绪状态/连击数、弹出特技/贴身险提示、
 /// 监听摔车、结算并支持按 R 重开。
+/// UI 视觉本身是 Assets/prefab/EndlessRunCanvas.prefab(手动在 Editor 里搭的,改颜色/字体/布局
+/// 直接在那份预制体上改,不用碰这个脚本)——这个脚本是在 EndlessRunBootstrap 里
+/// Instantiate 完预制体之后直接挂到它根节点上的,Awake() 按名字把预制体里的子物体找出来。
+/// 改预制体层级/改物体名字的话，下面 FindUIReferences() 里对应的路径也要跟着改。
 /// </summary>
 public class RunManager : MonoBehaviour
 {
@@ -35,7 +39,7 @@ public class RunManager : MonoBehaviour
 
     void Awake()
     {
-        BuildUI();
+        FindUIReferences();
     }
 
     public void Initialize(Transform bike, BikeDamageSystem bikeDamageSystem, BikeController controller)
@@ -110,10 +114,7 @@ public class RunManager : MonoBehaviour
 
     void UpdateHpBar(float currentHp, float maxHp)
     {
-        float fill = maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) : 0f;
-        // 临时验证用:排查"血条不掉血"的问题。确认没问题之后可以删掉。
-        Debug.Log($"[RunManager] UpdateHpBar currentHp={currentHp} maxHp={maxHp} fill={fill} hpBarFillIsNull={hpBarFill == null}");
-        if (hpBarFill != null) hpBarFill.fillAmount = fill;
+        if (hpBarFill != null) hpBarFill.fillAmount = maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) : 0f;
     }
 
     void HandleComboChanged(int comboCount)
@@ -158,66 +159,51 @@ public class RunManager : MonoBehaviour
         statusText.gameObject.SetActive(true);
     }
 
-    void BuildUI()
+    void FindUIReferences()
     {
-        GameObject canvasGO = new GameObject("EndlessRunCanvas");
-        Canvas canvas = canvasGO.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvasGO.AddComponent<CanvasScaler>();
-        canvasGO.AddComponent<GraphicRaycaster>();
+        distanceText = FindText("DistanceText");
+        speedText = FindText("SpeedText");
+        boostText = FindText("BoostText");
+        comboText = FindText("ComboText");
+        toastText = FindText("ToastText");
+        statusText = FindText("StatusText");
+        hpLabelText = FindText("HpLabelText");
+        hpBarFill = FindImage("HpBarBackground/HpBarFill");
 
-        distanceText = CreateText(canvasGO.transform, "DistanceText", new Vector2(0f, 1f), new Vector2(20f, -20f), 220f, 24, TextAnchor.UpperLeft);
-        speedText = CreateText(canvasGO.transform, "SpeedText", new Vector2(0f, 1f), new Vector2(240f, -20f), 220f, 24, TextAnchor.UpperLeft);
-        boostText = CreateText(canvasGO.transform, "BoostText", new Vector2(0f, 1f), new Vector2(20f, -50f), 300f, 22, TextAnchor.UpperLeft);
-        comboText = CreateText(canvasGO.transform, "ComboText", new Vector2(0f, 1f), new Vector2(20f, -80f), 300f, 22, TextAnchor.UpperLeft);
+        if (toastText != null) toastText.text = string.Empty;
+        if (statusText != null) statusText.gameObject.SetActive(false);
 
-        toastText = CreateText(canvasGO.transform, "ToastText", new Vector2(0.5f, 1f), new Vector2(0f, -140f), 600f, 36, TextAnchor.UpperCenter);
-        toastText.text = string.Empty;
-
-        statusText = CreateText(canvasGO.transform, "StatusText", new Vector2(0.5f, 0.5f), Vector2.zero, 500f, 32, TextAnchor.MiddleCenter);
-        statusText.gameObject.SetActive(false);
-
-        hpLabelText = CreateText(canvasGO.transform, "HpLabelText", new Vector2(1f, 1f), new Vector2(-20f, -20f), 220f, 22, TextAnchor.UpperRight);
-        hpLabelText.text = "HP";
-        hpBarFill = CreateHpBar(canvasGO.transform, new Vector2(-20f, -46f), 220f, 20f);
+        // Image.Type.Filled 在没有指定 sprite 的时候会直接走"画整个矩形"的兜底逻辑，
+        // fillAmount 完全不生效(这点跟 Type.Simple 不一样，纯色矩形那个技巧对 Filled 不成立)。
+        // 运行时强制保证这两项，不依赖预制体里有没有设对；颜色/fillMethod/fillOrigin 这些纯视觉的
+        // 交给预制体自己定，这里不碰。
+        if (hpBarFill != null)
+        {
+            hpBarFill.type = Image.Type.Filled;
+            hpBarFill.sprite = CreateSolidSprite();
+        }
     }
 
-    static Image CreateHpBar(Transform parent, Vector2 anchoredPos, float width, float height)
+    Text FindText(string path)
     {
-        GameObject bgGO = new GameObject("HpBarBackground");
-        bgGO.transform.SetParent(parent, false);
+        Transform t = transform.Find(path);
+        if (t == null)
+        {
+            Debug.LogError($"[RunManager] 在 UI 预制体里找不到 \"{path}\"，检查一下 EndlessRunCanvas.prefab 的层级/命名有没有改动。");
+            return null;
+        }
+        return t.GetComponent<Text>();
+    }
 
-        RectTransform bgRt = bgGO.AddComponent<RectTransform>();
-        bgRt.anchorMin = new Vector2(1f, 1f);
-        bgRt.anchorMax = new Vector2(1f, 1f);
-        bgRt.pivot = new Vector2(1f, 1f);
-        bgRt.anchoredPosition = anchoredPos;
-        bgRt.sizeDelta = new Vector2(width, height);
-
-        Image background = bgGO.AddComponent<Image>();
-        background.color = new Color(0f, 0f, 0f, 0.5f);
-
-        GameObject fillGO = new GameObject("HpBarFill");
-        fillGO.transform.SetParent(bgGO.transform, false);
-
-        RectTransform fillRt = fillGO.AddComponent<RectTransform>();
-        fillRt.anchorMin = Vector2.zero;
-        fillRt.anchorMax = Vector2.one;
-        fillRt.offsetMin = new Vector2(2f, 2f);
-        fillRt.offsetMax = new Vector2(-2f, -2f);
-
-        Image fill = fillGO.AddComponent<Image>();
-        // Image.Type.Filled 在没有指定 sprite 的时候会直接走"画整个矩形"的兜底逻辑，
-        // fillAmount 完全不生效(这点跟 Type.Simple 不一样，纯色矩形那个技巧对 Filled 不成立)，
-        // 所以这里必须给一张运行时生成的纯白 1x1 贴图，不能像背景那块一样留空。
-        fill.sprite = CreateSolidSprite();
-        fill.color = new Color(0.85f, 0.2f, 0.2f);
-        fill.type = Image.Type.Filled;
-        fill.fillMethod = Image.FillMethod.Horizontal;
-        fill.fillOrigin = (int)Image.OriginHorizontal.Left;
-        fill.fillAmount = 1f;
-
-        return fill;
+    Image FindImage(string path)
+    {
+        Transform t = transform.Find(path);
+        if (t == null)
+        {
+            Debug.LogError($"[RunManager] 在 UI 预制体里找不到 \"{path}\"，检查一下 EndlessRunCanvas.prefab 的层级/命名有没有改动。");
+            return null;
+        }
+        return t.GetComponent<Image>();
     }
 
     static Sprite CreateSolidSprite()
@@ -226,25 +212,5 @@ public class RunManager : MonoBehaviour
         texture.SetPixel(0, 0, Color.white);
         texture.Apply();
         return Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f));
-    }
-
-    static Text CreateText(Transform parent, string name, Vector2 anchor, Vector2 anchoredPos, float width, int fontSize, TextAnchor alignment)
-    {
-        GameObject go = new GameObject(name);
-        go.transform.SetParent(parent, false);
-
-        RectTransform rt = go.AddComponent<RectTransform>();
-        rt.anchorMin = anchor;
-        rt.anchorMax = anchor;
-        rt.pivot = anchor;
-        rt.anchoredPosition = anchoredPos;
-        rt.sizeDelta = new Vector2(width, 120f);
-
-        Text text = go.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.fontSize = fontSize;
-        text.alignment = alignment;
-        text.color = Color.white;
-        return text;
     }
 }

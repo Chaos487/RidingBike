@@ -65,7 +65,7 @@ public static class EndlessRunBootstrap
         damageSystem.ApplySettings(FindSettings<BikeDamageSettings>());
         damageSystem.Initialize(bike, crashDetector);
 
-        RunManager runManager = systems.AddComponent<RunManager>();
+        RunManager runManager = SetupRunManagerUI();
         runManager.Initialize(bike.transform, damageSystem, bike);
 
         LandingDetector landingDetector = systems.AddComponent<LandingDetector>();
@@ -83,6 +83,23 @@ public static class EndlessRunBootstrap
         runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner);
 
         SetupCamera(bike, damageSystem, landingDetector);
+    }
+
+    // UI 现在是手动在 Editor 里搭的 Assets/prefab/EndlessRunCanvas.prefab，实例化出来之后
+    // 直接把 RunManager 挂到它根节点上——RunManager.Awake() 会按名字把预制体里的子物体
+    // (DistanceText/SpeedText/.../HpBarBackground/HpBarFill) 找出来，改预制体视觉不用碰这份代码。
+    static RunManager SetupRunManagerUI()
+    {
+        GameObject canvasPrefab = FindPrefab("EndlessRunCanvas");
+        if (canvasPrefab == null)
+        {
+            Debug.LogError("EndlessRunBootstrap: 找不到 Assets/prefab/EndlessRunCanvas.prefab，局内 UI 不会显示。");
+            return new GameObject("RunManager (missing UI prefab)").AddComponent<RunManager>();
+        }
+
+        GameObject canvasInstance = Object.Instantiate(canvasPrefab);
+        canvasInstance.name = canvasPrefab.name;
+        return canvasInstance.AddComponent<RunManager>();
     }
 
     static void SetupBackground(BikeController bike)
@@ -150,5 +167,21 @@ public static class EndlessRunBootstrap
         }
 #endif
         return Resources.Load<Sprite>("bg1");
+    }
+
+    // 跟 FindBackgroundSprite 同一个思路:优先在编辑器里按名字搜整个 Assets(预制体放在
+    // Assets/prefab 下,不要求在 Resources 目录);找不到就退回 Resources.Load，给打包后的版本留一条路。
+    static GameObject FindPrefab(string name)
+    {
+#if UNITY_EDITOR
+        string[] guids = UnityEditor.AssetDatabase.FindAssets($"{name} t:Prefab");
+        if (guids.Length > 0)
+        {
+            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
+            GameObject prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab != null) return prefab;
+        }
+#endif
+        return Resources.Load<GameObject>(name);
     }
 }
