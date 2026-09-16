@@ -153,12 +153,12 @@ public static class EndlessRunBootstrap
         return Resources.Load<T>(typeof(T).Name);
     }
 
-    // 跟 FindSettings<T> 同一个思路:优先在编辑器里按名字搜整个 Assets(bg1.jpeg 放在
-    // Assets/Art 下,不要求在 Resources 目录);找不到就退回 Resources.Load,给打包后的版本留一条路。
+    // 跟 FindSettings<T> 同一个思路:优先在编辑器里按名字搜(限定在 Assets/Backgrounds 目录下，
+    // 避免"4"这种短名字在别的目录里撞到不相关的资产);找不到就退回 Resources.Load，给打包后的版本留一条路。
     static Sprite FindBackgroundSprite()
     {
 #if UNITY_EDITOR
-        string[] guids = UnityEditor.AssetDatabase.FindAssets("bg1 t:Sprite");
+        string[] guids = UnityEditor.AssetDatabase.FindAssets("4 t:Sprite", new[] { "Assets/Backgrounds" });
         if (guids.Length > 0)
         {
             string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
@@ -166,7 +166,7 @@ public static class EndlessRunBootstrap
             if (sprite != null) return sprite;
         }
 #endif
-        return Resources.Load<Sprite>("bg1");
+        return Resources.Load<Sprite>("4");
     }
 
     // 跟 FindBackgroundSprite 同一个思路:优先在编辑器里按名字搜整个 Assets(预制体放在
