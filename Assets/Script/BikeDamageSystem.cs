@@ -14,7 +14,8 @@ public class BikeDamageSystem : MonoBehaviour
     public float damagePerCrash = 35f;
 
     [Header("Recovery")]
-    public float invulnerabilitySeconds = 1.5f;
+    [Tooltip("摔车扣血之后这段时间内不会再次扣血(CrashDetector 直接跳过判定)，车身贴图同步闪烁提示玩家。")]
+    public float invulnerabilitySeconds = 5f;
     [Range(0f, 1f)]
     public float recoveryUprightBlend = 0.6f;
 
@@ -60,6 +61,7 @@ public class BikeDamageSystem : MonoBehaviour
 
         RecoverBikeUpright();
         crashDetector.Recover(invulnerabilitySeconds);
+        bike.PlayInvulnerabilityFlash(invulnerabilitySeconds);
 
         OnHpChanged?.Invoke(currentHp, maxHp);
     }

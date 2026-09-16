@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
@@ -86,6 +88,10 @@ public class BikeController : MonoBehaviour
     [Tooltip("旋转时的角速度 (deg/s)，越大转得越快。")]
     public float spinAngularSpeed = 720f;
 
+    [Header("Invulnerability Flash")]
+    [Tooltip("摔车扣血后的无敌期间，车身贴图一亮一灭切换一次的间隔(秒)，越小闪得越快。")]
+    public float invulnerabilityFlashInterval = 0.1f;
+
     float currentMotorSpeed;
     float input;
 
@@ -106,6 +112,9 @@ public class BikeController : MonoBehaviour
     float backWheelSpinDeg;
     Transform frontSpinVisual;
     Transform backSpinVisual;
+
+    readonly List<SpriteRenderer> flashRenderers = new List<SpriteRenderer>();
+    Coroutine flashCoroutine;
 
     /// <summary>是否正在执行主动触发的空中 360 旋转。外部系统(比如摔车判定)据此排除这种合法的高倾角状态。</summary>
     public bool IsSpinning => isSpinning;
@@ -173,6 +182,61 @@ public class BikeController : MonoBehaviour
         BackWheelContact = AttachContactSensor(backWheelVisual);
 
         SetupBodyContact();
+        CollectFlashRenderers();
+    }
+
+    /// <summary>收集无敌闪烁要用到的贴图:实际显示出来的是 frontSpinVisual/backSpinVisual
+    /// (轮子贴图被拆出来单独转的那个副本，见上面的注释)，不是原本的 Frontwheel/Backwheel——
+    /// 那两个原始物体的 SpriteRenderer 已经在 CreateSpinVisual 里被关掉了，闪它们没有视觉效果。
+    /// rack 是纯装饰件，没有拆分，直接闪它自己就行。</summary>
+    void CollectFlashRenderers()
+    {
+        flashRenderers.Clear();
+
+        AddFlashRenderer(frontSpinVisual);
+        AddFlashRenderer(backSpinVisual);
+        Transform rack = transform.Find("rack");
+        if (rack != null) AddFlashRenderer(rack);
+    }
+
+    void AddFlashRenderer(Transform target)
+    {
+        if (target == null) return;
+        SpriteRenderer sr = target.GetComponent<SpriteRenderer>();
+        if (sr != null) flashRenderers.Add(sr);
+    }
+
+    /// <summary>摔车扣血后的无敌期间调用:车身贴图一亮一灭闪烁 duration 秒，提示玩家现在打不到。</summary>
+    public void PlayInvulnerabilityFlash(float duration)
+    {
+        if (flashCoroutine != null) StopCoroutine(flashCoroutine);
+        flashCoroutine = StartCoroutine(FlashRoutine(duration));
+    }
+
+    IEnumerator FlashRoutine(float duration)
+    {
+        float elapsed = 0f;
+        bool visible = true;
+
+        while (elapsed < duration)
+        {
+            visible = !visible;
+            SetFlashRenderersVisible(visible);
+
+            yield return new WaitForSeconds(invulnerabilityFlashInterval);
+            elapsed += invulnerabilityFlashInterval;
+        }
+
+        SetFlashRenderersVisible(true);
+        flashCoroutine = null;
+    }
+
+    void SetFlashRenderersVisible(bool visible)
+    {
+        foreach (SpriteRenderer sr in flashRenderers)
+        {
+            if (sr != null) sr.enabled = visible;
+        }
     }
 
     /// <summary>车架本身的碰撞体不在这里创建——直接在 Scene 里手动加/调，形状比代码里定几个数字直观。
