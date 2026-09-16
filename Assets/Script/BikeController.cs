@@ -72,10 +72,6 @@ public class BikeController : MonoBehaviour
     [Tooltip("轮子贴图的旋转方向，如果转起来是反的就改成 -1。这个只影响视觉，不影响驱动物理。")]
     public float wheelSpinDirection = 1f;
 
-    [Header("Damage Parts")]
-    [Tooltip("车架上的行李架装饰件。留空的话会自动按名字 \"rack\" 找子物体，不需要手动拖。供 BikeDamageSystem 在第二次判定失控时隐藏。")]
-    public GameObject rack;
-
     [Header("Jump / Spin")]
     [Tooltip("起跳基础冲量(静止、平地起跳时的力度)。这个值算出来的跳跃高度必须明显超过 groundCheckDistance，不然 IsGrounded 全程判定为触地，跳跃等于没发生。")]
     public float jumpForce = 18f;
@@ -163,11 +159,6 @@ public class BikeController : MonoBehaviour
             frontWheelVisual = frontWheelJoint.connectedBody.transform;
         if (backWheelVisual == null && backWheelJoint != null && backWheelJoint.connectedBody != null)
             backWheelVisual = backWheelJoint.connectedBody.transform;
-        if (rack == null)
-        {
-            Transform found = transform.Find("rack");
-            if (found != null) rack = found.gameObject;
-        }
 
         frontWheelRadius = GetWheelRadius(frontWheelVisual);
         backWheelRadius = GetWheelRadius(backWheelVisual);
@@ -204,31 +195,6 @@ public class BikeController : MonoBehaviour
         if (sensor == null) sensor = wheel.gameObject.AddComponent<WheelContactSensor>();
         sensor.groundLayer = groundLayer;
         return sensor;
-    }
-
-    /// <summary>卸掉前轮的物理连接,把它变成一个独立的自由物体交给调用者(比如加个冲量让它飞出去)。
-    /// 立刻把 FrontWheelContact 清空——这个物理对象之后不管飞多远、有没有再碰到地面，
-    /// 都不应该再影响这辆车自己的摔车/落地判定；缺了前轮之后 CrashDetector 会自动只看剩下的轮子。</summary>
-    public Rigidbody2D DetachFrontWheel()
-    {
-        if (frontWheelVisual == null) return null;
-
-        if (frontWheelJoint != null) frontWheelJoint.enabled = false;
-
-        Rigidbody2D wheelBody = frontWheelVisual.GetComponent<Rigidbody2D>();
-        frontWheelVisual.SetParent(null, true);
-
-        FrontWheelContact = null;
-        frontWheelVisual = null;
-        frontSpinVisual = null;
-
-        return wheelBody;
-    }
-
-    /// <summary>隐藏车架上的行李架装饰件(纯视觉+小碰撞体,没有任何脚本依赖它，隐藏没有副作用)。</summary>
-    public void DetachRack()
-    {
-        if (rack != null) rack.SetActive(false);
     }
 
     static Transform CreateSpinVisual(Transform wheel)

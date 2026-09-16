@@ -73,7 +73,7 @@ public class CameraDirector : MonoBehaviour
         impulseSource = impulse;
         landingDetector = landing;
         damageSystem.OnFinalCrash += HandleFinalCrash;
-        damageSystem.OnPartialDamage += HandlePartialDamage;
+        damageSystem.OnHpChanged += HandlePartialDamage;
         landingDetector.OnLanded += HandleLanded;
     }
 
@@ -240,9 +240,9 @@ public class CameraDirector : MonoBehaviour
         }
     }
 
-    // 部分损毁(掉零件但没结束这一局)只给一次轻微震动，镜头照常跟随/缩放，
+    // 扣血但没结束这一局时只给一次轻微震动，镜头照常跟随/缩放，
     // 不做上面那套"接管定格"——玩家需要立刻感觉到自己还能继续骑。
-    void HandlePartialDamage(BikeDamageSystem.DamagedPart part, int livesRemaining)
+    void HandlePartialDamage(float currentHp, float maxHp)
     {
         if (impulseSource != null)
         {
@@ -258,7 +258,7 @@ public class CameraDirector : MonoBehaviour
         if (damageSystem != null)
         {
             damageSystem.OnFinalCrash -= HandleFinalCrash;
-            damageSystem.OnPartialDamage -= HandlePartialDamage;
+            damageSystem.OnHpChanged -= HandlePartialDamage;
         }
         if (landingDetector != null) landingDetector.OnLanded -= HandleLanded;
     }

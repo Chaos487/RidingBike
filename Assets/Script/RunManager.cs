@@ -26,6 +26,8 @@ public class RunManager : MonoBehaviour
     Text comboText;
     Text toastText;
     Text statusText;
+    Text hpLabelText;
+    Image hpBarFill;
 
     Sequence toastTweener;
     float startX;
@@ -43,7 +45,7 @@ public class RunManager : MonoBehaviour
         bikeController = controller;
         startX = bikeTransform.position.x;
         damageSystem.OnFinalCrash += HandleCrash;
-        damageSystem.OnPartialDamage += HandlePartialDamage;
+        damageSystem.OnHpChanged += HandlePartialDamage;
     }
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
@@ -100,10 +102,15 @@ public class RunManager : MonoBehaviour
         ShowToast("NEAR MISS!");
     }
 
-    void HandlePartialDamage(BikeDamageSystem.DamagedPart part, int livesRemaining)
+    void HandlePartialDamage(float currentHp, float maxHp)
     {
-        string partName = part == BikeDamageSystem.DamagedPart.FrontWheel ? "前轮飞了" : "货架掉了";
-        ShowToast($"{partName}! 还剩 {livesRemaining} 条命");
+        UpdateHpBar(currentHp, maxHp);
+        ShowToast($"摔车了! 剩余血量 {Mathf.CeilToInt(currentHp)}/{Mathf.CeilToInt(maxHp)}");
+    }
+
+    void UpdateHpBar(float currentHp, float maxHp)
+    {
+        if (hpBarFill != null) hpBarFill.fillAmount = maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) : 0f;
     }
 
     void HandleComboChanged(int comboCount)
@@ -129,6 +136,8 @@ public class RunManager : MonoBehaviour
     {
         if (runEnded) return;
         runEnded = true;
+
+        UpdateHpBar(0f, 1f);
 
         if (bikeController != null)
         {
@@ -164,6 +173,44 @@ public class RunManager : MonoBehaviour
 
         statusText = CreateText(canvasGO.transform, "StatusText", new Vector2(0.5f, 0.5f), Vector2.zero, 500f, 32, TextAnchor.MiddleCenter);
         statusText.gameObject.SetActive(false);
+
+        hpLabelText = CreateText(canvasGO.transform, "HpLabelText", new Vector2(1f, 1f), new Vector2(-20f, -20f), 220f, 22, TextAnchor.UpperRight);
+        hpLabelText.text = "HP";
+        hpBarFill = CreateHpBar(canvasGO.transform, new Vector2(-20f, -46f), 220f, 20f);
+    }
+
+    static Image CreateHpBar(Transform parent, Vector2 anchoredPos, float width, float height)
+    {
+        GameObject bgGO = new GameObject("HpBarBackground");
+        bgGO.transform.SetParent(parent, false);
+
+        RectTransform bgRt = bgGO.AddComponent<RectTransform>();
+        bgRt.anchorMin = new Vector2(1f, 1f);
+        bgRt.anchorMax = new Vector2(1f, 1f);
+        bgRt.pivot = new Vector2(1f, 1f);
+        bgRt.anchoredPosition = anchoredPos;
+        bgRt.sizeDelta = new Vector2(width, height);
+
+        Image background = bgGO.AddComponent<Image>();
+        background.color = new Color(0f, 0f, 0f, 0.5f);
+
+        GameObject fillGO = new GameObject("HpBarFill");
+        fillGO.transform.SetParent(bgGO.transform, false);
+
+        RectTransform fillRt = fillGO.AddComponent<RectTransform>();
+        fillRt.anchorMin = Vector2.zero;
+        fillRt.anchorMax = Vector2.one;
+        fillRt.offsetMin = new Vector2(2f, 2f);
+        fillRt.offsetMax = new Vector2(-2f, -2f);
+
+        Image fill = fillGO.AddComponent<Image>();
+        fill.color = new Color(0.85f, 0.2f, 0.2f);
+        fill.type = Image.Type.Filled;
+        fill.fillMethod = Image.FillMethod.Horizontal;
+        fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fill.fillAmount = 1f;
+
+        return fill;
     }
 
     static Text CreateText(Transform parent, string name, Vector2 anchor, Vector2 anchoredPos, float width, int fontSize, TextAnchor alignment)
