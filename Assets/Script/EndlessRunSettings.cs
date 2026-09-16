@@ -20,8 +20,10 @@ public class EndlessRunSettings : ScriptableObject
     [Header("Start")]
     [Tooltip("起点前方的安全平地长度。")]
     public float startFlatLength = 20f;
-    [Tooltip("地面视觉网格的厚度。")]
-    public float groundThickness = 3f;
+    [Tooltip("地面视觉网格的厚度(从地形顶部往下延伸多少米)。调大只是让填色区域更深，" +
+             "不影响碰撞(碰撞用的是 EdgeCollider2D，只取地形顶部那条曲线)，也不影响性能" +
+             "(顶点数不变，只是往下挪了个位置)——调够大只是为了保证镜头怎么拉远都看不到底边穿帮。")]
+    public float groundThickness = 100f;
 
     [Header("平地段长度 (米)")]
     public float minFlatLength = 4f;

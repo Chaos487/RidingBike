@@ -25,7 +25,7 @@ public class EndlessTerrainGenerator : MonoBehaviour
 
     [Header("Start")]
     public float startFlatLength = 20f;
-    public float groundThickness = 3f;
+    public float groundThickness = 100f;
 
     [Header("平地段长度 (米)")]
     public float minFlatLength = 4f;

@@ -16,7 +16,7 @@ MonoBehaviour:
   despawnBehindDistance: 25
   sampleSpacing: 0.4
   startFlatLength: 20
-  groundThickness: 3
+  groundThickness: 100
   minFlatLength: 5
   maxFlatLength: 20
   minUphillLength: 15
