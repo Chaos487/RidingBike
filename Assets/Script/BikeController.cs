@@ -474,7 +474,10 @@ public class BikeController : MonoBehaviour
     {
         if (isSpinning) return;
 
-        bool grounded = IsGrounded();
+        // 用真实轮胎接触，不用 IsGrounded() 的距离射线——射线容忍度很高，一次普通跳跃的
+        // 大半程都可能被它误判成"已经触地"，导致这里以为一直在地上：空中扳方向键的压头/抬头
+        // 不生效，自动回正也一直在追地面坡度而不是回正到水平，等于空中基本没有回正/控制这件事。
+        bool grounded = IsWheelGrounded;
 
         // 空中按方向键 → 压头 / 抬头
         if (!grounded && Mathf.Abs(input) > 0.01f)
