@@ -2,216 +2,50 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// 摔车判定:不是"车歪了就摔"，而是"自行车已经失去可恢复的骑行状态才摔车"。
-/// 四级状态机(Normal → Warning → Critical → Crashed)，只有 Critical 持续够久才真正摔车；
-/// Critical 期间如果车身倾角/角速度显示"正在回正"，会逐级降回 Warning → Normal，形成救车机制。
-/// 设计依据见 Desktop/RidingBike_Crash_Detection_Design.md。
-///
-/// 触地用真实物理接触，不用距离射线——射线只代表"车身中心离地面够近"，滞空高度不够大时
-/// 会在还没真正落地前就先报"触地"。Critical/Crashed 现在同时看两个信号:
-/// 车架本身的碰撞体(BikeController.BodyContact，实打实的物理接触，车翻倒打滑时靠这个) 和
-/// 前后轮(AllExistingWheelsGrounded，正常骑行落地靠这个)——任意一个报"触地"就算数。
-/// 只用轮子的话，车身翻倒打滚时轮子经常翘空、凑不齐"两轮都触地"，永远判不出摔车，
-/// 这是实机测出来的真实问题，不是猜的。
-/// Warning 不要求触地——空中姿态失控也应该能看到"开始危险"，但不会真的摔车，只有落地才会往下判。
-///
-/// 还没做的:基于真实碰撞冲量的撞击强度判定(依赖 BodyContact 的碰撞事件，留到下一步)。
+/// 摔车判定:车架本身的碰撞体(BikeController.BodyContact)一旦真的碰到东西，直接判定摔车。
+/// 不再用倾角阈值/计时器/角速度回正这套状态机——那套东西调起来太绕，价值也大半被
+/// BodyContact 这个碰撞体本身取代了:它的位置和大小本来就是刻意摆在车身正常骑行/跳跃/
+/// 落地都碰不到地面的地方，只有车身真的歪倒到相当程度才会接触到——"碰到了"本身
+/// 就已经等价于"倾角已经很危险了"，不需要再额外算一遍角度。
 /// </summary>
 public class CrashDetector : MonoBehaviour
 {
-    public enum CrashState { Normal, Warning, Critical, Crashed }
-
     [Header("References")]
     public Rigidbody2D bikeRigidbody;
-    [Tooltip("用来读取前后轮真实触地状态、地面坡度，以及排除主动触发的空中 360 旋转，避免转体过程中被误判成摔车。")]
+    [Tooltip("用来读取车架碰撞体(BodyContact)的真实触地状态。")]
     public BikeController bikeController;
 
-    [Header("Angle (相对当前地面坡度算；空中没有坡度参考时按水平算)")]
-    public float warningAngle = 35f;
-    public float criticalAngle = 50f;
-    public float maxRecoverableAngle = 60f;
-
-    [Header("Timing")]
-    public float minimumDangerTime = 0.05f;
-    public float crashConfirmTime = 0.20f;
-    public float recoveryTime = 0.10f;
-
-    [Header("Recovery (角速度回正判定)")]
-    public float recoveringAngularSpeedThreshold = 30f;
-
-    /// <summary>真正摔车(Crashed)那一刻触发，语义跟之前完全一样——外部系统不需要关心中间状态。</summary>
     public event Action OnCrash;
-    /// <summary>每次状态变化时触发，供以后的 UI/镜头/音效按 Warning/Critical 做分级反馈用(这一版还没接)。</summary>
-    public event Action<CrashState> OnStateChanged;
 
-    public CrashState State { get; private set; } = CrashState.Normal;
-
-    float dangerTime;
-    float overTiltTime;
-    float recoveryTimer;
+    bool crashed;
     float invulnerableUntil;
-    float debugLogTimer;
 
     /// <summary>供 BikeDamageSystem 在"部分损毁"(掉零件但没真的结束这一局)之后调用:
-    /// 复位状态机，并给一小段无敌时间，避免同一次摔倒的姿态在下一帧又立刻被判一次摔车。</summary>
+    /// 复位判定，并给一小段无敌时间，避免同一次摔倒的姿态在下一帧又立刻被判一次摔车。</summary>
     public void Recover(float invulnerableSeconds)
     {
-        EnterState(CrashState.Normal);
+        crashed = false;
         invulnerableUntil = Time.time + invulnerableSeconds;
-    }
-
-    public void ApplySettings(CrashDetectorSettings settings)
-    {
-        if (settings == null) return;
-
-        warningAngle = settings.warningAngle;
-        criticalAngle = settings.criticalAngle;
-        maxRecoverableAngle = settings.maxRecoverableAngle;
-        minimumDangerTime = settings.minimumDangerTime;
-        crashConfirmTime = settings.crashConfirmTime;
-        recoveryTime = settings.recoveryTime;
-        recoveringAngularSpeedThreshold = settings.recoveringAngularSpeedThreshold;
     }
 
     void FixedUpdate()
     {
-        if (State == CrashState.Crashed || bikeRigidbody == null) return;
+        if (crashed || bikeController == null) return;
         if (Time.time < invulnerableUntil) return;
 
-        if (bikeController != null && bikeController.IsSpinning)
-        {
-            // 主动触发的空中旋转：不管转到多大角度都不计入危险状态。
-            if (State != CrashState.Normal) EnterState(CrashState.Normal);
-            return;
-        }
+        if (bikeController.BodyContact == null || !bikeController.BodyContact.IsGrounded) return;
 
-        bool wheelsGrounded = AllExistingWheelsGrounded();
-        bool bodyGrounded = bikeController != null && bikeController.BodyContact != null && bikeController.BodyContact.IsGrounded;
-        // 车架碰过东西 或者 轮子正常触地，任意一个算数——车翻倒时靠车架，正常落地靠轮子。
-        bool grounded = bodyGrounded || wheelsGrounded;
-        float targetAngle = (bikeController != null && wheelsGrounded) ? bikeController.GetGroundSlopeAngle() : 0f;
-        float angleError = Mathf.DeltaAngle(targetAngle, bikeRigidbody.rotation);
-        float tilt = Mathf.Abs(angleError);
-        float angularVelocity = bikeRigidbody.angularVelocity;
-
-        // 正在回正:角速度的方向跟"倾角超出目标的方向"相反，且幅度不是噪声。
-        bool recovering = angleError * angularVelocity < 0f && Mathf.Abs(angularVelocity) > recoveringAngularSpeedThreshold;
-        // 倾角已经大到基本没救了的话，就算角速度显示在回正也不认。
-        bool stillFalling = tilt > maxRecoverableAngle || !recovering;
-        bool criticalConditionMet = grounded && tilt > criticalAngle && stillFalling;
-
-        // 临时验证用:不管什么状态，每 0.5 秒都打一条快照——之前只在非 Normal 时打，
-        // 如果 bug 是"车身明显翻了但算出来的 tilt 却很小"，状态会一直停在 Normal，
-        // 那种情况反而完全看不到 log。这次把原始的车身角度、坡度探测角度分开打出来，
-        // 才能分清是"轮子没触地"(Body Contact 缺失)还是"坡度探测本身算错了角度"。
-        // 确认状态机行为没问题之后可以删掉。
-        debugLogTimer += Time.fixedDeltaTime;
-        if (debugLogTimer >= 0.5f)
-        {
-            debugLogTimer = 0f;
-            bool frontContact = bikeController != null && bikeController.FrontWheelContact != null && bikeController.FrontWheelContact.IsGrounded;
-            bool backContact = bikeController != null && bikeController.BackWheelContact != null && bikeController.BackWheelContact.IsGrounded;
-            Debug.Log($"[CrashDetector] state={State} rawRotation={bikeRigidbody.rotation:0.0} targetAngle={targetAngle:0.0} tilt={tilt:0.0} " +
-                      $"grounded={grounded} bodyContact={bodyGrounded} frontContact={frontContact} backContact={backContact} " +
-                      $"criticalConditionMet={criticalConditionMet} recovering={recovering} angularVelocity={angularVelocity:0.0} " +
-                      $"dangerTime={dangerTime:0.00} overTiltTime={overTiltTime:0.00} recoveryTimer={recoveryTimer:0.00}");
-        }
-
-        switch (State)
-        {
-            case CrashState.Normal:
-                if (tilt > warningAngle) EnterState(CrashState.Warning);
-                break;
-
-            case CrashState.Warning:
-                if (tilt <= warningAngle)
-                {
-                    recoveryTimer += Time.fixedDeltaTime;
-                    if (recoveryTimer >= recoveryTime) EnterState(CrashState.Normal);
-                }
-                else
-                {
-                    recoveryTimer = 0f;
-                    if (criticalConditionMet)
-                    {
-                        dangerTime += Time.fixedDeltaTime;
-                        if (dangerTime >= minimumDangerTime) EnterState(CrashState.Critical);
-                    }
-                    else
-                    {
-                        dangerTime = 0f;
-                    }
-                }
-                break;
-
-            case CrashState.Critical:
-                if (criticalConditionMet)
-                {
-                    recoveryTimer = 0f;
-                    overTiltTime += Time.fixedDeltaTime;
-                    if (overTiltTime >= crashConfirmTime)
-                    {
-                        ConfirmCrash(tilt);
-                    }
-                }
-                else
-                {
-                    overTiltTime = 0f;
-                    recoveryTimer += Time.fixedDeltaTime;
-                    if (recoveryTimer >= recoveryTime) EnterState(CrashState.Warning);
-                }
-                break;
-        }
-    }
-
-    void EnterState(CrashState next)
-    {
-        Debug.Log($"[CrashDetector] {State} -> {next}");
-        State = next;
-        dangerTime = 0f;
-        overTiltTime = 0f;
-        recoveryTimer = 0f;
-        OnStateChanged?.Invoke(next);
-    }
-
-    void ConfirmCrash(float tilt)
-    {
-        State = CrashState.Crashed;
-        LogCrashDiagnostics(tilt);
-        OnStateChanged?.Invoke(CrashState.Crashed);
+        crashed = true;
+        LogCrashDiagnostics();
         OnCrash?.Invoke();
     }
 
-    /// <summary>车身现在实际装着的每一个轮子(FrontWheelContact/BackWheelContact 非 null 的那些)
-    /// 是不是都真的触地了。轮子被卸掉之后对应引用会是 null,直接跳过,不参与判定——
-    /// 不然前轮飞走之后永远凑不齐"两轮都触地"，反而变成了摔不了车的无敌状态。
-    /// 至少要还剩一个轮子,不然(理论上不会发生,后轮不会被卸)直接不判定。</summary>
-    bool AllExistingWheelsGrounded()
+    void LogCrashDiagnostics()
     {
-        if (bikeController == null) return false;
-
-        WheelContactSensor front = bikeController.FrontWheelContact;
-        WheelContactSensor back = bikeController.BackWheelContact;
-
-        bool frontOk = front == null || front.IsGrounded;
-        bool backOk = back == null || back.IsGrounded;
-        bool anyWheelLeft = front != null || back != null;
-
-        return anyWheelLeft && frontOk && backOk;
-    }
-
-    /// <summary>摔车瞬间把判定用到的全部状态打成一条独立的 log,方便复现/排查误判。</summary>
-    void LogCrashDiagnostics(float tilt)
-    {
-        bool frontContact = bikeController != null && bikeController.FrontWheelContact != null && bikeController.FrontWheelContact.IsGrounded;
-        bool backContact = bikeController != null && bikeController.BackWheelContact != null && bikeController.BackWheelContact.IsGrounded;
-        bool bodyContact = bikeController != null && bikeController.BodyContact != null && bikeController.BodyContact.IsGrounded;
+        if (bikeRigidbody == null) return;
 
         Debug.LogWarning(
-            $"[CrashDetector] 摔车 pos={bikeRigidbody.position} rot={bikeRigidbody.rotation:0.0} tilt={tilt:0.0} " +
-            $"vel={bikeRigidbody.linearVelocity} angVel={bikeRigidbody.angularVelocity:0.0} " +
-            $"bodyContact={bodyContact} frontContact={frontContact} backContact={backContact} " +
-            $"isSpinning={bikeController != null && bikeController.IsSpinning} spinDeg={(bikeController != null ? bikeController.SpinAccumulatedDegrees : 0f):0.0} " +
-            $"overTiltTime={overTiltTime:0.00}");
+            $"[CrashDetector] 摔车(车架触地) pos={bikeRigidbody.position} rot={bikeRigidbody.rotation:0.0} " +
+            $"vel={bikeRigidbody.linearVelocity} angVel={bikeRigidbody.angularVelocity:0.0}");
     }
 }
