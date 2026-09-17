@@ -77,14 +77,6 @@ public class CameraDirector : MonoBehaviour
         landingDetector.OnLanded += HandleLanded;
     }
 
-    /// <summary>停止跟随，镜头定在当前位置不动——GapFallHandler 判定车身掉进断层时调用。</summary>
-    public void DetachFollow() => cmCamera.Follow = null;
-
-    /// <summary>重新接上跟随目标。不额外判断车身是否已经回到画面内——Cinemachine 自己的
-    /// Damping 会把镜头平滑地"追"回目标身上，效果上跟"等车回到画面里才跟"差别不大，
-    /// 但不用另外写一套视野检测。</summary>
-    public void ReattachFollow(Transform target) => cmCamera.Follow = target;
-
     public void ApplySettings(CameraDirectorSettings settings)
     {
         if (settings == null) return;

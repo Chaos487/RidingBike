@@ -83,8 +83,8 @@ public static class EndlessRunBootstrap
 
         runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner);
 
-        CameraDirector cameraDirector = SetupCamera(bike, damageSystem, landingDetector);
-        SetupGapFallHandler(systems, bike, terrain, damageSystem, damageSettings, cameraDirector, runManager);
+        SetupGapFallHandler(systems, bike, terrain, damageSystem, damageSettings);
+        SetupCamera(bike, damageSystem, landingDetector);
         SetupAudio(bike, crashDetector, landingDetector);
     }
 
@@ -176,10 +176,10 @@ public static class EndlessRunBootstrap
         }
     }
 
-    static CameraDirector SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)
+    static void SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)
     {
         CinemachineCamera cmCamera = Object.FindFirstObjectByType<CinemachineCamera>();
-        if (cmCamera == null) return null;
+        if (cmCamera == null) return;
 
         CinemachineImpulseSource impulseSource = bike.GetComponent<CinemachineImpulseSource>();
         if (impulseSource == null) impulseSource = bike.gameObject.AddComponent<CinemachineImpulseSource>();
@@ -193,22 +193,16 @@ public static class EndlessRunBootstrap
         CameraDirector cameraDirector = cmCamera.gameObject.AddComponent<CameraDirector>();
         cameraDirector.ApplySettings(FindSettings<CameraDirectorSettings>());
         cameraDirector.Initialize(bike, damageSystem, impulseSource, landingDetector);
-        return cameraDirector;
     }
 
-    // 掉进断层(3.11 节)的专门处理——依赖地形(查断层范围)、伤害系统(扣血)、镜头(脱离/
-    // 重新跟随)，所以放在这几个系统都创建完之后接线；cameraDirector 为空(场景里没挂
-    // CinemachineCamera)就跳过，不影响其它系统正常运行。
+    // 掉进断层(3.11 节)的专门处理——直接判定为致命摔车，交给 BikeDamageSystem/RunManager
+    // 已有的结算流程，这里不需要依赖镜头/UI。
     static void SetupGapFallHandler(GameObject systems, BikeController bike, EndlessTerrainGenerator terrain,
-        BikeDamageSystem damageSystem, BikeDamageSettings damageSettings, CameraDirector cameraDirector, RunManager runManager)
+        BikeDamageSystem damageSystem, BikeDamageSettings damageSettings)
     {
-        if (cameraDirector == null) return;
-
         GapFallHandler gapFallHandler = systems.AddComponent<GapFallHandler>();
         gapFallHandler.ApplySettings(damageSettings);
-        gapFallHandler.Initialize(bike, terrain, damageSystem, cameraDirector);
-
-        runManager.InitializeGapFall(gapFallHandler);
+        gapFallHandler.Initialize(bike, terrain, damageSystem);
     }
 
     // 优先在编辑器里按类型搜整个 Assets(不要求放在 Resources 目录下,创建在哪里都能找到);

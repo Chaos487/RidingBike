@@ -300,23 +300,17 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
     推一把），完全绕开了摔车判定。现在 `WheelContactSensor` 额外检查接触点法线跟
     正上方的夹角，超过 `maxGroundAngle`(默认 70°，地形最陡的坡大约 63°，断层峭壁
     接近 90°，中间留了余量)就不算"贴地"，只算撞墙
--   判定的一刻:`BikeController` 整体禁用(输入/驱动/自动回正全部停摆，车身交给纯
-    物理自由落体继续往下掉——反正镜头已经看不到，不需要真的等它掉到底)、镜头的
-    Cinemachine Follow 被清空定在原地不动、扣一次血（`BikeDamageSystem.ApplyDamage`，
-    走跟正常摔车同一条 HP 血条，但不触发回正车身/无敌时间/贴图闪烁那一套）、UI 弹出
-    "按 Space 继续"（`VoidPromptText`，在 `EndlessRunCanvas.prefab` 里）
--   如果这一下正好把血扣没了，直接交给 `BikeDamageSystem.OnFinalCrash` 走正常摔车
-    结算，不弹"按 Space"提示——整局已经结束了
--   玩家按 Space:车身传送到断层终点前方（`gapRespawnAheadDistance`）、贴着记录的地面
-    高度（+ `gapRespawnHeightOffset` 避免卡进碰撞体），速度清零，`BikeController` 重新
-    启用，镜头重新接上 Follow——**不额外判断车身是否已经回到画面内**，直接重新接上
-    Follow，让 Cinemachine 自己的 Damping 把镜头平滑地"追"回去
--   等待"按 Space"期间地形/计分/HUD 都照常推进，不做全局暂停（`Time.timeScale`
-    没有被改动）——只有镜头和输入被这套流程接管
--   四个参数（`gapFallThreshold`、`gapFallDamage`、`gapRespawnAheadDistance`、
-    `gapRespawnHeightOffset`）**没有单独的 Settings 资产**，直接并进了 `BikeDamageSettings`
-    ——逻辑上都是"扣血"，跟正常摔车的 `damagePerCrash`/`invulnerabilitySeconds` 放
-    在一起配置，不用为了四个数字单开一份资产
+-   判定的一刻:`BikeController` 整体禁用(反正整局已经结束，输入没有意义)，
+    直接调用 `BikeDamageSystem.ForceFinalCrash()`——**不管当前还剩多少血**，
+    一律判定为致命摔车，交给已有的摔车结算流程(`RunManager` 锁输入/显示结算画面、
+    `CameraDirector` 接管镜头聚焦，跟正常摔死一样，按 R 重开)
+-   `gapFallThreshold` 一个参数，并进了 `BikeDamageSettings`(`断层 (GapFallHandler)`
+    分组)，不单开 Settings 资产——逻辑上也是摔车判定的一部分，跟 `damagePerCrash`
+    放在一起配置
+-   这套之前还做过"扣血但不死、按 Space 原地复活继续骑"的版本(镜头脱离跟随、
+    传送回断层终点、UI 弹提示)，后来改成直接判死——旧版本涉及的 `CameraDirector.
+    DetachFollow/ReattachFollow`、`RunManager` 的 `VoidPromptText` 提示、`BikeDamageSystem.
+    ApplyDamage(非致命扣血)` 都已经删掉，不要照旧版本的思路去找这些方法
 
 ------------------------------------------------------------------------
 
