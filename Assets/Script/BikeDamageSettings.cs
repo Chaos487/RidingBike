@@ -22,7 +22,7 @@ public class BikeDamageSettings : ScriptableObject
 
     [Header("断层扣血 (GapFallHandler)")]
     [Tooltip("车身比断层记录的地面高度低多少米,判定为\"掉进虚空\"。")]
-    public float gapFallThreshold = 8f;
+    public float gapFallThreshold = 2.5f;
     [Tooltip("判定掉进虚空扣多少血量——走这条同一个 HP 血条，不是单独一条命。")]
     public float gapFallDamage = 25f;
     [Tooltip("按空格重新出现时,传送到断层终点前方多远(米)。")]
