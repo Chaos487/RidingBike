@@ -68,8 +68,9 @@ public class GapFallHandler : MonoBehaviour
             return;
         }
 
-        if (bike.IsWheelGrounded) return; // 贴地就不可能掉进断层，省一次查表
-
+        // 不提前用 IsWheelGrounded 短路——轮子贴着断层峭壁侧面蹭的时候，靠合力/摩擦力
+        // 也能被(在 WheelContactSensor 修好之前)误判成"贴地"甚至顺着峭壁爬上去；这里
+        // 只认深度，不管当前是不是被判定为"触地"，掉得够深就无条件判定摔进虚空。
         Vector2 pos = bike.bikeRigidbody.position;
         if (terrain.TryGetGapAt(pos.x, out float groundY, out float gapEndX) && groundY - pos.y > fallThreshold)
         {
