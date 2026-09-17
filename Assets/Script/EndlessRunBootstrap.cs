@@ -85,13 +85,13 @@ public static class EndlessRunBootstrap
 
         CameraDirector cameraDirector = SetupCamera(bike, damageSystem, landingDetector);
         SetupGapFallHandler(systems, bike, terrain, damageSystem, damageSettings, cameraDirector);
-        SetupAudio(bike, crashDetector, landingDetector);
+        SetupAudio(bike, crashDetector, landingDetector, runManager);
     }
 
     // 音频是直接挂在场景里的 AudioManager(不是这里生成的，运行时只拿它的单例来接线)。
     // BikeController/CrashDetector/LandingDetector 都是本方法运行时才生成的，没法在 Inspector 里
     // 互相拖引用，所以在这里把它们各自的事件接到 AudioManager 对应的槽位上。
-    static void SetupAudio(BikeController bike, CrashDetector crashDetector, LandingDetector landingDetector)
+    static void SetupAudio(BikeController bike, CrashDetector crashDetector, LandingDetector landingDetector, RunManager runManager)
     {
         AudioManager audio = AudioManager.Instance;
         if (audio == null)
@@ -108,7 +108,9 @@ public static class EndlessRunBootstrap
             audio.StopRide();
         };
 
-        audio.PlayRide();
+        // 不在这里直接 PlayRide()——这时候开始界面(RunManager.EnterStartGate)还在静止着，
+        // 骑行音效循环得等玩家点了 Start、真正开始骑行才响。
+        runManager.OnGameStarted += audio.PlayRide;
     }
 
     // UI 现在是手动在 Editor 里搭的 Assets/prefab/EndlessRunCanvas.prefab，实例化出来之后

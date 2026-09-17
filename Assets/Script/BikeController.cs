@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class BikeController : MonoBehaviour
@@ -100,7 +101,7 @@ public class BikeController : MonoBehaviour
     float currentBoostBonusKmh;
     float xAtLastBoost;
 
-    bool spaceHeld;
+    bool actionHeld;
     float spaceHoldTime;
     bool isSpinning;
     bool hasSpunThisAirtime;
@@ -368,13 +369,13 @@ public class BikeController : MonoBehaviour
         // hasJumpedThisAirtime 用真实轮胎接触(groundedForAirtime)才清零，不依赖上面那条容忍度很高的
         // 射线——射线在起跳后一小段时间内可能还没读到"离地"，之前只靠它判断"能不能起跳"，
         // 松手再按一下空格就能在同一次滞空里再跳一次；现在必须真正落地一次才能解锁下一次跳跃。
-        if (Input.GetKeyDown(KeyCode.Space) && groundedForJump && !isSpinning && !hasJumpedThisAirtime)
+        if (ActionPressed() && groundedForJump && !isSpinning && !hasJumpedThisAirtime)
         {
             Jump();
         }
 
-        spaceHeld = Input.GetKey(KeyCode.Space);
-        if (spaceHeld && !groundedForAirtime && !isSpinning && !hasSpunThisAirtime)
+        actionHeld = ActionHeld();
+        if (actionHeld && !groundedForAirtime && !isSpinning && !hasSpunThisAirtime)
         {
             spaceHoldTime += Time.deltaTime;
             if (spaceHoldTime >= spinHoldThreshold)
@@ -382,11 +383,20 @@ public class BikeController : MonoBehaviour
                 StartSpin();
             }
         }
-        else if (!spaceHeld)
+        else if (!actionHeld)
         {
             spaceHoldTime = 0f;
         }
     }
+
+    // 手机端没有 Space 键：点一下屏幕等价于按一下 Space(触地起跳)，按住屏幕等价于按住
+    // Space(空中长按触发旋转)，跟键盘输入是"或"的关系，不是替换——PC 端的空格键继续有效。
+    // Input.GetMouseButton* 在触屏设备上会直接读到主触点，不需要额外用 Input.touches。
+    // 要排除点在 UI(Start/Confirm 按钮这些)上的那次点击，不然点 UI 会被同时读成一次跳跃/旋转输入。
+    static bool ActionPressed() => Input.GetKeyDown(KeyCode.Space) || (Input.GetMouseButtonDown(0) && !IsPointerOverUI());
+    static bool ActionHeld() => Input.GetKey(KeyCode.Space) || (Input.GetMouseButton(0) && !IsPointerOverUI());
+
+    static bool IsPointerOverUI() => EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
     void Jump()
     {
@@ -438,9 +448,9 @@ public class BikeController : MonoBehaviour
         bikeRigidbody.angularVelocity = spinDirection * spinAngularSpeed;
         spinAccumulatedDeg += spinAngularSpeed * Time.fixedDeltaTime;
 
-        // 持续按住空格就一直转，可以转出 540°/720° 这种高风险档位；松手就停在当前角度，
+        // 持续按住(空格或触屏)就一直转，可以转出 540°/720° 这种高风险档位；松手就停在当前角度，
         // 剩下交给自动回正/玩家手感去调整落地姿态。
-        if (!spaceHeld)
+        if (!actionHeld)
         {
             isSpinning = false;
         }

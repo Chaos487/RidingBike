@@ -1,3 +1,4 @@
+using System;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -32,10 +33,18 @@ public class RunManager : MonoBehaviour
     Text statusText;
     Text hpLabelText;
     Image hpBarFill;
+    GameObject hpBarRoot;
+    Button startButton;
 
     Sequence toastTweener;
     float startX;
     bool runEnded;
+    bool waitingForStart;
+
+    /// <summary>玩家点了 Start、真正开始骑行的那一刻触发——比如 AudioManager 的骑行音效循环
+    /// 要等这个，不能在 EndlessRunBootstrap.Setup() 里一创建就放，不然开始界面还静止着，
+    /// 引擎声就已经在响了。</summary>
+    public event Action OnGameStarted;
 
     void Awake()
     {
@@ -50,6 +59,49 @@ public class RunManager : MonoBehaviour
         startX = bikeTransform.position.x;
         damageSystem.OnFinalCrash += HandleCrash;
         damageSystem.OnHpChanged += HandlePartialDamage;
+
+        EnterStartGate();
+    }
+
+    /// <summary>开局前的静止画面:按住 Play 之后的初始状态就是开始界面，只多一个 Start 按钮——
+    /// 真正暂停(Time.timeScale = 0)，其它 HUD 全部隐藏，只留 Start。每次重开(R/点按屏幕
+    /// 重新加载场景)都会重新经过这里，不是只在 App 第一次启动时出现。
+    ///
+    /// 光靠 timeScale 挡不住 BikeController.Update() 里的按键/点击判定——Time.timeScale
+    /// 不影响 Update() 执行、也不影响 Input 读取——所以还要把 BikeController 显式禁用掉，
+    /// 不然玩家在开始界面点一下屏幕会被误读成一次跳跃输入，等按 Start 之后车身状态会很奇怪。</summary>
+    void EnterStartGate()
+    {
+        waitingForStart = true;
+        Time.timeScale = 0f;
+        if (bikeController != null) bikeController.enabled = false;
+
+        SetHudVisible(false);
+        if (startButton != null) startButton.gameObject.SetActive(true);
+    }
+
+    void HandleStartClicked()
+    {
+        if (!waitingForStart) return;
+        waitingForStart = false;
+
+        Time.timeScale = 1f;
+        if (bikeController != null) bikeController.enabled = true;
+
+        SetHudVisible(true);
+        if (startButton != null) startButton.gameObject.SetActive(false);
+
+        OnGameStarted?.Invoke();
+    }
+
+    void SetHudVisible(bool visible)
+    {
+        if (distanceText != null) distanceText.gameObject.SetActive(visible);
+        if (speedText != null) speedText.gameObject.SetActive(visible);
+        if (boostText != null) boostText.gameObject.SetActive(visible);
+        if (comboText != null) comboText.gameObject.SetActive(visible);
+        if (hpLabelText != null) hpLabelText.gameObject.SetActive(visible);
+        if (hpBarRoot != null) hpBarRoot.SetActive(visible);
     }
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
@@ -68,9 +120,13 @@ public class RunManager : MonoBehaviour
 
     void Update()
     {
+        if (waitingForStart) return; // 按钮点击走 HandleStartClicked，这里不用轮询任何输入
+
         if (runEnded)
         {
-            if (Input.GetKeyDown(KeyCode.R))
+            // 手机端没有 R 键：摔车结算画面这时候没有别的可点的 UI 跟它抢，屏幕任意位置点一下
+            // 就重开，不用像 BikeController 里判断跳跃输入那样去排除点在 UI 上的情况。
+            if (Input.GetKeyDown(KeyCode.R) || Input.GetMouseButtonDown(0))
             {
                 SceneManager.LoadScene(SceneManager.GetActiveScene().name);
             }
@@ -155,7 +211,7 @@ public class RunManager : MonoBehaviour
         }
 
         float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
-        statusText.text = $"摔车了! 距离 {distance:0} m\n按 R 重新开始";
+        statusText.text = $"摔车了! 距离 {distance:0} m\n按 R / 点击屏幕重新开始";
         statusText.gameObject.SetActive(true);
     }
 
@@ -169,9 +225,16 @@ public class RunManager : MonoBehaviour
         statusText = FindText("StatusText");
         hpLabelText = FindText("HpLabelText");
         hpBarFill = FindImage("HpBarBackground/HpBarFill");
+        hpBarRoot = hpBarFill != null ? hpBarFill.transform.parent.gameObject : null;
+        startButton = FindButton("StartButton");
 
         if (toastText != null) toastText.text = string.Empty;
         if (statusText != null) statusText.gameObject.SetActive(false);
+        if (startButton != null)
+        {
+            startButton.gameObject.SetActive(false); // EnterStartGate() 会在 Initialize() 里再打开，这里先关掉避免第一帧闪一下
+            startButton.onClick.AddListener(HandleStartClicked);
+        }
 
         // Image.Type.Filled 在没有指定 sprite 的时候会直接走"画整个矩形"的兜底逻辑，
         // fillAmount 完全不生效(这点跟 Type.Simple 不一样，纯色矩形那个技巧对 Filled 不成立)。
@@ -204,6 +267,17 @@ public class RunManager : MonoBehaviour
             return null;
         }
         return t.GetComponent<Image>();
+    }
+
+    Button FindButton(string path)
+    {
+        Transform t = transform.Find(path);
+        if (t == null)
+        {
+            Debug.LogError($"[RunManager] 在 UI 预制体里找不到 \"{path}\"，检查一下 EndlessRunCanvas.prefab 的层级/命名有没有改动。");
+            return null;
+        }
+        return t.GetComponent<Button>();
     }
 
     static Sprite CreateSolidSprite()
