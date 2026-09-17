@@ -25,6 +25,11 @@ MonoBehaviour:
   maxDownhillLength: 100
   minHillHeight: 3
   maxHillHeight: 20
+  gapChance: 0.15
+  minGapSpan: 3
+  maxGapSpan: 6
+  gapDepth: 6
+  gapEdgeLength: 1.5
   obstacleCheckIntervalMin: 6
   obstacleCheckIntervalMax: 12
   flatAngleThreshold: 5

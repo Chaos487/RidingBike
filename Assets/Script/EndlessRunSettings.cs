@@ -42,6 +42,18 @@ public class EndlessRunSettings : ScriptableObject
     public float minHillHeight = 2f;
     public float maxHillHeight = 5f;
 
+    [Header("断层 (Gap)")]
+    [Tooltip("每次平地结束时,有多大概率不生成小山坡、改成生成一次断层。0 = 关闭。")]
+    [Range(0f, 1f)]
+    public float gapChance = 0.15f;
+    [Tooltip("断层的跨度(米)——玩家必须在空中飞过这段距离,否则会掉进谷底。")]
+    public float minGapSpan = 3f;
+    public float maxGapSpan = 6f;
+    [Tooltip("断层的深度(米),要明显深到掉下去会摔车/扣血,不能只是颠簸一下。")]
+    public float gapDepth = 6f;
+    [Tooltip("断层两侧陡坡的长度(米),越短越接近垂直峭壁。")]
+    public float gapEdgeLength = 1.5f;
+
     [Header("Obstacle Hook")]
     [Tooltip("大约每隔多远对地形采样一次,供障碍物生成使用。")]
     public float obstacleCheckIntervalMin = 6f;

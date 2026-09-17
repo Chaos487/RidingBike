@@ -55,6 +55,9 @@ public class ObstacleSpawner : MonoBehaviour
 
     public void HandleGroundSampled(Vector2 groundPoint, float slopeAngleDeg, EndlessTerrainGenerator.SlopeDirection direction)
     {
+        // 断层(谷底/两侧陡坡)从不放障碍物——那里本来就是要跳过去的风险点，放个障碍物
+        // 要么直接埋在深坑里看不见，要么挡在陡坡上判定诡异，没有意义。
+        if (direction == EndlessTerrainGenerator.SlopeDirection.Gap) return;
         if (skipUphill && direction == EndlessTerrainGenerator.SlopeDirection.Uphill) return;
         if (groundPoint.x - lastObstacleX < minGapFromLastObstacle) return;
         if (Random.value > spawnChance) return;

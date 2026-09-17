@@ -8,6 +8,12 @@ using UnityEngine;
 /// 阶段之间用 SmoothStep 过渡(两端导数为 0),所以任意相邻阶段衔接处都不会有尖角,
 /// 地形整体是一条连续光滑的曲线,不是拼接直线段。
 ///
+/// 断层(Gap):每次平地结束时按 gapChance 的概率不生成小山坡、改成生成一段"假谷"——
+/// 陡降 -> 谷底(跨度就是 minGapSpan~maxGapSpan)-> 陡升,跟正常的坡完全复用同一套
+/// SmoothStep 插值(SampleHeight),只是高度差更大、坡长更短。地形依然是一条连续曲线,
+/// 碰撞体/网格都不需要真的断开——玩家跳不过去就会掉进谷底，摔车判定/HP 系统会接管，
+/// 不需要额外写"掉进无底洞"这种特殊逻辑。
+///
 /// 挂在 Assets/prefab/Ground.prefab 上——几何体是运行时按地形曲线生成的,没法预先在
 /// 编辑器里摆好,但视觉(材质/贴图)可以:MeshRenderer 上手动指定一个 Material 就会优先用它
 /// (什么贴图/渐变都行),不指定的话退回运行时生成的纯色材质(用 groundColor 这个字段)。
@@ -15,8 +21,8 @@ using UnityEngine;
 [RequireComponent(typeof(EdgeCollider2D))]
 public class EndlessTerrainGenerator : MonoBehaviour
 {
-    public enum SlopeDirection { Flat, Uphill, Downhill }
-    enum Phase { Flat, Rising, Falling }
+    public enum SlopeDirection { Flat, Uphill, Downhill, Gap }
+    enum Phase { Flat, Rising, Falling, GapDrop, GapFloor, GapRise }
 
     [Header("Reference")]
     [Tooltip("跟随生成的目标,通常是骑行者。")]
@@ -46,6 +52,18 @@ public class EndlessTerrainGenerator : MonoBehaviour
     [Header("坡的高度差 (米)")]
     public float minHillHeight = 2f;
     public float maxHillHeight = 5f;
+
+    [Header("断层 (Gap)")]
+    [Tooltip("每次平地结束时,有多大概率不生成小山坡、改成生成一次断层。0 = 关闭。")]
+    [Range(0f, 1f)]
+    public float gapChance = 0.15f;
+    [Tooltip("断层的跨度(米)——玩家必须在空中飞过这段距离,否则会掉进谷底。")]
+    public float minGapSpan = 3f;
+    public float maxGapSpan = 6f;
+    [Tooltip("断层的深度(米),要明显深到掉下去会摔车/扣血,不能只是颠簸一下。")]
+    public float gapDepth = 6f;
+    [Tooltip("断层两侧陡坡的长度(米),越短越接近垂直峭壁。")]
+    public float gapEdgeLength = 1.5f;
 
     [Header("Obstacle Hook")]
     public float obstacleCheckIntervalMin = 6f;
@@ -94,7 +112,7 @@ public class EndlessTerrainGenerator : MonoBehaviour
     float phaseLength;
     float phaseStartHeight;
     float phaseEndHeight;
-    float pendingHillHeight;
+    float pendingHeightDelta; // 小山坡的"爬升多高"、断层的"陷下去多深"共用这一个字段，用完在下一次 AdvancePhase 里原样加回来，保证海拔不漂移
 
     void Awake()
     {
@@ -139,6 +157,11 @@ public class EndlessTerrainGenerator : MonoBehaviour
         maxDownhillLength = settings.maxDownhillLength;
         minHillHeight = settings.minHillHeight;
         maxHillHeight = settings.maxHillHeight;
+        gapChance = settings.gapChance;
+        minGapSpan = settings.minGapSpan;
+        maxGapSpan = settings.maxGapSpan;
+        gapDepth = settings.gapDepth;
+        gapEdgeLength = settings.gapEdgeLength;
         obstacleCheckIntervalMin = settings.obstacleCheckIntervalMin;
         obstacleCheckIntervalMax = settings.obstacleCheckIntervalMax;
         flatAngleThreshold = settings.flatAngleThreshold;
@@ -215,14 +238,17 @@ public class EndlessTerrainGenerator : MonoBehaviour
         if (frontX >= nextObstacleCheckX)
         {
             float slopeDeg = GetSlopeAngle(frontX);
-            SlopeDirection direction = ClassifySlope(slopeDeg);
+            SlopeDirection direction = IsGapPhase(phase) ? SlopeDirection.Gap : ClassifySlope(slopeDeg);
             OnGroundSampled?.Invoke(new Vector2(frontX, height), slopeDeg, direction);
             nextObstacleCheckX = frontX + UnityEngine.Random.Range(obstacleCheckIntervalMin, obstacleCheckIntervalMax);
         }
     }
 
-    // 平地 -> 上坡 -> 下坡 -> 平地 -> ... 循环。下坡总是落回上坡爬升前的高度(用同一个
-    // pendingHillHeight),所以海拔不会累计漂移,不需要额外的海拔带修正逻辑。
+    static bool IsGapPhase(Phase p) => p == Phase.GapDrop || p == Phase.GapFloor || p == Phase.GapRise;
+
+    // 平地 -> 上坡 -> 下坡 -> 平地 -> ... 循环，或者平地 -> 断层陡降 -> 断层谷底 -> 断层陡升 -> 平地。
+    // 上坡/下坡、陡降/陡升都是同一套"落回出发前的高度"逻辑(用同一个 pendingHeightDelta)，
+    // 所以海拔不会累计漂移,不需要额外的海拔带修正逻辑。
     void AdvancePhase()
     {
         float nextPhaseStartX = phaseStartX + phaseLength;
@@ -231,19 +257,42 @@ public class EndlessTerrainGenerator : MonoBehaviour
         switch (phase)
         {
             case Phase.Flat:
-                phase = Phase.Rising;
-                pendingHillHeight = UnityEngine.Random.Range(minHillHeight, maxHillHeight);
-                phaseLength = UnityEngine.Random.Range(minUphillLength, maxUphillLength);
-                phaseStartHeight = baseHeight;
-                phaseEndHeight = baseHeight + pendingHillHeight;
+                if (UnityEngine.Random.value < gapChance)
+                {
+                    phase = Phase.GapDrop;
+                    pendingHeightDelta = gapDepth;
+                    phaseLength = gapEdgeLength;
+                    phaseStartHeight = baseHeight;
+                    phaseEndHeight = baseHeight - pendingHeightDelta;
+                }
+                else
+                {
+                    phase = Phase.Rising;
+                    pendingHeightDelta = UnityEngine.Random.Range(minHillHeight, maxHillHeight);
+                    phaseLength = UnityEngine.Random.Range(minUphillLength, maxUphillLength);
+                    phaseStartHeight = baseHeight;
+                    phaseEndHeight = baseHeight + pendingHeightDelta;
+                }
                 break;
             case Phase.Rising:
                 phase = Phase.Falling;
                 phaseLength = UnityEngine.Random.Range(minDownhillLength, maxDownhillLength);
                 phaseStartHeight = baseHeight;
-                phaseEndHeight = baseHeight - pendingHillHeight;
+                phaseEndHeight = baseHeight - pendingHeightDelta;
                 break;
-            default:
+            case Phase.GapDrop:
+                phase = Phase.GapFloor;
+                phaseLength = UnityEngine.Random.Range(minGapSpan, maxGapSpan);
+                phaseStartHeight = baseHeight;
+                phaseEndHeight = baseHeight; // 谷底保持水平，这一段的长度就是断层的跨度
+                break;
+            case Phase.GapFloor:
+                phase = Phase.GapRise;
+                phaseLength = gapEdgeLength;
+                phaseStartHeight = baseHeight;
+                phaseEndHeight = baseHeight + pendingHeightDelta; // 升回掉下去之前的高度
+                break;
+            default: // Falling、GapRise 结束后都回到 Flat
                 phase = Phase.Flat;
                 phaseLength = UnityEngine.Random.Range(minFlatLength, maxFlatLength);
                 phaseStartHeight = baseHeight;
