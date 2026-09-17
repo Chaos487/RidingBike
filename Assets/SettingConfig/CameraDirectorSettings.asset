@@ -13,16 +13,17 @@ MonoBehaviour:
   m_Name: CameraDirectorSettings
   m_EditorClassIdentifier: 
   minOrthoSize: 7
-  maxOrthoSize: 12
-  crashOrthoSize: 6
+  maxOrthoSize: 9
+  crashOrthoSize: 6.5
   airborneZoomOutBonus: 0.6
-  zoomInDuration: 0.5
+  zoomInDuration: 1
   zoomInEase: 6
-  zoomOutDuration: 1.1
+  zoomOutDuration: 1
   zoomOutEase: 3
-  crashZoomDuration: 0.12
+  crashZoomDuration: 1
   crashZoomEase: 27
   crashShakeAmplitude: 0.6
+  partialDamageShakeAmplitude: 0.25
   landingPunchAmount: 0.12
   landingPunchInDuration: 0.08
   landingPunchOutDuration: 0.22

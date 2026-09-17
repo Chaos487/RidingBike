@@ -28,7 +28,7 @@ MonoBehaviour:
   gapChance: 0.15
   minGapSpan: 3
   maxGapSpan: 6
-  gapDepth: 25
+  gapDepth: 100
   gapEdgeLength: 1.5
   obstacleCheckIntervalMin: 6
   obstacleCheckIntervalMax: 12
@@ -37,6 +37,6 @@ MonoBehaviour:
   obstacleSpawnChance: 0.15
   obstacleMinGap: 6
   skipObstaclesOnUphill: 1
-  obstacleSize: {x: 1, y: 4}
+  obstacleSize: {x: 1, y: 2}
   obstacleColor: {r: 0.9528302, g: 0.7879528, b: 0.022472408, a: 1}
   obstacleEdgeRadius: 0.08
