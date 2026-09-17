@@ -6,9 +6,9 @@ using UnityEngine;
 public enum SoundPlayOrder { Random, Sequential }
 
 /// <summary>
-/// 一个可配置的音效槽位：多个候选音频 + 挑选顺序(随机/按列表顺序循环) + 触发后延迟多少秒才播放。
-/// 循环槽位(BGM/环境音/骑行音)每次 Play 只在开始时挑一个 clip 循环到 Stop 为止；
-/// 一次性槽位(落地/加速/摔车)每次触发都重新挑一个 clip 播放一遍，多次触发之间互不打断、可以叠加。
+/// 一个可配置的音效槽位：多个候选音频 + 挑选顺序(随机/按列表顺序循环) + 触发后延迟多少秒才播放
+/// + 是否循环。Loop 打开时占住自己的 AudioSource 循环播放,直到被 Stop；关闭时按一次性音效播放
+/// (PlayOneShot),同一个槽位被连续触发多次会自然叠加、不会互相打断。
 /// </summary>
 [Serializable]
 public class SoundSlot
@@ -18,6 +18,9 @@ public class SoundSlot
     [Tooltip("触发之后延迟多少秒才真正播放，0 = 立即播放。")]
     public float delay = 0f;
     [Range(0f, 1f)] public float volume = 1f;
+    [Tooltip("勾上=循环播放(占住这个槽位自己的 AudioSource，直到被 Stop 为止)；" +
+             "不勾=一次性播放一遍(可以叠加，多次触发互不打断)。")]
+    public bool loop = false;
 
     int nextSequentialIndex;
 
@@ -40,7 +43,7 @@ public class SoundSlot
 
 /// <summary>
 /// 全局音频管理器。直接挂在场景里一个独立的空物体上手动配置(不是 EndlessRunBootstrap 运行时生成的)，
-/// 每个槽位对应一类游戏事件，音频列表/随机顺序播放/延迟时间全在 Inspector 里配，不用改代码。
+/// 每个槽位对应一类游戏事件，音频列表/随机顺序播放/延迟时间/是否循环全在 Inspector 里配，不用改代码。
 ///
 /// 其他游戏系统(BikeController/LandingDetector/CrashDetector)都是 EndlessRunBootstrap 在运行时
 /// 生成的，没法在 Inspector 里互相直接拖引用，所以这里做成单例，运行时用 AudioManager.Instance
@@ -50,123 +53,125 @@ public class AudioManager : MonoBehaviour
 {
     public static AudioManager Instance { get; private set; }
 
-    [Header("BGM(循环，进场景自动播放)")]
-    public SoundSlot bgm;
-    [Header("环境音(循环，进场景自动播放)")]
-    public SoundSlot ambient;
-    [Header("骑行中(循环，一局开始时播放、摔车时停止)")]
-    public SoundSlot ride;
-    [Header("起跳落地(一次性)")]
-    public SoundSlot landing;
-    [Header("Shift 加速(一次性)")]
-    public SoundSlot boost;
-    [Header("摔车(一次性)")]
-    public SoundSlot crash;
+    [Header("BGM(默认循环，进场景自动播放)")]
+    public SoundSlot bgm = new SoundSlot { loop = true };
+    [Header("环境音(默认循环，进场景自动播放)")]
+    public SoundSlot ambient = new SoundSlot { loop = true };
+    [Header("骑行中(默认循环，一局开始时播放、摔车时停止)")]
+    public SoundSlot ride = new SoundSlot { loop = true };
+    [Header("起跳落地(默认一次性)")]
+    public SoundSlot landing = new SoundSlot { loop = false };
+    [Header("Shift 加速(默认一次性)")]
+    public SoundSlot boost = new SoundSlot { loop = false };
+    [Header("摔车(默认一次性)")]
+    public SoundSlot crash = new SoundSlot { loop = false };
 
     AudioSource bgmSource;
     AudioSource ambientSource;
     AudioSource rideSource;
-    AudioSource oneShotSource;
+    AudioSource landingSource;
+    AudioSource boostSource;
+    AudioSource crashSource;
 
     Coroutine bgmDelayRoutine;
     Coroutine ambientDelayRoutine;
     Coroutine rideDelayRoutine;
+    Coroutine landingDelayRoutine;
+    Coroutine boostDelayRoutine;
+    Coroutine crashDelayRoutine;
 
     void Awake()
     {
         Instance = this;
 
-        bgmSource = CreateLoopingSource();
-        ambientSource = CreateLoopingSource();
-        rideSource = CreateLoopingSource();
-
-        // 一次性音效共用一个 AudioSource，靠 PlayOneShot 天然支持叠加播放(比如落地音还没放完
-        // 又摔车了)，不需要为每次触发单独开一个 AudioSource。
-        oneShotSource = gameObject.AddComponent<AudioSource>();
-        oneShotSource.playOnAwake = false;
+        bgmSource = CreateSource();
+        ambientSource = CreateSource();
+        rideSource = CreateSource();
+        landingSource = CreateSource();
+        boostSource = CreateSource();
+        crashSource = CreateSource();
     }
 
     void Start()
     {
-        PlayLoop(bgm, bgmSource, ref bgmDelayRoutine);
-        PlayLoop(ambient, ambientSource, ref ambientDelayRoutine);
+        Play(bgm, bgmSource, ref bgmDelayRoutine);
+        Play(ambient, ambientSource, ref ambientDelayRoutine);
     }
 
-    AudioSource CreateLoopingSource()
+    AudioSource CreateSource()
     {
         AudioSource source = gameObject.AddComponent<AudioSource>();
-        source.loop = true;
         source.playOnAwake = false;
         return source;
     }
 
-    /// <summary>开始骑行循环音效——一局开始时调用。</summary>
-    public void PlayRide() => PlayLoop(ride, rideSource, ref rideDelayRoutine);
+    public void PlayBgm() => Play(bgm, bgmSource, ref bgmDelayRoutine);
+    public void StopBgm() => Stop(bgmSource, ref bgmDelayRoutine);
+    public void PlayAmbient() => Play(ambient, ambientSource, ref ambientDelayRoutine);
+    public void StopAmbient() => Stop(ambientSource, ref ambientDelayRoutine);
 
-    /// <summary>停止骑行循环音效——摔车时调用。</summary>
-    public void StopRide()
-    {
-        if (rideDelayRoutine != null)
-        {
-            StopCoroutine(rideDelayRoutine);
-            rideDelayRoutine = null;
-        }
-        rideSource.Stop();
-    }
+    /// <summary>开始骑行槽位——一局开始时调用。</summary>
+    public void PlayRide() => Play(ride, rideSource, ref rideDelayRoutine);
+    /// <summary>停止骑行槽位——摔车时调用。对一次性(非 Loop)槽位没意义，只用来打断循环。</summary>
+    public void StopRide() => Stop(rideSource, ref rideDelayRoutine);
 
-    public void PlayLanding() => PlayOneShot(landing);
-    public void PlayBoost() => PlayOneShot(boost);
-    public void PlayCrash() => PlayOneShot(crash);
+    public void PlayLanding() => Play(landing, landingSource, ref landingDelayRoutine);
+    public void PlayBoost() => Play(boost, boostSource, ref boostDelayRoutine);
+    public void PlayCrash() => Play(crash, crashSource, ref crashDelayRoutine);
 
-    void PlayLoop(SoundSlot slot, AudioSource source, ref Coroutine delayRoutine)
+    /// <summary>统一播放入口，Loop 与否由 slot.loop 决定，跟槽位类别无关。</summary>
+    void Play(SoundSlot slot, AudioSource source, ref Coroutine delayRoutine)
     {
         if (!slot.HasClips) return;
 
-        if (delayRoutine != null) StopCoroutine(delayRoutine);
+        if (delayRoutine != null)
+        {
+            StopCoroutine(delayRoutine);
+            delayRoutine = null;
+        }
 
         if (slot.delay > 0f)
         {
-            delayRoutine = StartCoroutine(DelayedLoop(slot, source));
+            delayRoutine = StartCoroutine(DelayedPlay(slot, source));
         }
         else
         {
-            StartLoop(slot, source);
+            FirePlay(slot, source);
         }
     }
 
-    IEnumerator DelayedLoop(SoundSlot slot, AudioSource source)
+    IEnumerator DelayedPlay(SoundSlot slot, AudioSource source)
     {
         yield return new WaitForSeconds(slot.delay);
-        StartLoop(slot, source);
+        FirePlay(slot, source);
     }
 
-    void StartLoop(SoundSlot slot, AudioSource source)
+    void FirePlay(SoundSlot slot, AudioSource source)
     {
         AudioClip clip = slot.PickClip();
         if (clip == null) return;
-        source.clip = clip;
-        source.volume = slot.volume;
-        source.Play();
+
+        if (slot.loop)
+        {
+            source.clip = clip;
+            source.volume = slot.volume;
+            source.loop = true;
+            source.Play();
+        }
+        else
+        {
+            // 一次性播放不占用 source.clip/loop 状态，同一个 AudioSource 上可以叠加多次触发。
+            source.PlayOneShot(clip, slot.volume);
+        }
     }
 
-    void PlayOneShot(SoundSlot slot)
+    void Stop(AudioSource source, ref Coroutine delayRoutine)
     {
-        if (!slot.HasClips) return;
-
-        if (slot.delay > 0f) StartCoroutine(DelayedOneShot(slot));
-        else FireOneShot(slot);
-    }
-
-    IEnumerator DelayedOneShot(SoundSlot slot)
-    {
-        yield return new WaitForSeconds(slot.delay);
-        FireOneShot(slot);
-    }
-
-    void FireOneShot(SoundSlot slot)
-    {
-        AudioClip clip = slot.PickClip();
-        if (clip == null) return;
-        oneShotSource.PlayOneShot(clip, slot.volume);
+        if (delayRoutine != null)
+        {
+            StopCoroutine(delayRoutine);
+            delayRoutine = null;
+        }
+        source.Stop();
     }
 }

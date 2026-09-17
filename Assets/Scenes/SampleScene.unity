@@ -745,31 +745,37 @@ MonoBehaviour:
     playOrder: 0
     delay: 0
     volume: 1
+    loop: 1
   ambient:
     clips: []
     playOrder: 0
     delay: 0
     volume: 1
+    loop: 1
   ride:
     clips: []
     playOrder: 0
     delay: 0
     volume: 1
+    loop: 1
   landing:
     clips: []
     playOrder: 0
     delay: 0
     volume: 1
+    loop: 0
   boost:
     clips: []
     playOrder: 0
     delay: 0
     volume: 1
+    loop: 0
   crash:
     clips: []
     playOrder: 0
     delay: 0
     volume: 1
+    loop: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
