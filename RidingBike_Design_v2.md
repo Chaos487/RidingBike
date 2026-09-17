@@ -269,16 +269,46 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
     地形依然是一条连续曲线，`EdgeCollider2D`/网格都不需要真的断开——对应第 0/10 节
     之前讨论定的方向："缺口用假谷代替，不做真断开"
 -   谷底(`GapFloor`)那一段的长度就是断层的跨度，玩家必须全程在空中飞过这段距离，
-    否则会掉到谷底，摔一段远超正常颠簸的高度——直接触发 4.1 节的 Bad 落地判定，
-    大概率同时触发摔车/扣血，不需要为"掉进断层"单独写判定逻辑
+    否则会掉进谷底——具体怎么处理见 3.12 节 `GapFallHandler`
 -   `ObstacleSpawner` 会跳过断层范围内的所有采样点（新增的 `SlopeDirection.Gap`），
     不会有障碍物生成在谷底或陡坡上
 -   五个参数（`gapChance`、`minGapSpan`/`maxGapSpan`、`gapDepth`、`gapEdgeLength`）
-    都在 `EndlessRunSettings` 里，用法跟其它生成参数一样
+    都在 `EndlessRunSettings` 里，用法跟其它生成参数一样；`gapDepth` 必须明显比
+    3.12 节 `GapFallSettings.fallThreshold` 更深，不然玩家会在"掉进虚空"流程触发
+    之前就先摔到谷底的实心地面上，穿帮
 -   **还没做的**：断层目前是纯随机的，不保证"断层前有没有足够加速距离"、也不检查
     "按当前配置玩家是否有可能跳不过去"——如果调得太宽/太频繁，理论上可能生成一段
     实际过不去的地形，这个正是第 10 节 Chunk-based 生成想解决的问题，目前还没实现，
     调参时留意别把跨度/概率调得太离谱
+
+------------------------------------------------------------------------
+
+## 3.12 掉进断层 `GapFallHandler.cs` + `GapFallSettings.cs`
+
+> 处理"玩家没跳过断层"这个具体后果，跟 3.11 节的地形生成是两个独立系统。
+
+-   不用 Collider2D/触发区判定——这个项目已经在 `WheelContactSensor` 上踩过一次坑
+    （地形是持续重建的 `EdgeCollider2D`，跨越断层的触发区在地形频繁重建时 Enter/Exit
+    不保证严格配对），改成纯数据查表:`EndlessTerrainGenerator` 生成每段断层时就精确
+    记录 `[起点X, 终点X, 掉下去之前的地面高度]`，`GapFallHandler` 每帧拿车身当前 X 去
+    查(`TryGetGapAt`)，比地面高度记录低过 `fallThreshold` 就判定"掉进虚空"
+-   判定的一刻:`BikeController` 整体禁用(输入/驱动/自动回正全部停摆，车身交给纯
+    物理自由落体继续往下掉——反正镜头已经看不到，不需要真的等它掉到底)、镜头的
+    Cinemachine Follow 被清空定在原地不动、扣一次血（`BikeDamageSystem.ApplyDamage`，
+    走跟正常摔车同一条 HP 血条，但不触发回正车身/无敌时间/贴图闪烁那一套）、UI 弹出
+    "按 Space 继续"（`VoidPromptText`，在 `EndlessRunCanvas.prefab` 里）
+-   如果这一下正好把血扣没了，直接交给 `BikeDamageSystem.OnFinalCrash` 走正常摔车
+    结算，不弹"按 Space"提示——整局已经结束了
+-   玩家按 Space:车身传送到断层终点前方（`respawnAheadDistance`）、贴着记录的地面
+    高度（+ `respawnHeightOffset` 避免卡进碰撞体），速度清零，`BikeController` 重新
+    启用，镜头重新接上 Follow——**不额外判断车身是否已经回到画面内**，直接重新接上
+    Follow，让 Cinemachine 自己的 Damping 把镜头平滑地"追"回去
+-   等待"按 Space"期间地形/计分/HUD 都照常推进，不做全局暂停（`Time.timeScale`
+    没有被改动）——只有镜头和输入被这套流程接管
+-   四个参数（`fallThreshold`、`damage`、`respawnAheadDistance`、`respawnHeightOffset`）
+    在 `GapFallSettings`，目前仓库里还没有创建对应的 `.asset` 实例（`BikeDamageSettings`/
+    `TrickSystemSettings`/`ComboSystemSettings` 也都还没有），不创建就用脚本默认值,
+    需要调的话自己在 Project 窗口建一份
 
 ------------------------------------------------------------------------
 

@@ -49,8 +49,10 @@ public class EndlessRunSettings : ScriptableObject
     [Tooltip("断层的跨度(米)——玩家必须在空中飞过这段距离,否则会掉进谷底。")]
     public float minGapSpan = 3f;
     public float maxGapSpan = 6f;
-    [Tooltip("断层的深度(米),要明显深到掉下去会摔车/扣血,不能只是颠簸一下。")]
-    public float gapDepth = 6f;
+    [Tooltip("断层的深度(米)。必须明显比 GapFallSettings 的 fallThreshold 更深——" +
+             "玩家要在真正摔到谷底之前就先触发\"掉进虚空\"那套流程(镜头脱离+扣血+传送)，" +
+             "不然会先看到谷底其实是实心的，穿帮。")]
+    public float gapDepth = 25f;
     [Tooltip("断层两侧陡坡的长度(米),越短越接近垂直峭壁。")]
     public float gapEdgeLength = 1.5f;
 

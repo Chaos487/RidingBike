@@ -28,7 +28,7 @@ MonoBehaviour:
   gapChance: 0.15
   minGapSpan: 3
   maxGapSpan: 6
-  gapDepth: 6
+  gapDepth: 25
   gapEdgeLength: 1.5
   obstacleCheckIntervalMin: 6
   obstacleCheckIntervalMax: 12
