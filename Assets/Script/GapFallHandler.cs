@@ -4,7 +4,9 @@ using UnityEngine;
 /// 处理"掉进断层"(见 3.11 节)这个专门的失败情形:车身比断层记录的地面高度低过
 /// fallThreshold 时直接判定为致命的摔车——不管当前还剩多少血，一律走
 /// BikeDamageSystem.ForceFinalCrash() 结算，交给已有的摔车结算流程(锁输入、
-/// 镜头接管、显示结算画面、玩家按 R 重开)，这里不需要另外管镜头/UI。
+/// 显示结算画面、玩家按 R 重开)；镜头额外单独处理，见下面 CameraDirector.DetachFollow
+/// 那一行——车身判死之后还会带着物理速度继续往看不见的深处掉，镜头不停止跟随的话
+/// 会一直跟着往下跑，跟结算画面一起显得很怪。
 ///
 /// 判定不用 Collider2D/触发区——这个项目已经在 WheelContactSensor 上踩过一次坑:
 /// 地形是持续重建的 EdgeCollider2D，跨越断层范围的触发区在地形频繁重建时 Enter/Exit
@@ -20,14 +22,17 @@ public class GapFallHandler : MonoBehaviour
     BikeController bike;
     EndlessTerrainGenerator terrain;
     BikeDamageSystem damageSystem;
+    CameraDirector cameraDirector;
 
     bool triggered;
 
-    public void Initialize(BikeController bikeController, EndlessTerrainGenerator terrainGenerator, BikeDamageSystem bikeDamageSystem)
+    public void Initialize(BikeController bikeController, EndlessTerrainGenerator terrainGenerator,
+        BikeDamageSystem bikeDamageSystem, CameraDirector camera)
     {
         bike = bikeController;
         terrain = terrainGenerator;
         damageSystem = bikeDamageSystem;
+        cameraDirector = camera;
     }
 
     // 沿用 BikeDamageSettings，不单开一份资产——掉进断层本质上也是摔车判定的一种，
@@ -47,6 +52,7 @@ public class GapFallHandler : MonoBehaviour
         {
             triggered = true;
             bike.enabled = false;
+            if (cameraDirector != null) cameraDirector.DetachFollow();
             damageSystem.ForceFinalCrash();
         }
     }

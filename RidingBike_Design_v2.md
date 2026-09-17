@@ -300,17 +300,22 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
     推一把），完全绕开了摔车判定。现在 `WheelContactSensor` 额外检查接触点法线跟
     正上方的夹角，超过 `maxGroundAngle`(默认 70°，地形最陡的坡大约 63°，断层峭壁
     接近 90°，中间留了余量)就不算"贴地"，只算撞墙
--   判定的一刻:`BikeController` 整体禁用(反正整局已经结束，输入没有意义)，
-    直接调用 `BikeDamageSystem.ForceFinalCrash()`——**不管当前还剩多少血**，
-    一律判定为致命摔车，交给已有的摔车结算流程(`RunManager` 锁输入/显示结算画面、
-    `CameraDirector` 接管镜头聚焦，跟正常摔死一样，按 R 重开)
+-   判定的一刻:`BikeController` 整体禁用(反正整局已经结束，输入没有意义)、
+    `CameraDirector.DetachFollow()` 停止跟随(镜头 Follow 清空，定在当前位置不动)，
+    再调用 `BikeDamageSystem.ForceFinalCrash()`——**不管当前还剩多少血**，一律判定为
+    致命摔车，交给已有的摔车结算流程(`RunManager` 锁输入/显示结算画面、`CameraDirector`
+    自己的 `HandleFinalCrash` 接管镜头聚焦/震动，跟正常摔死一样，按 R 重开)
+-   镜头为什么要单独处理:判死之后 `BikeController` 只是被禁用，车身的 `Rigidbody2D`
+    还带着物理速度继续往看不见的深处掉(没有特意冻结)，如果不停跟随，镜头会一直跟着
+    车身往下跑，跟已经弹出来的结算画面一起显得很怪。`DetachFollow` 只负责停，没有配套
+    的"重新开始跟随"——判死之后是终局，不会再需要接回去
 -   `gapFallThreshold` 一个参数，并进了 `BikeDamageSettings`(`断层 (GapFallHandler)`
     分组)，不单开 Settings 资产——逻辑上也是摔车判定的一部分，跟 `damagePerCrash`
     放在一起配置
--   这套之前还做过"扣血但不死、按 Space 原地复活继续骑"的版本(镜头脱离跟随、
-    传送回断层终点、UI 弹提示)，后来改成直接判死——旧版本涉及的 `CameraDirector.
-    DetachFollow/ReattachFollow`、`RunManager` 的 `VoidPromptText` 提示、`BikeDamageSystem.
-    ApplyDamage(非致命扣血)` 都已经删掉，不要照旧版本的思路去找这些方法
+-   这套之前还做过"扣血但不死、按 Space 原地复活继续骑"的版本，后来改成直接判死——
+    那一版专用的 `RunManager` 的 `VoidPromptText` 提示、`CameraDirector.ReattachFollow`
+    (复活后重新接回跟随)、`BikeDamageSystem.ApplyDamage`(非致命扣血)都已经删掉；
+    `DetachFollow` 留下来了，但语义变了(不再是"暂停跟随等复活"，是"停止跟随到此为止")
 
 ------------------------------------------------------------------------
 

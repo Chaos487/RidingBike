@@ -77,6 +77,11 @@ public class CameraDirector : MonoBehaviour
         landingDetector.OnLanded += HandleLanded;
     }
 
+    /// <summary>停止跟随，镜头定在当前位置不动——GapFallHandler 判定掉进断层摔车时调用，
+    /// 车身会继续往看不见的深处掉，镜头不该跟着一起往下跑。摔车已经是终局，不需要重新
+    /// 接回去，所以只有停止，没有配套的"重新开始跟随"。</summary>
+    public void DetachFollow() => cmCamera.Follow = null;
+
     public void ApplySettings(CameraDirectorSettings settings)
     {
         if (settings == null) return;
