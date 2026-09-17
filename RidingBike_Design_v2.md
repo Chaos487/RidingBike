@@ -291,7 +291,15 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
     （地形是持续重建的 `EdgeCollider2D`，跨越断层的触发区在地形频繁重建时 Enter/Exit
     不保证严格配对），改成纯数据查表:`EndlessTerrainGenerator` 生成每段断层时就精确
     记录 `[起点X, 终点X, 掉下去之前的地面高度]`，`GapFallHandler` 每帧拿车身当前 X 去
-    查(`TryGetGapAt`)，比地面高度记录低过 `gapFallThreshold` 就判定"掉进虚空"
+    查(`TryGetGapAt`)，比地面高度记录低过 `gapFallThreshold` 就判定"掉进虚空"，
+    **不看 `IsWheelGrounded`**——只认深度，掉得够深就无条件判定，不管当前是不是被
+    判定为"触地"（下面这条 bug 修好之前，触地判定会被断层峭壁污染，靠它短路会漏判）
+-   **实测过的 bug，已修复**:轮子贴着断层峭壁(陡降/陡升两侧、接近垂直)蹭的时候，
+    `WheelContactSensor` 原来只看碰撞层、不看接触点法线方向，把撞墙也算成了"贴地"，
+    车能顺着峭壁一路"爬"上去（`ApplyBalance` 把峭壁当坡面回正、驱动轮摩擦力再往上
+    推一把），完全绕开了摔车判定。现在 `WheelContactSensor` 额外检查接触点法线跟
+    正上方的夹角，超过 `maxGroundAngle`(默认 70°，地形最陡的坡大约 63°，断层峭壁
+    接近 90°，中间留了余量)就不算"贴地"，只算撞墙
 -   判定的一刻:`BikeController` 整体禁用(输入/驱动/自动回正全部停摆，车身交给纯
     物理自由落体继续往下掉——反正镜头已经看不到，不需要真的等它掉到底)、镜头的
     Cinemachine Follow 被清空定在原地不动、扣一次血（`BikeDamageSystem.ApplyDamage`，
