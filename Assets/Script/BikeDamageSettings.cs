@@ -19,4 +19,14 @@ public class BikeDamageSettings : ScriptableObject
     [Tooltip("扣血时把车身角度朝目标角度(触地时是坡度，空中是水平)拉回的比例，0 = 完全不干预，1 = 直接摆正。")]
     [Range(0f, 1f)]
     public float recoveryUprightBlend = 0.6f;
+
+    [Header("断层扣血 (GapFallHandler)")]
+    [Tooltip("车身比断层记录的地面高度低多少米,判定为\"掉进虚空\"。")]
+    public float gapFallThreshold = 8f;
+    [Tooltip("判定掉进虚空扣多少血量——走这条同一个 HP 血条，不是单独一条命。")]
+    public float gapFallDamage = 25f;
+    [Tooltip("按空格重新出现时,传送到断层终点前方多远(米)。")]
+    public float gapRespawnAheadDistance = 1.5f;
+    [Tooltip("重新出现时车身中心比地面高多少米,避免正好卡进地形碰撞体里。")]
+    public float gapRespawnHeightOffset = 1.5f;
 }

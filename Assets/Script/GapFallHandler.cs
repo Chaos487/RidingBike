@@ -48,14 +48,16 @@ public class GapFallHandler : MonoBehaviour
         rackTransform = bike.transform.Find("rack");
     }
 
-    public void ApplySettings(GapFallSettings settings)
+    // 沿用 BikeDamageSettings，不单开一份资产——掉进断层本质上也是扣血，跟正常摔车的
+    // 扣血配置放在一起，不用为了四个数字多维护一份独立的 Settings 资产。
+    public void ApplySettings(BikeDamageSettings settings)
     {
         if (settings == null) return;
 
-        fallThreshold = settings.fallThreshold;
-        damage = settings.damage;
-        respawnAheadDistance = settings.respawnAheadDistance;
-        respawnHeightOffset = settings.respawnHeightOffset;
+        fallThreshold = settings.gapFallThreshold;
+        damage = settings.gapFallDamage;
+        respawnAheadDistance = settings.gapRespawnAheadDistance;
+        respawnHeightOffset = settings.gapRespawnHeightOffset;
     }
 
     void Update()

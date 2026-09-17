@@ -60,7 +60,7 @@ public class EndlessTerrainGenerator : MonoBehaviour
     [Tooltip("断层的跨度(米)——玩家必须在空中飞过这段距离,否则会掉进谷底。")]
     public float minGapSpan = 3f;
     public float maxGapSpan = 6f;
-    [Tooltip("断层的深度(米)。必须明显比 GapFallHandler 的 fallThreshold 更深——" +
+    [Tooltip("断层的深度(米)。必须明显比 BikeDamageSettings.gapFallThreshold 更深——" +
              "玩家要在真正摔到谷底之前就先触发\"掉进虚空\"那套流程(镜头脱离+扣血+传送)，" +
              "不然会先看到谷底其实是实心的，穿帮。")]
     public float gapDepth = 25f;

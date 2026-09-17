@@ -61,8 +61,9 @@ public static class EndlessRunBootstrap
         crashDetector.bikeRigidbody = bike.bikeRigidbody != null ? bike.bikeRigidbody : bike.GetComponent<Rigidbody2D>();
         crashDetector.bikeController = bike;
 
+        BikeDamageSettings damageSettings = FindSettings<BikeDamageSettings>();
         BikeDamageSystem damageSystem = systems.AddComponent<BikeDamageSystem>();
-        damageSystem.ApplySettings(FindSettings<BikeDamageSettings>());
+        damageSystem.ApplySettings(damageSettings);
         damageSystem.Initialize(bike, crashDetector);
 
         RunManager runManager = SetupRunManagerUI();
@@ -83,7 +84,7 @@ public static class EndlessRunBootstrap
         runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner);
 
         CameraDirector cameraDirector = SetupCamera(bike, damageSystem, landingDetector);
-        SetupGapFallHandler(systems, bike, terrain, damageSystem, cameraDirector, runManager);
+        SetupGapFallHandler(systems, bike, terrain, damageSystem, damageSettings, cameraDirector, runManager);
         SetupAudio(bike, crashDetector, landingDetector);
     }
 
@@ -199,12 +200,12 @@ public static class EndlessRunBootstrap
     // 重新跟随)，所以放在这几个系统都创建完之后接线；cameraDirector 为空(场景里没挂
     // CinemachineCamera)就跳过，不影响其它系统正常运行。
     static void SetupGapFallHandler(GameObject systems, BikeController bike, EndlessTerrainGenerator terrain,
-        BikeDamageSystem damageSystem, CameraDirector cameraDirector, RunManager runManager)
+        BikeDamageSystem damageSystem, BikeDamageSettings damageSettings, CameraDirector cameraDirector, RunManager runManager)
     {
         if (cameraDirector == null) return;
 
         GapFallHandler gapFallHandler = systems.AddComponent<GapFallHandler>();
-        gapFallHandler.ApplySettings(FindSettings<GapFallSettings>());
+        gapFallHandler.ApplySettings(damageSettings);
         gapFallHandler.Initialize(bike, terrain, damageSystem, cameraDirector);
 
         runManager.InitializeGapFall(gapFallHandler);
