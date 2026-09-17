@@ -32,6 +32,6 @@ MonoBehaviour:
   obstacleSpawnChance: 0.15
   obstacleMinGap: 6
   skipObstaclesOnUphill: 1
-  obstacleSize: {x: 0.6, y: 0.4}
-  obstacleColor: {r: 0.5, g: 0.35, b: 0.2, a: 1}
+  obstacleSize: {x: 1, y: 4}
+  obstacleColor: {r: 0.9528302, g: 0.7879528, b: 0.022472408, a: 1}
   obstacleEdgeRadius: 0.08
