@@ -98,7 +98,21 @@ public class EndlessTerrainGenerator : MonoBehaviour
     /// <summary>沿地形按一定间距采样时触发,供障碍物生成等系统订阅。</summary>
     public event Action<Vector2, float, SlopeDirection> OnGroundSampled;
 
+    // 记录已生成的每一段断层的 [起点X, 终点X] 和"掉下去之前的地面高度"，供 GapFallHandler
+    // 查询"车身当前 X 是不是在某个断层范围内、掉了多深"——不用碰撞体/触发区判定，见 3.11 节。
+    readonly struct GapRecord
+    {
+        public readonly float startX, endX, groundY;
+        public GapRecord(float startX, float endX, float groundY)
+        {
+            this.startX = startX;
+            this.endX = endX;
+            this.groundY = groundY;
+        }
+    }
+
     readonly List<Vector2> points = new List<Vector2>();
+    readonly List<GapRecord> gaps = new List<GapRecord>();
     EdgeCollider2D edgeCollider;
     MeshFilter meshFilter;
     MeshRenderer meshRenderer;
@@ -112,6 +126,8 @@ public class EndlessTerrainGenerator : MonoBehaviour
     float phaseLength;
     float phaseStartHeight;
     float phaseEndHeight;
+    float pendingGapStartX;
+    float pendingGapGroundY;
     float pendingHeightDelta; // 小山坡的"爬升多高"、断层的"陷下去多深"共用这一个字段，用完在下一次 AdvancePhase 里原样加回来，保证海拔不漂移
 
     void Awake()
@@ -173,6 +189,7 @@ public class EndlessTerrainGenerator : MonoBehaviour
     public void Initialize(Vector2 startPoint)
     {
         points.Clear();
+        gaps.Clear();
         frontX = startPoint.x;
         points.Add(startPoint);
 
@@ -215,6 +232,7 @@ public class EndlessTerrainGenerator : MonoBehaviour
         }
 
         changed |= TrimBehind(trackTarget.position.x - despawnBehindDistance);
+        gaps.RemoveAll(g => g.endX < trackTarget.position.x - despawnBehindDistance);
 
         if (changed)
         {
@@ -264,6 +282,8 @@ public class EndlessTerrainGenerator : MonoBehaviour
                     phaseLength = gapEdgeLength;
                     phaseStartHeight = baseHeight;
                     phaseEndHeight = baseHeight - pendingHeightDelta;
+                    pendingGapStartX = nextPhaseStartX;
+                    pendingGapGroundY = baseHeight;
                 }
                 else
                 {
@@ -293,6 +313,10 @@ public class EndlessTerrainGenerator : MonoBehaviour
                 phaseEndHeight = baseHeight + pendingHeightDelta; // 升回掉下去之前的高度
                 break;
             default: // Falling、GapRise 结束后都回到 Flat
+                if (phase == Phase.GapRise)
+                {
+                    gaps.Add(new GapRecord(pendingGapStartX, nextPhaseStartX, pendingGapGroundY));
+                }
                 phase = Phase.Flat;
                 phaseLength = UnityEngine.Random.Range(minFlatLength, maxFlatLength);
                 phaseStartHeight = baseHeight;
@@ -322,6 +346,25 @@ public class EndlessTerrainGenerator : MonoBehaviour
         if (slopeDeg > flatAngleThreshold) return SlopeDirection.Uphill;
         if (slopeDeg < -flatAngleThreshold) return SlopeDirection.Downhill;
         return SlopeDirection.Flat;
+    }
+
+    /// <summary>查一下 x 是否落在某个已生成断层的 [起点, 终点] 范围内，是的话给出"掉下去之前
+    /// 的地面高度"和断层终点 X(GapFallHandler 用后者算重新出现的落点)。断层数量任何时刻都
+    /// 很少(generateAheadDistance 范围内最多几个)，线性找就够，不需要额外建索引。</summary>
+    public bool TryGetGapAt(float x, out float groundY, out float gapEndX)
+    {
+        foreach (GapRecord gap in gaps)
+        {
+            if (x >= gap.startX && x <= gap.endX)
+            {
+                groundY = gap.groundY;
+                gapEndX = gap.endX;
+                return true;
+            }
+        }
+        groundY = 0f;
+        gapEndX = 0f;
+        return false;
     }
 
     bool TrimBehind(float xThreshold)

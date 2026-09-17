@@ -82,7 +82,8 @@ public static class EndlessRunBootstrap
 
         runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner);
 
-        SetupCamera(bike, damageSystem, landingDetector);
+        CameraDirector cameraDirector = SetupCamera(bike, damageSystem, landingDetector);
+        SetupGapFallHandler(systems, bike, terrain, damageSystem, cameraDirector, runManager);
         SetupAudio(bike, crashDetector, landingDetector);
     }
 
@@ -174,10 +175,10 @@ public static class EndlessRunBootstrap
         }
     }
 
-    static void SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)
+    static CameraDirector SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)
     {
         CinemachineCamera cmCamera = Object.FindFirstObjectByType<CinemachineCamera>();
-        if (cmCamera == null) return;
+        if (cmCamera == null) return null;
 
         CinemachineImpulseSource impulseSource = bike.GetComponent<CinemachineImpulseSource>();
         if (impulseSource == null) impulseSource = bike.gameObject.AddComponent<CinemachineImpulseSource>();
@@ -191,6 +192,22 @@ public static class EndlessRunBootstrap
         CameraDirector cameraDirector = cmCamera.gameObject.AddComponent<CameraDirector>();
         cameraDirector.ApplySettings(FindSettings<CameraDirectorSettings>());
         cameraDirector.Initialize(bike, damageSystem, impulseSource, landingDetector);
+        return cameraDirector;
+    }
+
+    // 掉进断层(3.11 节)的专门处理——依赖地形(查断层范围)、伤害系统(扣血)、镜头(脱离/
+    // 重新跟随)，所以放在这几个系统都创建完之后接线；cameraDirector 为空(场景里没挂
+    // CinemachineCamera)就跳过，不影响其它系统正常运行。
+    static void SetupGapFallHandler(GameObject systems, BikeController bike, EndlessTerrainGenerator terrain,
+        BikeDamageSystem damageSystem, CameraDirector cameraDirector, RunManager runManager)
+    {
+        if (cameraDirector == null) return;
+
+        GapFallHandler gapFallHandler = systems.AddComponent<GapFallHandler>();
+        gapFallHandler.ApplySettings(FindSettings<GapFallSettings>());
+        gapFallHandler.Initialize(bike, terrain, damageSystem, cameraDirector);
+
+        runManager.InitializeGapFall(gapFallHandler);
     }
 
     // 优先在编辑器里按类型搜整个 Assets(不要求放在 Resources 目录下,创建在哪里都能找到);

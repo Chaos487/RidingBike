@@ -31,6 +31,7 @@ public class RunManager : MonoBehaviour
     Text toastText;
     Text statusText;
     Text hpLabelText;
+    Text voidPromptText;
     Image hpBarFill;
 
     Sequence toastTweener;
@@ -64,6 +65,13 @@ public class RunManager : MonoBehaviour
         trickSystem.OnTrickFailed += HandleTrickFailed;
         comboSystem.OnComboChanged += HandleComboChanged;
         obstacleSpawner.OnNearMiss += HandleNearMiss;
+    }
+
+    /// <summary>接上"掉进断层"这套流程的进入/离开事件，显示/隐藏"按 Space 继续"提示。</summary>
+    public void InitializeGapFall(GapFallHandler gapFallHandler)
+    {
+        gapFallHandler.OnEnteredVoid += HandleEnteredVoid;
+        gapFallHandler.OnExitedVoid += HandleExitedVoid;
     }
 
     void Update()
@@ -104,6 +112,16 @@ public class RunManager : MonoBehaviour
     void HandleNearMiss()
     {
         ShowToast("NEAR MISS!");
+    }
+
+    void HandleEnteredVoid()
+    {
+        if (voidPromptText != null) voidPromptText.gameObject.SetActive(true);
+    }
+
+    void HandleExitedVoid()
+    {
+        if (voidPromptText != null) voidPromptText.gameObject.SetActive(false);
     }
 
     void HandlePartialDamage(float currentHp, float maxHp)
@@ -168,10 +186,12 @@ public class RunManager : MonoBehaviour
         toastText = FindText("ToastText");
         statusText = FindText("StatusText");
         hpLabelText = FindText("HpLabelText");
+        voidPromptText = FindText("VoidPromptText");
         hpBarFill = FindImage("HpBarBackground/HpBarFill");
 
         if (toastText != null) toastText.text = string.Empty;
         if (statusText != null) statusText.gameObject.SetActive(false);
+        if (voidPromptText != null) voidPromptText.gameObject.SetActive(false);
 
         // Image.Type.Filled 在没有指定 sprite 的时候会直接走"画整个矩形"的兜底逻辑，
         // fillAmount 完全不生效(这点跟 Type.Simple 不一样，纯色矩形那个技巧对 Filled 不成立)。

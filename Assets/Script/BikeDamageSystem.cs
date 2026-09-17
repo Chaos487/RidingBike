@@ -66,6 +66,24 @@ public class BikeDamageSystem : MonoBehaviour
         OnHpChanged?.Invoke(currentHp, maxHp);
     }
 
+    /// <summary>纯粹扣血，不走 HandleCrash 那一整套(不回正车身、不给无敌时间、不闪烁)——
+    /// 供掉进断层(GapFallHandler)这类没有实体碰撞、车身早就不在画面里的伤害来源使用。
+    /// 返回 false 表示这一下正好把血扣没了(已经触发 OnFinalCrash)，调用方应该直接放弃
+    /// 自己那一套后续流程，交给正常的摔车结算接管。</summary>
+    public bool ApplyDamage(float amount)
+    {
+        currentHp = Mathf.Max(0f, currentHp - amount);
+
+        if (currentHp <= 0f)
+        {
+            OnFinalCrash?.Invoke();
+            return false;
+        }
+
+        OnHpChanged?.Invoke(currentHp, maxHp);
+        return true;
+    }
+
     void RecoverBikeUpright()
     {
         Rigidbody2D rb = bike.bikeRigidbody;
