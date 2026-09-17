@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -89,6 +90,9 @@ public class BikeController : MonoBehaviour
     [Header("Invulnerability Flash")]
     [Tooltip("摔车扣血后的无敌期间，车身贴图一亮一灭切换一次的间隔(秒)，越小闪得越快。")]
     public float invulnerabilityFlashInterval = 0.1f;
+
+    /// <summary>Shift 加速真正触发的那一刻抛出(冷却中按 Shift 不会触发)，给音效/特效订阅用。</summary>
+    public event Action OnBoost;
 
     float currentMotorSpeed;
     float input;
@@ -306,6 +310,7 @@ public class BikeController : MonoBehaviour
 
         currentBoostBonusKmh = boostSpeedBonusKmh;
         xAtLastBoost = bikeRigidbody.position.x;
+        OnBoost?.Invoke();
     }
 
     void LateUpdate()

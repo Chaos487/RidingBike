@@ -83,6 +83,30 @@ public static class EndlessRunBootstrap
         runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner);
 
         SetupCamera(bike, damageSystem, landingDetector);
+        SetupAudio(bike, crashDetector, landingDetector);
+    }
+
+    // 音频是直接挂在场景里的 AudioManager(不是这里生成的，运行时只拿它的单例来接线)。
+    // BikeController/CrashDetector/LandingDetector 都是本方法运行时才生成的，没法在 Inspector 里
+    // 互相拖引用，所以在这里把它们各自的事件接到 AudioManager 对应的槽位上。
+    static void SetupAudio(BikeController bike, CrashDetector crashDetector, LandingDetector landingDetector)
+    {
+        AudioManager audio = AudioManager.Instance;
+        if (audio == null)
+        {
+            Debug.LogWarning("EndlessRunBootstrap: 场景里找不到 AudioManager，音效不会播放。");
+            return;
+        }
+
+        bike.OnBoost += audio.PlayBoost;
+        landingDetector.OnLanded += (quality, order) => audio.PlayLanding();
+        crashDetector.OnCrash += () =>
+        {
+            audio.PlayCrash();
+            audio.StopRide();
+        };
+
+        audio.PlayRide();
     }
 
     // UI 现在是手动在 Editor 里搭的 Assets/prefab/EndlessRunCanvas.prefab，实例化出来之后
