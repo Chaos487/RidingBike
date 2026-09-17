@@ -35,6 +35,14 @@ public class RunManager : MonoBehaviour
     Image hpBarFill;
     GameObject hpBarRoot;
     Button startButton;
+    Button boostButton;
+    Image boostButtonImage;
+
+    [Header("Boost 按钮(手机端)")]
+    [Tooltip("氮气就绪时圆圈按钮的颜色，要够亮/够跳，一眼看出来能点。")]
+    public Color boostReadyColor = new Color(1f, 0.65f, 0.15f, 1f);
+    [Tooltip("氮气没就绪时圆圈按钮的颜色，故意做得偏灰/半透明，暗示点了也没用。")]
+    public Color boostNotReadyColor = new Color(0.5f, 0.5f, 0.5f, 0.4f);
 
     Sequence toastTweener;
     float startX;
@@ -102,6 +110,7 @@ public class RunManager : MonoBehaviour
         if (comboText != null) comboText.gameObject.SetActive(visible);
         if (hpLabelText != null) hpLabelText.gameObject.SetActive(visible);
         if (hpBarRoot != null) hpBarRoot.SetActive(visible);
+        if (boostButton != null) boostButton.gameObject.SetActive(visible);
     }
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
@@ -141,10 +150,19 @@ public class RunManager : MonoBehaviour
 
         if (bikeController != null)
         {
-            boostText.text = bikeController.IsBoostReady
+            bool ready = bikeController.IsBoostReady;
+            boostText.text = ready
                 ? "氮气: 就绪 (Shift)"
                 : $"氮气: 还差 {bikeController.DistanceUntilBoostReady:0} m";
+
+            if (boostButtonImage != null) boostButtonImage.color = ready ? boostReadyColor : boostNotReadyColor;
         }
+    }
+
+    void HandleBoostButtonClicked()
+    {
+        // 没就绪的时候点了也没用——TryTriggerBoost() 自己内部会先判 IsBoostReady，这里不用重复判断。
+        if (bikeController != null) bikeController.TryTriggerBoost();
     }
 
     void HandleTrickScored(int score, float degrees)
@@ -227,6 +245,8 @@ public class RunManager : MonoBehaviour
         hpBarFill = FindImage("HpBarBackground/HpBarFill");
         hpBarRoot = hpBarFill != null ? hpBarFill.transform.parent.gameObject : null;
         startButton = FindButton("StartButton");
+        boostButton = FindButton("BoostButton");
+        boostButtonImage = boostButton != null ? boostButton.GetComponent<Image>() : null;
 
         if (toastText != null) toastText.text = string.Empty;
         if (statusText != null) statusText.gameObject.SetActive(false);
@@ -234,6 +254,11 @@ public class RunManager : MonoBehaviour
         {
             startButton.gameObject.SetActive(false); // EnterStartGate() 会在 Initialize() 里再打开，这里先关掉避免第一帧闪一下
             startButton.onClick.AddListener(HandleStartClicked);
+        }
+        if (boostButton != null)
+        {
+            boostButton.onClick.AddListener(HandleBoostButtonClicked);
+            if (boostButtonImage != null) boostButtonImage.color = boostNotReadyColor; // 初始状态先按"没就绪"画，Update() 会立刻按真实状态纠正
         }
 
         // Image.Type.Filled 在没有指定 sprite 的时候会直接走"画整个矩形"的兜底逻辑，

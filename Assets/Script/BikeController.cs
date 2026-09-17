@@ -305,7 +305,9 @@ public class BikeController : MonoBehaviour
         HandleJumpAndSpin();
     }
 
-    void TryTriggerBoost()
+    /// <summary>没就绪的时候点了也没用(内部会先检查 IsBoostReady)——手机端的氮气按钮
+    /// (RunManager 里接的)直接调这个就行，不用在按钮那边自己再判一遍是否就绪。</summary>
+    public void TryTriggerBoost()
     {
         if (!IsBoostReady) return;
 
