@@ -28,8 +28,8 @@ Transform:
   m_GameObject: {fileID: 1308484154192270642}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.75, y: -0.17, z: -0.0074879904}
-  m_LocalScale: {x: 5, y: 5, z: 1}
+  m_LocalPosition: {x: -0.212, y: 0.069, z: -0.0074879904}
+  m_LocalScale: {x: 2, y: 2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7316531443551290128}
@@ -179,8 +179,8 @@ Transform:
   m_GameObject: {fileID: 5156639890018941492}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.08116318, y: 0.177, z: -0.0074879904}
-  m_LocalScale: {x: 5, y: 5, z: 1}
+  m_LocalPosition: {x: 0.08116318, y: 0.257, z: -0.0074879904}
+  m_LocalScale: {x: 2, y: 2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7316531443551290128}
@@ -373,7 +373,7 @@ WheelJoint2D:
   m_BreakTorque: Infinity
   m_BreakAction: 3
   m_AutoConfigureConnectedAnchor: 1
-  m_Anchor: {x: 0.88561064, y: -0.1807955}
+  m_Anchor: {x: 0.41924423, y: 0.07668179}
   m_ConnectedAnchor: {x: 0.009122139, y: 0.003840897}
   m_Suspension:
     m_DampingRatio: 0.9
@@ -398,7 +398,7 @@ WheelJoint2D:
   m_BreakTorque: Infinity
   m_BreakAction: 3
   m_AutoConfigureConnectedAnchor: 1
-  m_Anchor: {x: -0.75, y: -0.17}
+  m_Anchor: {x: -0.212, y: 0.069}
   m_ConnectedAnchor: {x: -0.0000000054572915, y: 4.543903e-10}
   m_Suspension:
     m_DampingRatio: 0.9
@@ -434,7 +434,6 @@ MonoBehaviour:
   boostDecayPerSecondKmh: 30
   maxSpeedKmh: 100
   maxAngularSpeed: 400
-  airLeanTorque: 30
   autoBalanceTorque: 25
   autoBalanceDamping: 4
   groundCheckDistance: 1.2
@@ -482,8 +481,8 @@ Transform:
   m_GameObject: {fileID: 8921212775599145840}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.84, y: -0.2, z: -0.0074879904}
-  m_LocalScale: {x: 5, y: 5, z: 1}
+  m_LocalPosition: {x: 0.401, y: 0.069, z: -0.0074879904}
+  m_LocalScale: {x: 2, y: 2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7316531443551290128}
@@ -577,8 +576,8 @@ CircleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.008295155, y: 0.005530103}
-  m_Radius: 0.1351145
+  m_Offset: {x: 0.008295149, y: 0.005530104}
+  m_Radius: 0.13511449
 --- !u!50 &4348423915387458601
 Rigidbody2D:
   serializedVersion: 5
