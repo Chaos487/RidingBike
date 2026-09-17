@@ -26,9 +26,10 @@
 速度上限用真实单位表达(默认 100km/h);自动回正贴合坡面;跳跃力度随车速/下坡角度
 动态加成;空中长按空格触发 360° 空翻(不接受方向键控制空中姿态,是设计选择,不是 bug)。
 
-**无限地形生成**(`EndlessTerrainGenerator.cs` + `EndlessRunSettings.cs`,3.2 节)
+**无限地形生成**(`EndlessTerrainGenerator.cs` + `EndlessRunSettings.cs`,3.2 / 3.11 节)
 程序化生成"平地→上坡→下坡→平地→…"循环,阶段间 SmoothStep 过渡不留尖角;上下坡对
-速度的影响完全来自物理重力,没有脚本化强制加减速;所有参数抽成 ScriptableObject。
+速度的影响完全来自物理重力,没有脚本化强制加减速;平地结束时还会按概率生成断层
+(可配置出现概率/跨度/深度),地形依然是连续曲线,不是真的断开;所有参数抽成 ScriptableObject。
 
 **障碍物**(`ObstacleSpawner.cs`,3.3 节)
 沿地形按概率放置,上坡不放(留作救车缓冲区);碰撞体带圆角避免高速冲量异常。
