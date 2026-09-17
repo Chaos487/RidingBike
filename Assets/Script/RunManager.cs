@@ -32,11 +32,17 @@ public class RunManager : MonoBehaviour
     Text toastText;
     Text statusText;
     Text hpLabelText;
+    Text bestDistanceText;
     Image hpBarFill;
     GameObject hpBarRoot;
     Button startButton;
     Button boostButton;
     Image boostButtonImage;
+
+    // PlayerPrefs 在 PC/iOS 上都是内置的、跨平台的本地持久化(Windows 存注册表，iOS 存 plist)，
+    // 不用另外写一套存档逻辑——这是这个项目第一次真正"跨局/跨启动"持久化的数据。
+    const string BestDistanceKey = "RidingBike_BestDistance";
+    float bestDistance;
 
     [Header("Boost 按钮(手机端)")]
     [Tooltip("氮气就绪时圆圈按钮的颜色，要够亮/够跳，一眼看出来能点。")]
@@ -111,6 +117,7 @@ public class RunManager : MonoBehaviour
         if (hpLabelText != null) hpLabelText.gameObject.SetActive(visible);
         if (hpBarRoot != null) hpBarRoot.SetActive(visible);
         if (boostButton != null) boostButton.gameObject.SetActive(visible);
+        if (bestDistanceText != null) bestDistanceText.gameObject.SetActive(visible);
     }
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
@@ -144,6 +151,16 @@ public class RunManager : MonoBehaviour
 
         float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
         distanceText.text = $"距离: {distance:0} m";
+
+        // 破纪录的时候实时更新——玩家能看到"最远距离"这个数字跟着当前距离一起往上跳，
+        // 比只在结算画面才告诉他"破紀錄了"更有即时反馈。PlayerPrefs.SetFloat 本身只是写内存缓存，
+        // 不会每帧都落盘，真正的磁盘写入(Save())留到 HandleCrash 里做一次就够。
+        if (distance > bestDistance)
+        {
+            bestDistance = distance;
+            PlayerPrefs.SetFloat(BestDistanceKey, bestDistance);
+            if (bestDistanceText != null) bestDistanceText.text = $"最远距离: {bestDistance:0} m";
+        }
 
         float speedKmh = bikeController != null ? Mathf.Abs(bikeController.bikeRigidbody.linearVelocity.x) * 3.6f : 0f;
         speedText.text = $"时速: {speedKmh:0} km/h";
@@ -231,6 +248,10 @@ public class RunManager : MonoBehaviour
         float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
         statusText.text = $"摔车了! 距离 {distance:0} m\n按 R / 点击屏幕重新开始";
         statusText.gameObject.SetActive(true);
+
+        // 摔车结算是个自然的存盘点——真正落盘一次，防止手机端切后台/被系统杀掉的时候丢掉这一局刚破的纪录
+        // (Update() 里 SetFloat 只更新内存缓存，不保证真的写到磁盘)。
+        PlayerPrefs.Save();
     }
 
     void FindUIReferences()
@@ -242,6 +263,7 @@ public class RunManager : MonoBehaviour
         toastText = FindText("ToastText");
         statusText = FindText("StatusText");
         hpLabelText = FindText("HpLabelText");
+        bestDistanceText = FindText("BestDistanceText");
         hpBarFill = FindImage("HpBarBackground/HpBarFill");
         hpBarRoot = hpBarFill != null ? hpBarFill.transform.parent.gameObject : null;
         startButton = FindButton("StartButton");
@@ -250,6 +272,9 @@ public class RunManager : MonoBehaviour
 
         if (toastText != null) toastText.text = string.Empty;
         if (statusText != null) statusText.gameObject.SetActive(false);
+
+        bestDistance = PlayerPrefs.GetFloat(BestDistanceKey, 0f);
+        if (bestDistanceText != null) bestDistanceText.text = $"最远距离: {bestDistance:0} m";
         if (startButton != null)
         {
             startButton.gameObject.SetActive(false); // EnterStartGate() 会在 Initialize() 里再打开，这里先关掉避免第一帧闪一下
