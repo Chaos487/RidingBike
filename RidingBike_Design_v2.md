@@ -8,42 +8,51 @@ Unity 6 (`6000.0.63f1`) + URP + 2D 物理，目前是 PC
 
 ------------------------------------------------------------------------
 
-# 0. 当前进度快照（2026-09-14）
+# 0. 当前进度快照（2026-09-17）
 
-按第 23 节的 P0→P3 顺序对了一遍代码目录，当前实际状态：
+按第 23 节的 P0→P3 顺序、逐个对照当前代码库核实了一遍（读了全部 `Assets/Script/*.cs`，不是只看提交记录）：
 
 **P0 —— 核心体验**
 
--   [x] Landing Quality —— 已实现，见 4.1 节更新
+-   [x] Landing Quality —— 已实现，见 4.1 节
 -   [x] Trick Score —— 已实现，`TrickSystem.cs` + `TrickSystemSettings`
 -   [x] Combo —— 已实现，`ComboSystem.cs` + `ComboSystemSettings`
 -   [x] Near Miss —— 已实现，`NearMissDetector.cs`（挂在 `ObstacleSpawner` 生成的每个障碍物上）
 
 P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunManager` 已能弹字/显示 Combo 数），但还有几块明确的欠账，暂不算已完成：
 
--   没有统一的 `ScoreSystem`——Distance、Trick 分数各自独立显示，Combo 目前只是个计数器，并没有像第 6 节要求的那样真正乘到 Trick 分数上
--   没有"PERFECT!"落地专属弹字——当前只有 Trick 分数弹字，为了不跟它抢显示，落地质量本身暂时没有单独反馈
--   摔车结算画面信息不全——目前只显示距离，第 16 节要求的 Score / Best Distance / Highest Combo / Best Trick 都还没有
--   已知 bug：空中长按空格触发不了旋转、A/D 也不能控制空中姿态，直接卡住"空中特技"这条 P0 核心体验，跟踪在 [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2)
+-   没有统一的 `ScoreSystem`——Distance、Trick 分数各自独立显示，`ComboSystem` 目前只是个纯计数器（`comboCount`），并没有像第 6 节要求的那样真正乘到 Trick 分数上；`TrickSystem.ScoreForDegrees()` 完全不读 Combo 数
+-   没有"PERFECT!"落地专属弹字——`LandingDetector.EvaluateLanding()` 现在只有一行 `Debug.Log` 输出质量分级，代码注释自己写着"临时验证用……接了 UI/ScoreSystem 之后可以删掉"，落地质量本身依然没有专属 UI/音效反馈（`AudioManager` 的 `landing` 槽位现在对 Perfect/Good/Bad 播的是同一个音效，没有分级）
+-   摔车结算画面信息不全——`RunManager.HandleCrash()` 目前只拼 `距离 {distance} m`，第 16 节要求的 Score / Best Distance / Highest Combo / Best Trick 都还没有；也完全没有任何跨局的最佳记录持久化（没有 `PlayerPrefs`/存档，每次重开都从零开始）
+-   已知 bug，仍然 OPEN，本次没有实机验证条件、只做了代码核对：
+    -   [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)（跳跃偶发不生效）：代码里 `groundCheckDistance` 确实已经是修复后的 `1.2`（issue 描述的修复已经落进当前代码），但 issue 本身写明"还没有实机验证过、用户要求先搁置"，本次没有条件复测，状态维持 OPEN，不要当成已解决
+    -   [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2)（空中无法触发旋转 / A、D 无法控制空中姿态）：**这个 issue 的后半段已经不是 bug 了，是设计变了**——`BikeController.ApplyBalance()` 现在的注释明确写着"空中不再响应方向键……方向键在空中彻底不影响车身角度"，也就是说"空中用 A/D 压头抬头"这个预期行为本身被主动拿掉了，改成完全交给自动回正 + 空格旋转两条路径，不是还没修好。前半段"长按空格触发不了空中旋转"本次没有条件实机验证，`HandleJumpAndSpin()`/`StartSpin()` 代码逻辑读起来是完整的，但读代码不能代替实机测试，issue 继续保持 OPEN
 
-**多条命损毁系统**（`BikeDamageSystem.cs`，不在原设计文档范围内，玩法上的额外改动）：失控判定不再直接结束一局，默认能扛 3 次——第 1 次卸前轮(飞出去)、第 2 次卸 rack，第 3 次才是真摔车结算。**代码已写完并推送，还没有实机测试过**，前轮飞走后的手感、无敌时间/回正参数是否合适都待验证。
+**生命值/损毁系统**（`BikeDamageSystem.cs`，不在原设计文档范围内，玩法上的额外改动）：**跟这份文档 2026-09-14 快照里记的不一样，这里订正一下**——实际实现是一条纯 HP 血条（默认 `maxHp=100`，`damagePerCrash=35`，扛得住 2 次、第 3 次才死），**不是**"第 1 次卸前轮飞出去、第 2 次卸 rack"这种部件真实掉落的机制；每次摔车扣血后车身自动回正一部分（`recoveryUprightBlend`）、给一段无敌时间（默认 5 秒，`CrashDetector.Recover()`）、车身贴图闪烁提示（`BikeController.PlayInvulnerabilityFlash`），血量归零才真的触发 `OnFinalCrash` 走摔车结算。本次会话多轮实机 Play 测试里能看到 HP 条正常渲染、扣血 toast 正常弹出，但没有专门验证过"血量正好耗到 0 触发最终摔车结算"这条边界路径。
+
+**新增系统（不在 2026-09-14 快照里，本次确认新增）：**
+
+-   **多层视差背景**（`BackgroundScroller.cs`，挂在 `Assets/prefab/Background.prefab`）：见 3.9 节，已实现并接入 `EndlessRunBootstrap`
+-   **音频框架**（`AudioManager.cs`，直接挂在 `SampleScene` 里的 `AudioManager` 空物体上）：见 3.10 节。**只是结构，不是内容**——`bgm`/`ambient`/`ride`/`landing`/`boost`/`crash` 六个槽位、随机或顺序播放、延迟、循环开关都已经能用，但目前场景里六个槽位都还没拖入任何音频 clip，游戏实际运行是静音的。且这六个槽位只覆盖第 19 节音频清单里的一部分（清单里的 Jump、Trick、Near Miss、UI selection 还没有对应槽位，需要照 `SoundSlot` 同样的模式自己加）
 
 **P1 —— 内容与风险**：Event/Landmark Chunk、障碍物组合、Speed Risk、难度曲线，均未开始。上次讨论定了 Chunk 地形的方向（`TerrainChunkData` 复用现有阶段原语拼接；缺口用假谷代替，不做真断开），但还没写代码。
 
 **P2 —— Roguelike**：三选一 Upgrade、Speed/Trick/Control Build、自行车部件构筑、局外 Meta Progression，均未开始。
 
-**P3 —— Presentation**：正式美术、音效音乐、UI Polish、移动端输入、存档，均未开始。
+**P3 —— Presentation**：正式美术依然只有地形/障碍物是纯色网格、色块，`Bike.prefab` 现在用的是真实自行车线稿图（不再是纯色占位方块，但也不是最终成品美术）；背景美术已经是真的 craftpix 像素美术（见上面"多层视差背景"）。音效框架已搭（见上）但无内容。音乐、UI Polish、移动端输入、存档均未开始。
 
-**HP / Shield**：按第 14 节的决定，仍然不做，不算欠账。
+**HP / Shield**：第 14 节当时的决定是"不做"，但实际已经做了一版简化的纯 HP 系统（见上），跟第 14 节的讨论结论不一致，这算是本文档和代码之间最大的一处分歧，后续要不要正式改第 14 节的结论、把 HP 系统扶正成正式设计，需要单独拍板。
 
-**额外花掉的时间**：Landing Quality 做完之后，插进来处理了一批让已有功能"真正能用"的 bug／调参，不在原设计文档范围内，但会持续影响后面几节里跟物理相关的判定：
+**这次额外做的、不在原设计文档范围内的修复/调整：**
 
 -   轮子转速视觉与物理解耦，修掉了上坡被顶停的问题
 -   100km/h 提速相关的一系列物理再校准（电机转速上限、驱动扭矩、悬挂稳定性、Fixed Timestep 提到 200Hz）
--   跳跃力度不够高、車速/坡度对起跳的加成（现在起跳力度会随车速和下坡角度动态变化，见 3.1 节）
--   `IsGrounded()` 的地面检测射线长度不够，导致跳跃/坡度贴合/摔车判定/落地质量在车身静止时全部误判为"在空中"——已修复并实机验证
--   摔车判定从距离射线换成前后轮真实物理接触，且要求两轮都触地才判定——修掉了"空中被判摔车"的一批误判（相关背景见 [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)）
--   `WheelContactSensor` 从 Enter/Exit 配对计数改成按物理步判定，避免地形碰撞体频繁重建导致触地状态卡死——但空中旋转触发/空中姿态控制的问题仍未解决，另开 [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2) 跟踪
+-   跳跃力度不够高、车速/坡度对起跳的加成（现在起跳力度会随车速和下坡角度动态变化，见 3.1 节）
+-   `groundCheckDistance` 从 0.8 提到 1.2（对应 GitHub #1，细节见上）
+-   摔车判定从距离射线换成前后轮真实物理接触，且要求两轮都触地才判定
+-   `WheelContactSensor` 从 Enter/Exit 配对计数改成按物理步判定，避免地形碰撞体频繁重建（约每 0.4m 一次）导致触地状态卡死
+-   轮子 `CircleCollider2D` 用的 `WheelMaterial.physicsMaterial2D` 弹性系数(`bounciness`)一直是 0.1，导致车身即便静止不动也会持续小幅弹跳/俯仰震荡——已归零，同时把一个越界的 `m_BounceCombine` 枚举值(4，Unity 合法范围是 0~3)顺手改回合法值
+-   `EndlessRunBootstrap.FindPrefab()` 原来用 `AssetDatabase.FindAssets` 的模糊文本搜索按名字找 `Assets/prefab` 下的预制体，"Ground" 会模糊命中同目录下的 "Background.prefab"（Back-**Ground**），导致地形一度被错误实例化成背景预制体——改成精确文件名匹配
 
 ------------------------------------------------------------------------
 
@@ -138,10 +147,7 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   需要持续一小段时间才判定摔车
 -   给玩家短暂的救车机会
 -   主动空翻不会被误判
--   摔车后：
-    -   锁定输入
-    -   冻结后轮电机
-    -   交给 `RunManager` 进行结算
+-   `CrashDetector.OnCrash` 触发之后**不直接**锁定输入/结算——中间插了一层 `BikeDamageSystem`（见 3.8 节），扣血/给无敌时间/回正车身，血量真正归零那次才会锁定输入、冻结后轮电机、交给 `RunManager` 结算
 
 ------------------------------------------------------------------------
 
@@ -150,8 +156,12 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   左上角实时显示：
     -   距离
     -   时速
--   摔车后显示结算信息
--   `R` 重开
+    -   氮气(Boost)是否就绪，没就绪时显示还差多少米回满
+    -   当前连击数（`ComboSystem.OnComboChanged`）
+-   顶部弹字提示（同一个 Toast，新的会打断上一个）：特技得分/特技失败、Near Miss、摔车扣血剩余血量
+-   HP 血条（`HpBarBackground/HpBarFill`），跟着 `BikeDamageSystem.OnHpChanged` 实时更新
+-   摔车结算后显示结算信息（目前只有距离，见第 0 节的欠账记录）
+-   `R` 重开（重新加载当前场景）
 
 ------------------------------------------------------------------------
 
@@ -165,11 +175,10 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   拉远使用更平滑的 ease
 -   `Shift` 时镜头目标立即拉满，不等待实际速度提升
 -   空中额外拉远
--   落地产生短促镜头回弹
+-   落地产生短促镜头回弹，回弹幅度按 4.1 节的落地质量分级（Perfect 几乎感觉不到，Bad 最明显）
 -   速度越快，look-ahead 越明显
--   摔车瞬间镜头接管：
-    -   快速聚焦
-    -   Cinemachine Impulse 抖动
+-   扣血但没死这一局（`BikeDamageSystem.OnHpChanged`）：只给一次轻微 Impulse 震动，镜头继续跟随/缩放，不接管
+-   血量归零真摔车（`BikeDamageSystem.OnFinalCrash`）：镜头才快速聚焦 + 更强的 Impulse 抖动，并停止跟随
 -   参数集中到 `CameraDirectorSettings`
 
 ------------------------------------------------------------------------
@@ -181,6 +190,70 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   自动连接所有系统
 -   不依赖手动修改 `.unity` 场景文件
 -   不需要在 Inspector 中手动拖引用
+
+------------------------------------------------------------------------
+
+## 3.8 生命值/损毁系统 `BikeDamageSystem.cs` + `BikeDamageSettings.cs`
+
+> 不在原设计文档范围内，是开发过程中额外加的玩法调整——第 14 节当时讨论的结论
+> 是"不加 HP/Shield"，这里跟那个结论不一致，见第 0 节的说明。
+
+-   插在 `CrashDetector` 和 `RunManager`/`CameraDirector` 中间：`CrashDetector` 判定一次
+    "姿态失控"不再直接结束一局
+-   纯数值血条：默认 `maxHp=100`，每次摔车扣 `damagePerCrash=35`（默认能扛 2 次，第 3 次才死）
+-   扣血但没死：车身角速度清零、朝目标角度（触地贴合坡度/空中回正水平）插值回正一部分
+    （`recoveryUprightBlend`），给一段无敌时间（默认 5 秒，期间 `CrashDetector` 直接跳过判定），
+    车身贴图同步闪烁（`BikeController.PlayInvulnerabilityFlash`）
+-   血量归零：触发 `OnFinalCrash`，交给 `RunManager`/`CameraDirector` 走真正的摔车结算流程
+-   `OnHpChanged` 事件供 UI 血条和镜头轻微震动订阅
+
+------------------------------------------------------------------------
+
+## 3.9 多层视差背景 `BackgroundScroller.cs`
+
+-   一个物体只负责一层：挂多份这个组件、每份指定不同 `Sprite` 和 `Parallax Factor`
+    就是多层视差，互相独立
+-   `Parallax Factor`：1 = 跟地面一样快（世界固定，最快/最近），0 = 完全跟镜头走
+    （相对屏幕不动，最远，比如天空）
+-   无限横向滚动用"面板按 `deltaX * (1 - parallaxFactor)` 连续漂移 + 漂出覆盖范围就
+    重定位到另一端接着用"的算法，不是按镜头位置重新计算网格坐标——后者在
+    `parallaxFactor < 1` 时会导致面板世界坐标跟镜头越差越远，长距离 endless run
+    必然出问题
+-   素材本身不是无缝贴图，靠相邻面板交替水平镜像（`flipX`）拼接消除接缝
+-   `Background.prefab`（`Assets/prefab/Background.prefab`）目前配了 4 层，用的是
+    `Assets/Nature Backgrounds Pixel Art` 这套 craftpix 像素美术；层数不是写死的，
+    `EndlessRunBootstrap` 用 `GetComponentsInChildren<BackgroundScroller>()` 找，
+    在预制体里加/删子物体不用改代码
+-   每层的 `Scale`/`Vertical Offset` 控制这一层的大小/位置；`Background.prefab` 根节点
+    自己的 Transform.Y 会作为所有层共享的整体垂直偏移叠加进去（相当于一个"整体一起挪"
+    的总闸），根节点 X 和任何子层自己的 Transform 都不接入计算，改了没用
+-   通过 `EndlessRunBootstrap.SetupParallaxBackground()` 在运行时实例化并把
+    `trackTarget` 接到主摄像机上（不是车身——车身的物理抖动摄像机的 Cinemachine
+    阻尼已经帮忙滤掉了，背景直接继承这份平滑）
+
+------------------------------------------------------------------------
+
+## 3.10 音频框架 `AudioManager.cs`
+
+> 只是结构，不是内容——见第 0 节的说明，目前场景里没有挂任何音频 clip。
+
+-   直接挂在 `SampleScene` 里一个独立的空物体（`AudioManager`）上手动配置，不是
+    `EndlessRunBootstrap` 运行时生成的——单例（`AudioManager.Instance`），因为
+    `BikeController`/`CrashDetector`/`LandingDetector` 这些系统都是运行时才生成的，
+    没法在 Inspector 里手动拖引用
+-   六个槽位，每个槽位配置完全独立：`bgm`、`ambient`（环境音）、`ride`（骑行中）、
+    `landing`（落地，不分 Perfect/Good/Bad）、`boost`（Shift 加速真正触发时）、
+    `crash`（每次 `CrashDetector.OnCrash`，不是只在最终摔死那次）
+-   每个槽位共用同一个可配置结构（`SoundSlot`）：
+    -   音频列表（可配多个）
+    -   挑选顺序：`Random`（每次独立随机）/ `Sequential`（按列表顺序循环）
+    -   触发后延迟多少秒才播放
+    -   是否循环（勾上占用这个槽位自己的 `AudioSource` 循环播放到被 Stop 为止；
+        不勾则是一次性播放、可以叠加、互不打断）
+-   `bgm`/`ambient` 进场景自动播放，`ride` 在 `EndlessRunBootstrap.SetupAudio()`
+    里一局开始时播放、摔车时停止
+-   目前只覆盖第 19 节音频清单的一部分，清单里的 Jump / Trick / Near Miss /
+    UI selection 还没有对应槽位，需要的话照 `SoundSlot` 同样的模式加
 
 ------------------------------------------------------------------------
 
@@ -208,9 +281,11 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 > `CameraDirector` 已经订阅了这个判定结果：质量越差，落地回弹镜头越明显
 > （对应下面 4.1 节原本设想的"轻微镜头回弹"这条反馈，已经接上）。
 >
-> **还没做的**：UI 反馈（"PERFECT!" 弹字）、分数/Combo 加成、音效——这些
-> 依赖后面还没做的 ScoreSystem/ComboSystem/音频系统，逻辑判定本身已经闭环。
-> 三档阈值是估的第一版数字，还没有经过大量实机测试微调手感。
+> **还没做的**：UI 反馈（"PERFECT!" 弹字）、分数/Combo 加成——这两项依赖还没做的
+> `ScoreSystem`，逻辑判定本身已经闭环。`ComboSystem` 本身已经实现（3.6/6 节），
+> 但落地质量目前不影响连击数的增量，只区分"加不加"(Bad 不加)。
+> `AudioManager` 的 `landing` 音效槽位（3.10 节）现在对 Perfect/Good/Bad 播的是
+> 同一个音效，还没有按质量分级。三档阈值是估的第一版数字，还没有经过大量实机测试微调手感。
 
 这是目前最重要的玩法增强。
 
@@ -768,11 +843,17 @@ Combo 不应该只影响 UI，而应该真正影响：
 
 目前：
 
--   地形：纯色网格
+-   地形：纯色网格（顶点色渐变+噪声做了一点明暗层次，仍然是程序化生成，不是贴图）
 -   障碍物：彩色方块
--   自行车：占位精灵
+-   自行车：已经换成真实的自行车线稿贴图（`Assets/prefab/Bike.prefab`），不再是纯色占位方块，
+    但也不是最终成品美术
+-   背景：已经是正式的多层视差像素美术（`Assets/Nature Backgrounds Pixel Art`，见 3.9 节），
+    不是占位
 
-下一阶段再进入正式美术。
+下一阶段再进入正式美术（主要是地形/障碍物）。
+
+音频框架已经搭好（见 3.10 节 `AudioManager.cs`），但场景里还没有挂任何实际音频文件，
+下面这份清单里的类别，跟 `AudioManager` 现有槽位不是一一对应的关系。
 
 ## Visual Direction
 

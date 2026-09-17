@@ -1,59 +1,69 @@
 # RidingBike
 
-一个基于物理的 2D 骑行 endless run 原型。Unity 6 (6000.0.63f1) + URP + 2D 物理,目前是 PC 原型阶段(键盘操作),还没有做正式的美术、音效或 roguelike 局内/局外养成系统。
+一个基于物理的 2D 骑行 endless run 原型。Unity 6 (6000.0.63f1) + URP + 2D 物理,目前是 PC 原型阶段(键盘操作)。
+
+这是游戏概览,只讲"现在有什么、大致怎么运作"。完整的系统细节、当前进度核实记录、
+已知 bug、以及往后开发新功能要参考的设计方向,都在 [`RidingBike_Design_v2.md`](RidingBike_Design_v2.md)
+——**后续新功能开发以那份文档为准**,这份 README 只做高层索引,不重复维护细节。
 
 ## 核心玩法
 
-骑车向右无限前进,地形随机生成、有上下坡和障碍物,姿态失控会摔车结束本局。
+骑车向右无限前进,地形持续生成、有上下坡和障碍物。玩家需要在高速前进的同时控制姿态、
+跳跃、空翻,追求"贴身擦过障碍物"和"高质量落地"带来的连击和分数,姿态彻底失控会摔车。
 
 **操作**:
 - `A` / `D`(或方向键左右):加速 / 减速倒车
-- `Shift`(左右皆可):加速键,按住时用更大扭矩更快提速,最高速度不变
+- `Shift`(左右皆可):加速键,按住时用更大扭矩更快提速,最高速度不变,按行驶距离充能
 - `Space`:触地时短按跳跃;空中长按触发 360° 空翻
 - `R`:摔车结算后重开(重新加载场景)
 
 ## 已实现的系统
 
-### 骑行物理(`BikeController.cs`)
-- `Rigidbody2D` + 两个 `WheelJoint2D` 组成的真实物理自行车,后轮电机驱动、前轮被动(和真实自行车一样,链条只带后轮)
-- 速度上限用真实单位表达(`maxSpeedKmh`,默认 100km/h),按轮子实际世界半径反推电机转速上限,保证能转到匹配的物理速度
-- 按住 Shift 时驱动扭矩/电机加速度更大,但最高速度不变,统一由 `maxSpeedKmh` 封顶
-- 自动回正(PD 弹簧):触地时把车身角度拉向"当地地面坡度"而不是死磕水平,贴合坡面骑行;空中退回水平,方便落地时姿态可控
-- 空中按方向键可以压头/抬头
-- 跳跃 + 空中长按空格触发的 360° 空翻(不会被摔车判定误伤)
-- 轮子的视觉转速和物理完全解耦:按实际车速换算出转多少度,转的是一个单独的、没有任何物理组件的子物体,不会反过来干扰驱动轮靠摩擦力驱动车身的机制(早期版本在这里踩过坑——直接转物理轮子的 Transform 会把上坡的车顶停)
+以下按类别列出现状,每项的实现细节在设计文档对应章节(括号内是章节号)。
 
-### 无限地形生成(`EndlessTerrainGenerator.cs` + `EndlessRunSettings.cs`)
-- 程序化生成"平地 → 上坡 → 下坡 → 平地 → ..."循环的地形,不是随机拼接直线段
-- 平地/上坡/下坡的长度范围、坡的高度差都能独立配置,阶段之间用 SmoothStep 过渡(两端导数为 0),没有尖角,不会有物理"打架"
-- 上下坡对速度的影响完全来自物理(重力沿坡面分量),没有任何脚本化的强制加减速
-- 玩家前方持续生成、身后自动回收,保持点数恒定
-- 所有参数抽成了 `EndlessRunSettings`(ScriptableObject),Project 窗口 `Create > RidingBike > Endless Run Settings` 建一份放在 `Assets` 任意位置就能在 Inspector 里调,不建就用脚本默认值;仓库里已经有一份 `Assets/EndlessRunSettings.asset`
+**骑行物理**(`BikeController.cs`,3.1 节)
+`Rigidbody2D` + 两个 `WheelJoint2D` 组成的真实物理自行车,后轮电机驱动、前轮被动;
+速度上限用真实单位表达(默认 100km/h);自动回正贴合坡面;跳跃力度随车速/下坡角度
+动态加成;空中长按空格触发 360° 空翻(不接受方向键控制空中姿态,是设计选择,不是 bug)。
 
-### 障碍物(`ObstacleSpawner.cs`)
-- 沿地形按概率放置,上坡不放(留作低速缓冲/救车区间)
-- 碰撞体带圆角,避免高速经过时在直角上被物理引擎解算出过大冲量
+**无限地形生成**(`EndlessTerrainGenerator.cs` + `EndlessRunSettings.cs`,3.2 节)
+程序化生成"平地→上坡→下坡→平地→…"循环,阶段间 SmoothStep 过渡不留尖角;上下坡对
+速度的影响完全来自物理重力,没有脚本化强制加减速;所有参数抽成 ScriptableObject。
 
-### 摔车判定(`CrashDetector.cs`)
-- 车身触地且倾角超过阈值、并持续一小段时间后才判定摔车(给救车余地),不会误判主动做的空翻
-- 摔车后锁定输入、冻结后轮电机,交给 `RunManager` 结算
+**障碍物**(`ObstacleSpawner.cs`,3.3 节)
+沿地形按概率放置,上坡不放(留作救车缓冲区);碰撞体带圆角避免高速冲量异常。
 
-### 局内 UI / 结算(`RunManager.cs`)
-- 左上角实时显示距离和时速(km/h)
-- 摔车后显示结算文字,按 R 重开
+**落地质量 / 特技 / 连击 / 贴身险**(`LandingDetector.cs` / `TrickSystem.cs` /
+`ComboSystem.cs` / `NearMissDetector.cs`,4.1 / 5 / 6 / 7 节)
+落地瞬间按角度偏差、角速度、垂直速度分出 Perfect / Good / Bad;空中转出的角度按
+档位换算特技分;贴身擦过障碍物、或 Perfect/Good 落地会累计连击,超时或摔车清零。
+这四个系统的分数目前互相独立展示,**还没有一个统一的 ScoreSystem 把它们乘到一起**。
 
-### 速度反应式镜头(`CameraDirector.cs` + `CameraDirectorSettings.cs`)
-- 基于场景里已有的 Cinemachine(`CinemachineCamera` + `CinemachinePositionComposer`)跟拍,所有缓动用 DOTween 驱动
-- 车速越快镜头越拉远,越慢/摔车越放大聚焦;放大用短促的 ease,拉远用丝滑的 ease,两个方向的反差是同一套系统里缓动方向不同造成的
-- 按住 Shift 时镜头目标立刻拉满,不等物理车速真的追上去
-- 空中额外拉远一点,落地一个短促的镜头回弹
-- 车速越快,镜头目标点越往车头前方偏移(look-ahead)
-- 摔车瞬间无条件接管:镜头快速聚焦 + 通过 Cinemachine Impulse 触发一次幅度可调的短暂抖动
-- 参数抽成了 `CameraDirectorSettings`,用法和 `EndlessRunSettings` 一样(`Create > RidingBike > Camera Director Settings`)
+**摔车判定 / 生命值**(`CrashDetector.cs` + `BikeDamageSystem.cs`,3.4 / 3.8 节)
+车身触地且倾角超过阈值、持续一小段时间才判定一次"失控";失控不直接结束一局,而是
+扣一条 HP 血条(默认能扛 2 次、第 3 次才真的摔车结算),期间给无敌时间和贴图闪烁提示。
 
-### 自动装配(`EndlessRunBootstrap.cs`)
-- 场景加载(含重开)时自动找到 Bike,停用场景里原本那块静态地面,接上上述所有系统
-- 不依赖手动编辑 `.unity` 场景文件,不需要在 Inspector 里手动拖引用
+**局内 UI / 结算**(`RunManager.cs`,3.5 节)
+距离、时速、氮气就绪状态、连击数、HP 血条实时显示;特技/摔车/贴身险弹字提示;
+摔车后显示结算信息,`R` 重开。**结算画面目前只有距离,没有分数/最佳记录**,也没有任何
+跨局存档。
+
+**速度反应式镜头**(`CameraDirector.cs` + `CameraDirectorSettings.cs`,3.6 节)
+基于 Cinemachine 跟拍,车速越快镜头越拉远、越慢/摔车越聚焦,落地按质量给回弹反馈,
+摔车瞬间接管镜头。
+
+**多层视差背景**(`BackgroundScroller.cs`,3.9 节)
+`Assets/prefab/Background.prefab` 下挂多层、每层独立的滚动速度做出纵深感,用真实
+craftpix 像素美术,层数可以在预制体里自由加减,不用改代码。
+
+**音频框架**(`AudioManager.cs`,3.10 节)
+挂在场景里的一个独立物体上,六个可配置槽位(BGM/环境音/骑行中/落地/加速/摔车),
+每个槽位支持多音频随机或顺序播放、延迟触发、是否循环。**目前只是空的架子,场景里
+还没有挂任何实际音频文件,运行是静音的。**
+
+**自动装配**(`EndlessRunBootstrap.cs`,3.7 节)
+场景加载(含重开)时自动找到 Bike、停用场景里的静态地面、实例化并接好上述所有系统,
+不依赖手动编辑 `.unity` 场景文件。
 
 ## 技术栈
 
@@ -62,10 +72,12 @@
 - Cinemachine 3.1.6(镜头跟拍)
 - DOTween(Demigiant,`Assets/Plugins/Demigiant/DOTween`)——所有镜头缓动用它做
 
-## 还没做的
+## 还没做的 / 已知问题
 
-- 局外 meta 进度、自行车部件构筑、生命值/护盾系统(设计阶段讨论过,还没写代码)
-- 局内三选一增益卡之类的 roguelike build 系统
-- 正式美术(现在地形是纯色网格、障碍物是彩色方块、车是占位精灵)、音效/音乐
-- 移动端输入适配(现在只有键盘)
-- 存档/进度持久化
+只列要点,完整清单、优先级排序(P0→P3)、每一项的具体欠账见设计文档第 0 / 23 节:
+
+- 没有统一 ScoreSystem,Combo 不真正影响分数,摔车结算画面信息不全,没有跨局存档
+- [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)、
+  [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2) 两个已知 bug,状态见设计文档第 0 节
+- Event/Landmark 地形、Speed Risk、难度曲线、Roguelike 三选一/Build 构筑、局外 Meta 进度:均未开始
+- 正式美术(地形/障碍物仍是纯色网格和色块)、音频内容(架子已搭,没有素材)、移动端输入:均未完成
