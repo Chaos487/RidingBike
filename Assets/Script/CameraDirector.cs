@@ -49,8 +49,12 @@ public class CameraDirector : MonoBehaviour
 
     float retargetThreshold = 0.03f;
 
+    float detachDuration = 0.4f;
+    float detachDampingTarget = 30f; // 阻尼拉到这么大之后，短时间内实际观感上已经跟"没在跟随"没区别
+
     Tweener zoomTweener;
     Tweener lookaheadTweener;
+    Tweener detachTweener;
     Sequence landingPunchSequence;
 
     bool isCrashed;
@@ -77,10 +81,39 @@ public class CameraDirector : MonoBehaviour
         landingDetector.OnLanded += HandleLanded;
     }
 
-    /// <summary>停止跟随，镜头定在当前位置不动——GapFallHandler 判定掉进断层摔车时调用，
-    /// 车身会继续往看不见的深处掉，镜头不该跟着一起往下跑。摔车已经是终局，不需要重新
-    /// 接回去，所以只有停止，没有配套的"重新开始跟随"。</summary>
-    public void DetachFollow() => cmCamera.Follow = null;
+    /// <summary>停止跟随——GapFallHandler 判定掉进断层摔车时调用，车身会继续往看不见的
+    /// 深处掉，镜头不该跟着一起往下跑。摔车已经是终局，不需要重新接回去，所以只有停止，
+    /// 没有配套的"重新开始跟随"。
+    ///
+    /// 不是直接把 Follow 清空(那样上一帧还在跟着跑、这一帧瞬间定住，速度硬切到 0，很突兀)，
+    /// 而是用 DOTween 把 CinemachinePositionComposer 的 Damping 在短时间内拉到很大——
+    /// 阻尼越大，镜头对目标位置变化的反应越"迟钝"，效果上就是跟随力度顺滑地松开、
+    /// 逐渐追不上，而不是说停就停；Damping 拉满之后再清空 Follow，交接干净。
+    /// 跟 TargetOffset(look-ahead)是同一个 Composer 上的字段，用同样的手法驱动。</summary>
+    public void DetachFollow()
+    {
+        detachTweener?.Kill();
+
+        if (composer == null)
+        {
+            cmCamera.Follow = null;
+            return;
+        }
+
+        detachTweener = DOTween.To(GetDamping, SetDamping, detachDampingTarget, detachDuration)
+            .SetEase(Ease.OutSine)
+            .OnComplete(() => cmCamera.Follow = null);
+    }
+
+    float GetDamping() => composer.Damping.x;
+
+    void SetDamping(float value)
+    {
+        Vector3 damping = composer.Damping;
+        damping.x = value;
+        damping.y = value;
+        composer.Damping = damping;
+    }
 
     public void ApplySettings(CameraDirectorSettings settings)
     {
@@ -259,6 +292,7 @@ public class CameraDirector : MonoBehaviour
     {
         zoomTweener?.Kill();
         lookaheadTweener?.Kill();
+        detachTweener?.Kill();
         landingPunchSequence?.Kill();
         if (damageSystem != null)
         {
