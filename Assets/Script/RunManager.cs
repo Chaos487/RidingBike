@@ -247,8 +247,13 @@ public class RunManager : MonoBehaviour
         if (hpBarFill != null) hpBarFill.fillAmount = maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) : 0f;
         if (hpValueText != null) hpValueText.text = $"{Mathf.CeilToInt(Mathf.Max(0f, currentHp))}/{Mathf.CeilToInt(maxHp)}";
 
-        bool danger = maxHp > 0f && currentHp / maxHp < hpDangerRatio;
-        SetHpDangerBlink(danger);
+        // 两种情况都算危险,满足其一就闪烁:①当前血量本身撑不到满血值的 hpDangerRatio;
+        // ②满血值被 Node 削得只剩开局起始满血值的 hpDangerRatio——哪怕当前正好是满状态
+        // (比如被削到只剩 10 上限、当前 10/10),血量池薄成这样也该提醒玩家很危险。
+        bool currentHpDanger = maxHp > 0f && currentHp / maxHp < hpDangerRatio;
+        bool maxHpDanger = damageSystem != null && damageSystem.OriginalMaxHp > 0f &&
+            maxHp / damageSystem.OriginalMaxHp < hpDangerRatio;
+        SetHpDangerBlink(currentHpDanger || maxHpDanger);
     }
 
     /// <summary>残血(低于 hpDangerRatio)时让血条来回闪烁,提醒玩家现在很危险——比如在 Node

@@ -28,6 +28,11 @@ public class BikeDamageSystem : MonoBehaviour
     /// (NodeEffectSystem.WouldBeLethal),不给外部改——改血量只能走 ModifyMaxHp/HandleCrash 这些方法。</summary>
     public float CurrentHp => currentHp;
 
+    /// <summary>这一局开局时的满血值(Initialize 时捕获一次,之后 Node 系统改 maxHp 也不会跟着变)。
+    /// 供 UI 判断"满血值本身被 Node 削得只剩多少比例"用——即使当前正好是满状态(比如 10/10),
+    /// 如果这个 10 只是原本 100 的一成,依然应该算危险,不能只看 currentHp/maxHp 这个比例。</summary>
+    public float OriginalMaxHp { get; private set; }
+
     /// <summary>因为摔车扣血时触发(不包括 Node 系统改满血值)，参数是当前血量和满血值。
     /// RunManager/CameraDirector 订阅这个来做"摔车了"的提示/震动反馈——如果 Node 系统的
     /// ModifyMaxHp 也复用这个事件，会被误判成又摔了一次车，所以两者分开成不同事件。</summary>
@@ -43,6 +48,7 @@ public class BikeDamageSystem : MonoBehaviour
         bike = bikeController;
         crashDetector = detector;
         currentHp = maxHp;
+        OriginalMaxHp = maxHp; // 此时 ApplySettings 已经跑过,maxHp 是这一局真正的起始满血值
         crashDetector.OnCrash += HandleCrash;
     }
 
