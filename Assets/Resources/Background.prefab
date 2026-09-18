@@ -287,7 +287,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d66ed997c314503bb2128dd204e13bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  backgroundSprite: {fileID: 21300000, guid: 27d2e452b9cbfc248ab16d84e1b0d9b6, type: 3}
+  backgroundSprite: {fileID: 0}
   trackTarget: {fileID: 0}
   parallaxFactor: 0.6
   scale: 1.4
@@ -389,7 +389,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d66ed997c314503bb2128dd204e13bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  backgroundSprite: {fileID: 21300000, guid: b22a76e84be70b74d97c89999155859a, type: 3}
+  backgroundSprite: {fileID: 0}
   trackTarget: {fileID: 0}
   parallaxFactor: 0.7
   scale: 1.4
