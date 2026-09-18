@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9995bc68afaace7c4723ea1b7522cdb2, type: 3}
   m_Name: NodeSettings
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   minNodeInterval: 80
   maxNodeInterval: 100
   safeZoneBefore: 15
@@ -19,68 +19,86 @@ MonoBehaviour:
   midTierStartIndex: 3
   lateTierStartIndex: 6
   choices:
-  - title: "\u8F7B\u88C5\u4E0A\u9635"
-    description: "\u8DF3\u8DC3\u529B\u5EA6 +3"
-    tier: 0
+  - title: "轻装上阵"
+    description: "跳跃力度 +3"
+    minStage: 0
+    riskLevel: 0
+    weight: 10
     effects:
     - type: 1
       value: 3
-  - title: "\u5F3A\u5316\u5F15\u64CE"
-    description: "\u8F66\u901F\u4E0A\u9650 +8%"
-    tier: 0
+  - title: "强化引擎"
+    description: "车速上限 +8%"
+    minStage: 0
+    riskLevel: 0
+    weight: 10
     effects:
     - type: 0
       value: 8
-  - title: "\u5FEB\u901F\u8865\u7ED9"
-    description: "\u6C2E\u6C14\u56DE\u80FD\u8DDD\u79BB -20%"
-    tier: 0
+  - title: "快速补给"
+    description: "氮气回能距离 -20%"
+    minStage: 0
+    riskLevel: 0
+    weight: 10
     effects:
     - type: 4
       value: 20
-  - title: "\u6781\u9650\u8C03\u6821"
-    description: "\u8F66\u901F\u4E0A\u9650 +15%\n\u6700\u5927 HP -15"
-    tier: 1
+  - title: "极限调校"
+    description: "车速上限 +15%\n最大 HP -15"
+    minStage: 1
+    riskLevel: 2
+    weight: 7
     effects:
     - type: 0
       value: 15
     - type: 2
       value: -15
-  - title: "\u8D8A\u91CE\u6539\u88C5"
-    description: "\u8DF3\u8DC3\u529B\u5EA6 +6\n\u8F66\u901F\u4E0A\u9650 -5%"
-    tier: 1
+  - title: "越野改装"
+    description: "跳跃力度 +6\n车速上限 -5%"
+    minStage: 1
+    riskLevel: 1
+    weight: 8
     effects:
     - type: 1
       value: 6
     - type: 0
       value: -5
-  - title: "\u8F7B\u91CF\u8F66\u67B6"
-    description: "\u52A0\u901F\u5EA6 +20%\n\u6700\u5927 HP -10"
-    tier: 1
+  - title: "轻量车架"
+    description: "加速度 +20%\n最大 HP -10"
+    minStage: 1
+    riskLevel: 2
+    weight: 7
     effects:
     - type: 3
       value: 20
     - type: 2
       value: -10
-  - title: "\u7834\u98CE\u6DA1\u8F6E"
-    description: "\u8F66\u901F\u4E0A\u9650 +30%\n\u6700\u5927 HP -30"
-    tier: 2
+  - title: "破风涡轮"
+    description: "车速上限 +30%\n最大 HP -30"
+    minStage: 2
+    riskLevel: 3
+    weight: 5
     effects:
     - type: 0
       value: 30
     - type: 2
       value: -30
-  - title: "\u75AF\u72C2\u6C2E\u6C14"
-    description: "\u6C2E\u6C14\u56DE\u80FD\u8DDD\u79BB -50%\n\u8F66\u901F\u4E0A\u9650
+  - title: "疯狂氮气"
+    description: "氮气回能距离 -50%\n车速上限
       -10%"
-    tier: 2
+    minStage: 2
+    riskLevel: 2
+    weight: 6
     effects:
     - type: 4
       value: 50
     - type: 0
       value: -10
-  - title: "\u5B64\u6CE8\u4E00\u63B7"
-    description: "\u8DF3\u8DC3\u529B\u5EA6 +15\n\u6700\u5927 HP -40"
-    tier: 2
+  - title: "孤注一掷"
+    description: "跳跃力度 +15\n最大 HP -40"
+    minStage: 2
+    riskLevel: 3
+    weight: 4
     effects:
     - type: 1
       value: 15

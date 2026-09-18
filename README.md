@@ -71,15 +71,18 @@ craftpix 像素美术,层数可以在预制体里自由加减,不用改代码。
 场景加载(含重开)时自动找到 Bike、停用场景里的静态地面、实例化并接好上述所有系统,
 不依赖手动编辑 `.unity` 场景文件。
 
-**Roguelike Node 三选一**(`NodeManager.cs` + `NodeSettings.cs`,存档设计见
+**Roguelike Node 三选一**(`NodeManager.cs` 调度 +`DecisionCurve.cs`/`NodeChoicePool.cs`/
+`NodeEffectSystem.cs`/`NodeChoiceUI.cs` 分职责 + `NodeSettings.cs` 配置,存档设计见
 [GitHub #3](https://github.com/Chaos487/RidingBike/issues/3))
 骑行一定距离触发一次:真正暂停(`Time.timeScale = 0` + 挂起 `BikeController`)、弹出三个
 Choice、选中→确认两步生效后恢复。触发点前后是安全区,`EndlessTerrainGenerator` /
 `ObstacleSpawner` 通过反向查询跳过断层/障碍物生成,不会让玩家因为暂停/恢复意外摔车。
-Decision Curve 按"第几个 Node"分早/中/后期档位,越往后正面强化越大、代价越明显。
-Effect 第一版是白名单(改 `BikeController`/`BikeDamageSystem` 的既有数值字段),不是
-通用效果引擎。**目前是纯数值原型,没有背景虚化/正式美术,Choice 池的具体数值/文案
-都是占位,后续按需要在 `NodeSettings` 资产里调。**
+`DecisionCurve` 按"第几个 Node"把进度换算成早/中/后期档位;`NodeChoicePool` 按 Choice 的
+`Min Stage`(从这档开始一直到后面所有档都可能出现,不是只在对应档出现一次)过滤、按 `Weight`
+加权抽取,并保证呈现的三个选项尽量覆盖低/中/高 `Risk Level`,不是纯随机抽奖;`NodeEffectSystem`
+把选中的 Effects 应用到 `BikeController`/`BikeDamageSystem` 的既有数值字段(白名单式,不是
+通用效果引擎);`NodeChoiceUI` 只管面板显示/选中态/Confirm 按钮,不知道游戏逻辑。**目前没有
+背景虚化/正式美术,Choice 池的具体数值/文案仍是占位,后续按需要在 `NodeSettings` 资产里调。**
 
 ## 技术栈
 

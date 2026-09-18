@@ -1,8 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>Node 处在风险曲线的哪一档——不是独立的类型分类，直接等于 Choice 池抽取认的那一个维度。</summary>
+/// <summary>Decision Curve 的分档——按第几个 Node 计数换算出来,不是独立的类型分类。</summary>
 public enum NodeTier { Early, Mid, Late }
+
+/// <summary>Choice 的风险等级,用于三选一时保证呈现的选项覆盖低/中/高风险(见 NodeChoicePool),
+/// 不直接决定数值大小——数值大小完全由 Effects 自己的 Value 决定。</summary>
+public enum RiskLevel { Safe, Low, Medium, High }
 
 /// <summary>第一版收窄成白名单:效果只能是这几种,直接改 BikeController/BikeDamageSystem 的
 /// 现有数值字段,不做通用效果引擎。</summary>
@@ -35,7 +39,14 @@ public class ChoicePreset
     public string title;
     [TextArea(2, 4)]
     public string description;
-    public NodeTier tier;
+    [Tooltip("最早在第几档可用——从这档开始一直到后面所有档都可能被抽到,不是只在这一档出现。" +
+             "比如 Min Stage = Early 的 Choice,在 Mid/Late 档也依然可能出现。")]
+    public NodeTier minStage;
+    [Tooltip("风险等级。NodeChoicePool 生成三选一时会尽量让三个选项分别落在低/中/高风险," +
+             "不是纯随机抽奖——这个字段只影响\"会不会被凑进这三个里\",不影响数值大小。")]
+    public RiskLevel riskLevel;
+    [Tooltip("同一风险分档内的相对权重,越大越容易被抽到。")]
+    public float weight = 10f;
     public List<EffectEntry> effects = new List<EffectEntry>();
 }
 
@@ -75,39 +86,36 @@ public class NodeSettings : ScriptableObject
             {
                 title = "轻装上阵",
                 description = "跳跃力度 +3",
-                tier = NodeTier.Early,
+                minStage = NodeTier.Early,
+                riskLevel = RiskLevel.Safe,
+                weight = 10f,
                 effects = { new EffectEntry { type = EffectType.JumpForceFlat, value = 3f } },
             },
             new ChoicePreset
             {
                 title = "强化引擎",
                 description = "车速上限 +8%",
-                tier = NodeTier.Early,
+                minStage = NodeTier.Early,
+                riskLevel = RiskLevel.Safe,
+                weight = 10f,
                 effects = { new EffectEntry { type = EffectType.MaxSpeedPercent, value = 8f } },
             },
             new ChoicePreset
             {
                 title = "快速补给",
                 description = "氮气回能距离 -20%",
-                tier = NodeTier.Early,
+                minStage = NodeTier.Early,
+                riskLevel = RiskLevel.Safe,
+                weight = 10f,
                 effects = { new EffectEntry { type = EffectType.BoostRechargePercent, value = 20f } },
-            },
-            new ChoicePreset
-            {
-                title = "极限调校",
-                description = "车速上限 +15%\n最大 HP -15",
-                tier = NodeTier.Mid,
-                effects =
-                {
-                    new EffectEntry { type = EffectType.MaxSpeedPercent, value = 15f },
-                    new EffectEntry { type = EffectType.MaxHpFlat, value = -15f },
-                },
             },
             new ChoicePreset
             {
                 title = "越野改装",
                 description = "跳跃力度 +6\n车速上限 -5%",
-                tier = NodeTier.Mid,
+                minStage = NodeTier.Mid,
+                riskLevel = RiskLevel.Low,
+                weight = 8f,
                 effects =
                 {
                     new EffectEntry { type = EffectType.JumpForceFlat, value = 6f },
@@ -116,9 +124,24 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
+                title = "极限调校",
+                description = "车速上限 +15%\n最大 HP -15",
+                minStage = NodeTier.Mid,
+                riskLevel = RiskLevel.Medium,
+                weight = 7f,
+                effects =
+                {
+                    new EffectEntry { type = EffectType.MaxSpeedPercent, value = 15f },
+                    new EffectEntry { type = EffectType.MaxHpFlat, value = -15f },
+                },
+            },
+            new ChoicePreset
+            {
                 title = "轻量车架",
                 description = "加速度 +20%\n最大 HP -10",
-                tier = NodeTier.Mid,
+                minStage = NodeTier.Mid,
+                riskLevel = RiskLevel.Medium,
+                weight = 7f,
                 effects =
                 {
                     new EffectEntry { type = EffectType.AccelerationPercent, value = 20f },
@@ -127,20 +150,11 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
-                title = "破风涡轮",
-                description = "车速上限 +30%\n最大 HP -30",
-                tier = NodeTier.Late,
-                effects =
-                {
-                    new EffectEntry { type = EffectType.MaxSpeedPercent, value = 30f },
-                    new EffectEntry { type = EffectType.MaxHpFlat, value = -30f },
-                },
-            },
-            new ChoicePreset
-            {
                 title = "疯狂氮气",
                 description = "氮气回能距离 -50%\n车速上限 -10%",
-                tier = NodeTier.Late,
+                minStage = NodeTier.Late,
+                riskLevel = RiskLevel.Medium,
+                weight = 6f,
                 effects =
                 {
                     new EffectEntry { type = EffectType.BoostRechargePercent, value = 50f },
@@ -149,9 +163,24 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
+                title = "破风涡轮",
+                description = "车速上限 +30%\n最大 HP -30",
+                minStage = NodeTier.Late,
+                riskLevel = RiskLevel.High,
+                weight = 5f,
+                effects =
+                {
+                    new EffectEntry { type = EffectType.MaxSpeedPercent, value = 30f },
+                    new EffectEntry { type = EffectType.MaxHpFlat, value = -30f },
+                },
+            },
+            new ChoicePreset
+            {
                 title = "孤注一掷",
                 description = "跳跃力度 +15\n最大 HP -40",
-                tier = NodeTier.Late,
+                minStage = NodeTier.Late,
+                riskLevel = RiskLevel.High,
+                weight = 4f,
                 effects =
                 {
                     new EffectEntry { type = EffectType.JumpForceFlat, value = 15f },
