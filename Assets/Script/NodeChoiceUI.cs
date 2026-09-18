@@ -18,11 +18,16 @@ public class NodeChoiceUI : MonoBehaviour
 {
     static readonly Color CardNormalColor = new Color(0.15f, 0.15f, 0.18f, 0.92f);
     static readonly Color CardSelectedColor = new Color(0.25f, 0.45f, 0.3f, 0.95f);
+    // 会把玩家直接扣死的选项标红——即使选中也保持红色(用更亮的红区分"选中"),不套用普通的
+    // 绿色选中态,不然玩家看不出这个选项本来就是危险的。
+    static readonly Color CardLethalColor = new Color(0.5f, 0.12f, 0.12f, 0.92f);
+    static readonly Color CardLethalSelectedColor = new Color(0.75f, 0.18f, 0.18f, 0.95f);
 
     readonly Image[] cardImages = new Image[3];
     readonly Button[] cardButtons = new Button[3];
     readonly Text[] titleTexts = new Text[3];
     readonly Text[] descTexts = new Text[3];
+    readonly bool[] cardLethal = new bool[3];
     GameObject confirmButtonObject;
     Button confirmButton;
 
@@ -38,7 +43,9 @@ public class NodeChoiceUI : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    public void ShowChoices(IReadOnlyList<ChoicePreset> choices)
+    /// <summary>lethalFlags[i] = true 表示选了 choices[i] 会直接把玩家扣死——卡片会标红提醒,
+    /// 但依然可以选(不禁用按钮),玩家可以是故意的。</summary>
+    public void ShowChoices(IReadOnlyList<ChoicePreset> choices, IReadOnlyList<bool> lethalFlags)
     {
         selectedIndex = -1;
         choiceCount = choices.Count;
@@ -52,7 +59,8 @@ public class NodeChoiceUI : MonoBehaviour
 
             if (titleTexts[i] != null) titleTexts[i].text = choices[i].title;
             if (descTexts[i] != null) descTexts[i].text = choices[i].description;
-            if (cardImages[i] != null) cardImages[i].color = CardNormalColor;
+            cardLethal[i] = lethalFlags != null && i < lethalFlags.Count && lethalFlags[i];
+            if (cardImages[i] != null) cardImages[i].color = cardLethal[i] ? CardLethalColor : CardNormalColor;
         }
 
         gameObject.SetActive(true);
@@ -70,7 +78,12 @@ public class NodeChoiceUI : MonoBehaviour
         selectedIndex = index;
         for (int i = 0; i < 3; i++)
         {
-            if (cardImages[i] != null) cardImages[i].color = i == index ? CardSelectedColor : CardNormalColor;
+            if (cardImages[i] == null) continue;
+
+            bool selected = i == index;
+            cardImages[i].color = cardLethal[i]
+                ? (selected ? CardLethalSelectedColor : CardLethalColor)
+                : (selected ? CardSelectedColor : CardNormalColor);
         }
 
         if (confirmButtonObject != null) confirmButtonObject.SetActive(true);

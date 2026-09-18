@@ -128,7 +128,13 @@ public class NodeManager : MonoBehaviour
         NodeTier stage = decisionCurve.GetStage(nodeCount);
         currentChoices = choicePool.GenerateChoices(stage, 3);
 
-        if (ui != null) ui.ShowChoices(currentChoices);
+        List<bool> lethalFlags = new List<bool>(currentChoices.Count);
+        foreach (ChoicePreset choice in currentChoices)
+        {
+            lethalFlags.Add(NodeEffectSystem.WouldBeLethal(choice, damageSystem));
+        }
+
+        if (ui != null) ui.ShowChoices(currentChoices, lethalFlags);
 
         Time.timeScale = 0f;
         bike.enabled = false;

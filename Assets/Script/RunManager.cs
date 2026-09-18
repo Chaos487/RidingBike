@@ -57,6 +57,17 @@ public class RunManager : MonoBehaviour
     [Range(0f, 1f)]
     public float hpPunchElasticity = 0.6f;
 
+    [Header("HP 低血量闪烁")]
+    [Tooltip("当前血量 / 满血值 低于这个比例时,血条开始闪烁提示玩家——防止玩家没注意到自己" +
+             "残血,在 Node 里选了扣血选项直接把自己扣死。")]
+    [Range(0f, 1f)]
+    public float hpDangerRatio = 0.2f;
+    [Tooltip("闪烁一次(暗→亮或亮→暗单程)的时长,越小闪得越快。")]
+    public float hpBlinkDuration = 0.4f;
+    [Tooltip("闪烁时血条最暗淡到的透明度。")]
+    [Range(0f, 1f)]
+    public float hpBlinkMinAlpha = 0.25f;
+
     [Header("Boost 按钮(手机端)")]
     [Tooltip("氮气就绪时圆圈按钮的颜色，要够亮/够跳，一眼看出来能点。")]
     public Color boostReadyColor = new Color(1f, 0.65f, 0.15f, 1f);
@@ -65,6 +76,8 @@ public class RunManager : MonoBehaviour
 
     Sequence toastTweener;
     Tweener hpPunchTweener;
+    Tweener hpBlinkTweener;
+    bool hpBlinking;
     float startX;
     bool runEnded;
     bool waitingForStart;
@@ -233,6 +246,36 @@ public class RunManager : MonoBehaviour
     {
         if (hpBarFill != null) hpBarFill.fillAmount = maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) : 0f;
         if (hpValueText != null) hpValueText.text = $"{Mathf.CeilToInt(Mathf.Max(0f, currentHp))}/{Mathf.CeilToInt(maxHp)}";
+
+        bool danger = maxHp > 0f && currentHp / maxHp < hpDangerRatio;
+        SetHpDangerBlink(danger);
+    }
+
+    /// <summary>残血(低于 hpDangerRatio)时让血条来回闪烁,提醒玩家现在很危险——比如在 Node
+    /// 选项里点了个扣血选项可能会直接扣死。用 DOFade 在满不透明和 hpBlinkMinAlpha 之间来回跳,
+    /// 状态没变化时不重复触发(不然每次 UpdateHpBar 都会打断正在播的闪烁,动画会卡顿）。</summary>
+    void SetHpDangerBlink(bool active)
+    {
+        if (active == hpBlinking) return;
+        hpBlinking = active;
+
+        hpBlinkTweener?.Kill();
+
+        if (hpBarFill == null) return;
+
+        if (active)
+        {
+            Color c = hpBarFill.color;
+            c.a = 1f;
+            hpBarFill.color = c;
+            hpBlinkTweener = hpBarFill.DOFade(hpBlinkMinAlpha, hpBlinkDuration).SetLoops(-1, LoopType.Yoyo);
+        }
+        else
+        {
+            Color c = hpBarFill.color;
+            c.a = 1f;
+            hpBarFill.color = c;
+        }
     }
 
     /// <summary>扣血瞬间整个血条框放大再回弹一下,提醒玩家扣血了——跟落地反馈同一个手法(DOTween

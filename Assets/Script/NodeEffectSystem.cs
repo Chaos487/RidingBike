@@ -13,6 +13,19 @@ public static class NodeEffectSystem
         }
     }
 
+    /// <summary>预判"选了这个 Choice 会不会把玩家直接扣死"——只加总它带的 MaxHpFlat 效果,
+    /// 不实际改动任何状态。给 NodeChoiceUI 用来把这种选项的卡片标红提醒玩家,但依然可选。</summary>
+    public static bool WouldBeLethal(ChoicePreset choice, BikeDamageSystem damageSystem)
+    {
+        float hpDelta = 0f;
+        foreach (EffectEntry effect in choice.effects)
+        {
+            if (effect.type == EffectType.MaxHpFlat) hpDelta += effect.value;
+        }
+
+        return damageSystem.CurrentHp + hpDelta <= 0f;
+    }
+
     static void ApplyEffect(EffectEntry effect, BikeController bike, BikeDamageSystem damageSystem)
     {
         switch (effect.type)
