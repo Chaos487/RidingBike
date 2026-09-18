@@ -1,5 +1,6 @@
 using System;
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -34,6 +35,7 @@ public class RunManager : MonoBehaviour
     Text hpLabelText;
     Text bestDistanceText;
     Image hpBarFill;
+    TMP_Text hpValueText;
     GameObject hpBarRoot;
     Button startButton;
     Button boostButton;
@@ -44,6 +46,17 @@ public class RunManager : MonoBehaviour
     const string BestDistanceKey = "RidingBike_BestDistance";
     float bestDistance;
 
+    [Header("HP 扣血反馈")]
+    [Tooltip("扣血瞬间整个血条框(HpBarRoot)放大再回弹的幅度,0 = 关闭。")]
+    public float hpPunchStrength = 0.25f;
+    [Tooltip("放大回弹动画的总时长(秒)。")]
+    public float hpPunchDuration = 0.35f;
+    [Tooltip("回弹震荡次数,越大弹得越多次。")]
+    public int hpPunchVibrato = 8;
+    [Tooltip("回弹的弹性,0 = 不回弹(单纯放大再缩回),1 = 弹性拉满。")]
+    [Range(0f, 1f)]
+    public float hpPunchElasticity = 0.6f;
+
     [Header("Boost 按钮(手机端)")]
     [Tooltip("氮气就绪时圆圈按钮的颜色，要够亮/够跳，一眼看出来能点。")]
     public Color boostReadyColor = new Color(1f, 0.65f, 0.15f, 1f);
@@ -51,6 +64,7 @@ public class RunManager : MonoBehaviour
     public Color boostNotReadyColor = new Color(0.5f, 0.5f, 0.5f, 0.4f);
 
     Sequence toastTweener;
+    Tweener hpPunchTweener;
     float startX;
     bool runEnded;
     bool waitingForStart;
@@ -73,6 +87,9 @@ public class RunManager : MonoBehaviour
         startX = bikeTransform.position.x;
         damageSystem.OnFinalCrash += HandleCrash;
         damageSystem.OnHpChanged += HandlePartialDamage;
+
+        // 开局先按满血刷一次血条文字,不然要等到第一次扣血才会显示"100/100"。
+        UpdateHpBar(damageSystem.maxHp, damageSystem.maxHp);
 
         EnterStartGate();
     }
@@ -200,12 +217,27 @@ public class RunManager : MonoBehaviour
     void HandlePartialDamage(float currentHp, float maxHp)
     {
         UpdateHpBar(currentHp, maxHp);
+        PlayHpBarPunch();
         ShowToast($"摔车了! 剩余血量 {Mathf.CeilToInt(currentHp)}/{Mathf.CeilToInt(maxHp)}");
     }
 
     void UpdateHpBar(float currentHp, float maxHp)
     {
         if (hpBarFill != null) hpBarFill.fillAmount = maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) : 0f;
+        if (hpValueText != null) hpValueText.text = $"{Mathf.CeilToInt(Mathf.Max(0f, currentHp))}/{Mathf.CeilToInt(maxHp)}";
+    }
+
+    /// <summary>扣血瞬间整个血条框放大再回弹一下,提醒玩家扣血了——跟落地反馈同一个手法(DOTween
+    /// 自带的 DOPunchScale),从 1 倍放大到 (1+hpPunchStrength) 倍再震荡回弹到 1 倍。
+    /// 每次扣血都要先 Kill 掉上一次没播完的,不然短时间内连续扣血会叠加出越缩越小的诡异缩放。</summary>
+    void PlayHpBarPunch()
+    {
+        if (hpBarRoot == null) return;
+
+        hpPunchTweener?.Kill();
+        hpBarRoot.transform.localScale = Vector3.one;
+        hpPunchTweener = hpBarRoot.transform
+            .DOPunchScale(Vector3.one * hpPunchStrength, hpPunchDuration, hpPunchVibrato, hpPunchElasticity);
     }
 
     void HandleComboChanged(int comboCount)
@@ -232,7 +264,7 @@ public class RunManager : MonoBehaviour
         if (runEnded) return;
         runEnded = true;
 
-        UpdateHpBar(0f, 1f);
+        UpdateHpBar(0f, damageSystem != null ? damageSystem.maxHp : 1f);
 
         if (bikeController != null)
         {
@@ -264,8 +296,10 @@ public class RunManager : MonoBehaviour
         statusText = FindText("StatusText");
         hpLabelText = FindText("HpLabelText");
         bestDistanceText = FindText("BestDistanceText");
-        hpBarFill = FindImage("HpBarBackground/HpBarFill");
-        hpBarRoot = hpBarFill != null ? hpBarFill.transform.parent.gameObject : null;
+        hpBarFill = FindImage("HpBarRoot/HpBarBackground/HpBarFill");
+        hpValueText = FindTMPText("HpBarRoot/HpValueText");
+        Transform hpBarRootTransform = transform.Find("HpBarRoot");
+        hpBarRoot = hpBarRootTransform != null ? hpBarRootTransform.gameObject : null;
         startButton = FindButton("StartButton");
         boostButton = FindButton("BoostButton");
         boostButtonImage = boostButton != null ? boostButton.GetComponent<Image>() : null;
@@ -328,6 +362,17 @@ public class RunManager : MonoBehaviour
             return null;
         }
         return t.GetComponent<Button>();
+    }
+
+    TMP_Text FindTMPText(string path)
+    {
+        Transform t = transform.Find(path);
+        if (t == null)
+        {
+            Debug.LogError($"[RunManager] 在 UI 预制体里找不到 \"{path}\"，检查一下 EndlessRunCanvas.prefab 的层级/命名有没有改动。");
+            return null;
+        }
+        return t.GetComponent<TMP_Text>();
     }
 
     static Sprite CreateSolidSprite()
