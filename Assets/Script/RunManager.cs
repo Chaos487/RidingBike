@@ -87,6 +87,7 @@ public class RunManager : MonoBehaviour
         startX = bikeTransform.position.x;
         damageSystem.OnFinalCrash += HandleCrash;
         damageSystem.OnHpChanged += HandlePartialDamage;
+        damageSystem.OnMaxHpChanged += HandleMaxHpChanged;
 
         // 开局先按满血刷一次血条文字,不然要等到第一次扣血才会显示"100/100"。
         UpdateHpBar(damageSystem.maxHp, damageSystem.maxHp);
@@ -219,6 +220,13 @@ public class RunManager : MonoBehaviour
         UpdateHpBar(currentHp, maxHp);
         PlayHpBarPunch();
         ShowToast($"摔车了! 剩余血量 {Mathf.CeilToInt(currentHp)}/{Mathf.CeilToInt(maxHp)}");
+    }
+
+    /// <summary>满血值被 Node 系统这类"非摔车"来源改动时触发——只静默刷新血条,不弹"摔车了"
+    /// 的 toast、也不放放大回弹动画,那两个是专门给真的摔车用的反馈,用在这里会误导玩家。</summary>
+    void HandleMaxHpChanged(float currentHp, float maxHp)
+    {
+        UpdateHpBar(currentHp, maxHp);
     }
 
     void UpdateHpBar(float currentHp, float maxHp)

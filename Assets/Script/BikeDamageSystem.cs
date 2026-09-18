@@ -24,8 +24,13 @@ public class BikeDamageSystem : MonoBehaviour
 
     float currentHp;
 
-    /// <summary>血量变化时触发(包括扣血、以后如果加回血)，参数是当前血量和满血值，供 UI 更新血条。</summary>
+    /// <summary>因为摔车扣血时触发(不包括 Node 系统改满血值)，参数是当前血量和满血值。
+    /// RunManager/CameraDirector 订阅这个来做"摔车了"的提示/震动反馈——如果 Node 系统的
+    /// ModifyMaxHp 也复用这个事件，会被误判成又摔了一次车，所以两者分开成不同事件。</summary>
     public event Action<float, float> OnHpChanged;
+    /// <summary>满血值被 Node 系统这类"非摔车"来源修改时触发，参数是当前血量和满血值。
+    /// 只用来静默刷新血条 UI，不应该触发摔车提示/镜头震动。</summary>
+    public event Action<float, float> OnMaxHpChanged;
     /// <summary>血量耗尽，这次才是真的摔车结算。</summary>
     public event Action OnFinalCrash;
 
@@ -81,7 +86,7 @@ public class BikeDamageSystem : MonoBehaviour
     {
         maxHp = Mathf.Max(1f, maxHp + delta);
         currentHp = Mathf.Clamp(currentHp + delta, 0f, maxHp);
-        OnHpChanged?.Invoke(currentHp, maxHp);
+        OnMaxHpChanged?.Invoke(currentHp, maxHp);
     }
 
     void RecoverBikeUpright()
