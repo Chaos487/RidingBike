@@ -145,6 +145,22 @@ public class NodeManager : MonoBehaviour
         if (currentChoices == null || selectedIndex < 0 || selectedIndex >= currentChoices.Count) return;
 
         NodeEffectSystem.ApplyChoice(currentChoices[selectedIndex], bike, damageSystem);
+
+        // ApplyChoice 可能通过 ModifyMaxHp 直接把玩家扣死——damageSystem.OnFinalCrash 是同步
+        // 触发的,RunManager/CameraDirector 这时候已经跑完摔车结算(锁 BikeController、接管镜头、
+        // 显示结算画面),HandleFinalCrash 也已经把 ended 置 true。这种情况绝不能再走 ClosePanel
+        // 那套"重新启用 BikeController + Time.timeScale 恢复 1 + 排下一个 Node"的流程,不然等于
+        // 把已经结束的一局又救活,车会继续往前跑。
+        if (ended)
+        {
+            if (ui != null) ui.Hide();
+            nodePanelOpen = false;
+            // timeScale 仍然要恢复(Node 面板暂停时压到了 0),不然摔车结算的镜头缓动/物理表现
+            // 会跟着一起冻结，效果跟正常摔车(此时 timeScale 本来就是 1)不一致。
+            Time.timeScale = 1f;
+            return;
+        }
+
         ClosePanel();
     }
 
