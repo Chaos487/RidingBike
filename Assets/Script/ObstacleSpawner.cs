@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 /// <summary>
@@ -32,7 +31,7 @@ public class ObstacleSpawner : MonoBehaviour
 
     /// <summary>Node 系统的反向安全区查询(NodeManager.IsInSafeZone):采样点落在安全区内就
     /// 不生成障碍物。为空(没有 Node 系统接线)时视为永远不在安全区内,不影响障碍物照常生成。</summary>
-    public Func<float, bool> isInSafeZone;
+    public System.Func<float, bool> isInSafeZone;
 
     Material sharedMaterial;
     float lastObstacleX = float.NegativeInfinity;
