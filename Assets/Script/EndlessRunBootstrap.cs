@@ -86,6 +86,24 @@ public static class EndlessRunBootstrap
         CameraDirector cameraDirector = SetupCamera(bike, damageSystem, landingDetector);
         SetupGapFallHandler(systems, bike, terrain, damageSystem, damageSettings, cameraDirector);
         SetupAudio(bike, crashDetector, landingDetector, runManager);
+        SetupNodeSystem(systems, bike, damageSystem, runManager, terrain, obstacleSpawner);
+    }
+
+    // Roguelike Node 三选一系统(GitHub Issue #3 存档方案)——触发/安全区/选择/生效全部交给
+    // NodeManager,这里只负责接线:把安全区反向查询接到断层/障碍物生成器上,把开始/结束两个
+    // 时机点(OnGameStarted/OnFinalCrash)接到 NodeManager 对应的方法上。
+    static void SetupNodeSystem(GameObject systems, BikeController bike, BikeDamageSystem damageSystem,
+        RunManager runManager, EndlessTerrainGenerator terrain, ObstacleSpawner obstacleSpawner)
+    {
+        NodeManager nodeManager = systems.AddComponent<NodeManager>();
+        nodeManager.ApplySettings(FindSettings<NodeSettings>());
+        nodeManager.Initialize(bike, damageSystem, runManager.transform);
+
+        terrain.overlapsSafeZone = nodeManager.OverlapsSafeZone;
+        obstacleSpawner.isInSafeZone = nodeManager.IsInSafeZone;
+
+        runManager.OnGameStarted += nodeManager.BeginRun;
+        damageSystem.OnFinalCrash += nodeManager.HandleFinalCrash;
     }
 
     // 音频是直接挂在场景里的 AudioManager(不是这里生成的，运行时只拿它的单例来接线)。

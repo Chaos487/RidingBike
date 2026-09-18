@@ -100,6 +100,11 @@ public class EndlessTerrainGenerator : MonoBehaviour
     /// <summary>沿地形按一定间距采样时触发,供障碍物生成等系统订阅。</summary>
     public event Action<Vector2, float, SlopeDirection> OnGroundSampled;
 
+    /// <summary>Node 系统的反向安全区查询(NodeManager.OverlapsSafeZone):[rangeStart, rangeEnd]
+    /// 跟任意一个已登记的 Node 安全区有重叠就返回 true——安全区内不生成断层。为空(没有 Node
+    /// 系统接线)时视为永远不重叠,不影响断层照常生成。</summary>
+    public Func<float, float, bool> overlapsSafeZone;
+
     // 记录已生成的每一段断层的 [起点X, 终点X] 和"掉下去之前的地面高度"，供 GapFallHandler
     // 查询"车身当前 X 是不是在某个断层范围内、掉了多深"——不用碰撞体/触发区判定，见 3.11 节。
     readonly struct GapRecord
@@ -277,7 +282,10 @@ public class EndlessTerrainGenerator : MonoBehaviour
         switch (phase)
         {
             case Phase.Flat:
-                if (UnityEngine.Random.value < gapChance)
+                // Node 安全区内不生成断层(见 3.11a 节)——即使概率骰中了也强制退回小山坡。
+                bool gapWouldOverlapSafeZone = overlapsSafeZone != null &&
+                    overlapsSafeZone(nextPhaseStartX, nextPhaseStartX + gapEdgeLength * 2f + maxGapSpan);
+                if (!gapWouldOverlapSafeZone && UnityEngine.Random.value < gapChance)
                 {
                     phase = Phase.GapDrop;
                     pendingHeightDelta = gapDepth;

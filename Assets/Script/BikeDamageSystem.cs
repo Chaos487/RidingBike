@@ -75,6 +75,15 @@ public class BikeDamageSystem : MonoBehaviour
         OnFinalCrash?.Invoke();
     }
 
+    /// <summary>供 Node 系统的 MaxHpFlat 效果使用:同时调整满血值和当前血量(而不是只调满血值、
+    /// 让当前血量凭空"多"出一截或者超过新的满血值)，正值当场回一部分血,负值当场扣一部分血。</summary>
+    public void ModifyMaxHp(float delta)
+    {
+        maxHp = Mathf.Max(1f, maxHp + delta);
+        currentHp = Mathf.Clamp(currentHp + delta, 0f, maxHp);
+        OnHpChanged?.Invoke(currentHp, maxHp);
+    }
+
     void RecoverBikeUpright()
     {
         Rigidbody2D rb = bike.bikeRigidbody;
