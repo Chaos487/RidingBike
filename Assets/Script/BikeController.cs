@@ -51,6 +51,11 @@ public class BikeController : MonoBehaviour
     /// 谁都不改谁。</summary>
     public float? externalSpeedCapKmh;
 
+    /// <summary>true 时禁止触发新的跳跃/空翻/氮气加速,但不影响驱动/悬挂/自动回正——车身
+    /// 继续平稳前进,只是玩家的这几个主动输入被挡住。NodeManager 在 Approaching(进站减速)
+    /// 期间打开这个开关,提醒玩家安分骑行,别在快到站的时候搞事。</summary>
+    public bool jumpAndBoostLocked;
+
     /// <summary>车身速度上限，换算成物理用的 m/s。</summary>
     public float MaxLinearSpeed => Mathf.Min(maxSpeedKmh, externalSpeedCapKmh ?? float.MaxValue) / 3.6f;
 
@@ -316,7 +321,7 @@ public class BikeController : MonoBehaviour
     /// (RunManager 里接的)直接调这个就行，不用在按钮那边自己再判一遍是否就绪。</summary>
     public void TryTriggerBoost()
     {
-        if (!IsBoostReady) return;
+        if (jumpAndBoostLocked || !IsBoostReady) return;
 
         currentBoostBonusKmh = boostSpeedBonusKmh;
         xAtLastBoost = bikeRigidbody.position.x;
@@ -378,12 +383,14 @@ public class BikeController : MonoBehaviour
         // hasJumpedThisAirtime 用真实轮胎接触(groundedForAirtime)才清零，不依赖上面那条容忍度很高的
         // 射线——射线在起跳后一小段时间内可能还没读到"离地"，之前只靠它判断"能不能起跳"，
         // 松手再按一下空格就能在同一次滞空里再跳一次；现在必须真正落地一次才能解锁下一次跳跃。
-        if (ActionPressed() && groundedForJump && !isSpinning && !hasJumpedThisAirtime)
+        if (!jumpAndBoostLocked && ActionPressed() && groundedForJump && !isSpinning && !hasJumpedThisAirtime)
         {
             Jump();
         }
 
-        actionHeld = ActionHeld();
+        // 锁住的时候强制当成"没按"处理，不只是不触发新动作——这样正在按住的空格/触屏也不会
+        // 在解锁瞬间突然被读成一次新按住，累计的旋转计时也会跟着清零，不会留一段隐藏进度。
+        actionHeld = !jumpAndBoostLocked && ActionHeld();
         if (actionHeld && !groundedForAirtime && !isSpinning && !hasSpunThisAirtime)
         {
             spaceHoldTime += Time.deltaTime;

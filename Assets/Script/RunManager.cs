@@ -229,10 +229,11 @@ public class RunManager : MonoBehaviour
     }
 
     /// <summary>NodeManager 进入 Approaching 状态时调用——车速开始平滑下降接近 Station 之前,
-    /// 先给玩家一个"为什么车在变慢"的提示,不是无缘无故的减速。</summary>
+    /// 先给玩家一个"为什么车在变慢"的提示,顺带说明这段路跳跃/氮气都被锁住了
+    /// (BikeController.jumpAndBoostLocked),不是无缘无故的减速/操作失灵。</summary>
     public void ShowStationApproachWarning()
     {
-        ShowToast("即将进站");
+        ShowToast("即将进站，禁止跳跃/加速");
     }
 
     void HandlePartialDamage(float currentHp, float maxHp)

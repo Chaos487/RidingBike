@@ -159,12 +159,13 @@ public class NodeManager : MonoBehaviour
         if (markerSpawner != null) markerSpawner.RequestMarkerAt(nextTriggerX);
     }
 
-    /// <summary>接近 Station:弹一次"即将进站"提示,车速开始平滑降到站内低速——玩家依然能
-    /// 控制车身(跳跃/空翻),安全区保证这段路不会有环境性的致命内容,只有玩家自己操作失误
-    /// 才会摔车。</summary>
+    /// <summary>接近 Station:弹一次"即将进站"提示,车速开始平滑降到站内低速。这段路上禁止
+    /// 跳跃/空翻/氮气——只让车平稳减速进站,不让玩家在快到站的时候搞事;安全区本身保证不会有
+    /// 环境性的致命内容,禁跳跃纯粹是为了让"进站"这个动作看起来更稳、更有仪式感。</summary>
     void EnterApproaching()
     {
         flowState = StationFlowState.Approaching;
+        bike.jumpAndBoostLocked = true;
         if (runManager != null) runManager.ShowStationApproachWarning();
         StartSpeedRamp(stationSpeedKmh, approachSlowdownDuration);
     }
@@ -233,6 +234,7 @@ public class NodeManager : MonoBehaviour
         flowState = StationFlowState.Exiting;
         Time.timeScale = 1f;
         bike.enabled = true;
+        bike.jumpAndBoostLocked = false; // 出站开始就还给玩家控制,禁跳跃只针对"进站"这一段
         bike.externalSpeedCapKmh = stationSpeedKmh;
 
         StartSpeedRamp(bike.maxSpeedKmh, exitAccelerationDuration, FinishExiting);
