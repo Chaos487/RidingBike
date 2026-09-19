@@ -72,9 +72,9 @@ craftpix 像素美术,层数可以在预制体里自由加减,不用改代码。
 不依赖手动编辑 `.unity` 场景文件。
 
 **Roguelike Station 三选一**(`NodeManager.cs` 调度 + `DecisionCurve.cs`/`NodeChoicePool.cs`/
-`NodeEffectSystem.cs`/`NodeChoiceUI.cs` 分职责 + `NodeSettings.cs` 配置 +
-`StationMarkerSpawner.cs`/`StationBlurFeature.cs` 呈现层,存档设计见
-[GitHub #3](https://github.com/Chaos487/RidingBike/issues/3) 和后续 Station/Pit Stop 讨论)
+`NodeEffectSystem.cs`/`NodeChoiceUI.cs` 分职责 + `NodeSettings.cs` 配置 + `StationMarkerSpawner.cs`
+呈现层,存档设计见 [GitHub #3](https://github.com/Chaos487/RidingBike/issues/3) 和后续
+Station/Pit Stop 讨论)
 骑行一定距离后物理化"进站":先进入 Approaching(弹"即将进站"提示,车速平滑降到站内低速,
 玩家依然能控制跳跃/空翻),到站后才真正暂停(`Time.timeScale = 0` + 挂起 `BikeController`)、
 弹出三选一、选中→确认两步生效,随后 Exiting(车速平滑加速回正常封顶)才回到正常骑行——
@@ -82,9 +82,12 @@ craftpix 像素美术,层数可以在预制体里自由加减,不用改代码。
 `externalSpeedCapKmh`(可空临时封顶)跟 Node 效果永久改的 `maxSpeedKmh` 分开,互不覆盖。
 安全区覆盖"预警减速开始→出站加速结束"整段,`EndlessTerrainGenerator` / `ObstacleSpawner`
 通过反向查询跳过这段范围内的断层/障碍物生成。`StationMarkerSpawner` 在世界里贴地摆一个
-占位旗子标记 Station 位置;暂停时的背景模糊是真实屏幕空间模糊(`Assets/Shaders/StationBlur.shader`
-手写 HLSL + `StationBlurFeature.cs` 的 URP Renderer Feature,不是 UI 遮罩,也不是 Shader Graph),
-需要在 URP Renderer Data 资产里手动 `Add Renderer Feature` 选一次才会生效。
+占位旗子标记 Station 位置。**暂停时的背景虚化暂时搁置**:`Assets/Shaders/StationBlur.shader` +
+`StationBlurFeature.cs` 这套真实屏幕空间模糊(URP Renderer Feature,手写 HLSL)代码还在,
+但在这个项目实际用的 Render Graph 渲染路径下跑不起来(`ScriptableRenderPass.Execute` 是
+Compatibility Mode 专用的老 API,Render Graph 模式下整个 Pass 不生效),`NodeManager` 已经不再
+调用它,`NodePanel` 暂时还是用原来那层半透明黑色遮罩顶着——以后要么把 Pass 重写成
+`RecordRenderGraph` 新 API,要么在 Player Settings 里切到 Compatibility Mode。
 `DecisionCurve` 按"第几个 Station"把进度换算成早/中/后期档位;`NodeChoicePool` 按 Choice 的
 `Min Stage`(从这档开始一直到后面所有档都可能出现,不是只在对应档出现一次)过滤、按 `Weight`
 加权抽取,并保证呈现的三个选项尽量覆盖低/中/高 `Risk Level`,不是纯随机抽奖;`NodeEffectSystem`

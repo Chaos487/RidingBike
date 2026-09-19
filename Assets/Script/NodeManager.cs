@@ -198,7 +198,6 @@ public class NodeManager : MonoBehaviour
         // 暂停期间 Time.timeScale = 0,WaitForSeconds 会被同步冻结,必须用 Realtime 版本。
         if (stationUiDelay > 0f) yield return new WaitForSecondsRealtime(stationUiDelay);
 
-        if (StationBlurFeature.Instance != null) StationBlurFeature.Instance.SetActive(true);
         if (ui != null) ui.ShowChoices(currentChoices, lethalFlags);
     }
 
@@ -215,7 +214,6 @@ public class NodeManager : MonoBehaviour
         if (ended)
         {
             if (ui != null) ui.Hide();
-            if (StationBlurFeature.Instance != null) StationBlurFeature.Instance.SetActive(false);
             // timeScale 仍然要恢复(暂停时压到了 0),不然摔车结算的镜头缓动/物理表现会跟着一起
             // 冻结，效果跟正常摔车(此时 timeScale 本来就是 1)不一致。
             Time.timeScale = 1f;
@@ -225,13 +223,12 @@ public class NodeManager : MonoBehaviour
         StartExiting();
     }
 
-    /// <summary>离站:关面板、取消模糊、恢复暂停,车速从站内低速平滑加速回(刚生效的新)正常
-    /// 封顶——车速目标用 bike.maxSpeedKmh 而不是缓存的旧值,这样选中的车速类 Effect 会立刻
-    /// 反映在这次加速的终点上。</summary>
+    /// <summary>离站:关面板、恢复暂停,车速从站内低速平滑加速回(刚生效的新)正常封顶——
+    /// 车速目标用 bike.maxSpeedKmh 而不是缓存的旧值,这样选中的车速类 Effect 会立刻反映在
+    /// 这次加速的终点上。</summary>
     void StartExiting()
     {
         if (ui != null) ui.Hide();
-        if (StationBlurFeature.Instance != null) StationBlurFeature.Instance.SetActive(false);
 
         flowState = StationFlowState.Exiting;
         Time.timeScale = 1f;
