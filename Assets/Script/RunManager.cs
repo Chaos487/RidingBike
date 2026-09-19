@@ -228,6 +228,13 @@ public class RunManager : MonoBehaviour
         ShowToast("NEAR MISS!");
     }
 
+    /// <summary>NodeManager 进入 Approaching 状态时调用——车速开始平滑下降接近 Station 之前,
+    /// 先给玩家一个"为什么车在变慢"的提示,不是无缘无故的减速。</summary>
+    public void ShowStationApproachWarning()
+    {
+        ShowToast("即将进站");
+    }
+
     void HandlePartialDamage(float currentHp, float maxHp)
     {
         UpdateHpBar(currentHp, maxHp);

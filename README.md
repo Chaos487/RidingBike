@@ -71,18 +71,26 @@ craftpix 像素美术,层数可以在预制体里自由加减,不用改代码。
 场景加载(含重开)时自动找到 Bike、停用场景里的静态地面、实例化并接好上述所有系统,
 不依赖手动编辑 `.unity` 场景文件。
 
-**Roguelike Node 三选一**(`NodeManager.cs` 调度 +`DecisionCurve.cs`/`NodeChoicePool.cs`/
-`NodeEffectSystem.cs`/`NodeChoiceUI.cs` 分职责 + `NodeSettings.cs` 配置,存档设计见
-[GitHub #3](https://github.com/Chaos487/RidingBike/issues/3))
-骑行一定距离触发一次:真正暂停(`Time.timeScale = 0` + 挂起 `BikeController`)、弹出三个
-Choice、选中→确认两步生效后恢复。触发点前后是安全区,`EndlessTerrainGenerator` /
-`ObstacleSpawner` 通过反向查询跳过断层/障碍物生成,不会让玩家因为暂停/恢复意外摔车。
-`DecisionCurve` 按"第几个 Node"把进度换算成早/中/后期档位;`NodeChoicePool` 按 Choice 的
+**Roguelike Station 三选一**(`NodeManager.cs` 调度 + `DecisionCurve.cs`/`NodeChoicePool.cs`/
+`NodeEffectSystem.cs`/`NodeChoiceUI.cs` 分职责 + `NodeSettings.cs` 配置 +
+`StationMarkerSpawner.cs`/`StationBlurFeature.cs` 呈现层,存档设计见
+[GitHub #3](https://github.com/Chaos487/RidingBike/issues/3) 和后续 Station/Pit Stop 讨论)
+骑行一定距离后物理化"进站":先进入 Approaching(弹"即将进站"提示,车速平滑降到站内低速,
+玩家依然能控制跳跃/空翻),到站后才真正暂停(`Time.timeScale = 0` + 挂起 `BikeController`)、
+弹出三选一、选中→确认两步生效,随后 Exiting(车速平滑加速回正常封顶)才回到正常骑行——
+不是原来那种瞬间暂停。减速/加速复用 `BikeController` 现成的限速追赶逻辑,新增一个
+`externalSpeedCapKmh`(可空临时封顶)跟 Node 效果永久改的 `maxSpeedKmh` 分开,互不覆盖。
+安全区覆盖"预警减速开始→出站加速结束"整段,`EndlessTerrainGenerator` / `ObstacleSpawner`
+通过反向查询跳过这段范围内的断层/障碍物生成。`StationMarkerSpawner` 在世界里贴地摆一个
+占位旗子标记 Station 位置;暂停时的背景模糊是真实屏幕空间模糊(`Assets/Shaders/StationBlur.shader`
+手写 HLSL + `StationBlurFeature.cs` 的 URP Renderer Feature,不是 UI 遮罩,也不是 Shader Graph),
+需要在 URP Renderer Data 资产里手动 `Add Renderer Feature` 选一次才会生效。
+`DecisionCurve` 按"第几个 Station"把进度换算成早/中/后期档位;`NodeChoicePool` 按 Choice 的
 `Min Stage`(从这档开始一直到后面所有档都可能出现,不是只在对应档出现一次)过滤、按 `Weight`
 加权抽取,并保证呈现的三个选项尽量覆盖低/中/高 `Risk Level`,不是纯随机抽奖;`NodeEffectSystem`
 把选中的 Effects 应用到 `BikeController`/`BikeDamageSystem` 的既有数值字段(白名单式,不是
-通用效果引擎);`NodeChoiceUI` 只管面板显示/选中态/Confirm 按钮,不知道游戏逻辑。**目前没有
-背景虚化/正式美术,Choice 池的具体数值/文案仍是占位,后续按需要在 `NodeSettings` 资产里调。**
+通用效果引擎);`NodeChoiceUI` 只管面板显示/选中态/Confirm 按钮,不知道游戏逻辑。**Station
+世界标记和 Choice 池的具体数值/文案仍是占位,后续按需要再替换正式美术。**
 
 ## 技术栈
 

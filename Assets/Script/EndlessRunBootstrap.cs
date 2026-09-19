@@ -89,15 +89,19 @@ public static class EndlessRunBootstrap
         SetupNodeSystem(systems, bike, damageSystem, runManager, terrain, obstacleSpawner);
     }
 
-    // Roguelike Node 三选一系统(GitHub Issue #3 存档方案)——触发/安全区/选择/生效全部交给
-    // NodeManager,这里只负责接线:把安全区反向查询接到断层/障碍物生成器上,把开始/结束两个
-    // 时机点(OnGameStarted/OnFinalCrash)接到 NodeManager 对应的方法上。
+    // Roguelike Node 三选一系统(GitHub Issue #3 存档方案,现在以物理化 Station 呈现)——
+    // 触发/安全区/减速进站/加速出站/选择/生效全部交给 NodeManager,这里只负责接线:
+    // 把 Station 世界标记的地形引用、安全区反向查询接到断层/障碍物生成器上,
+    // 把开始/结束两个时机点(OnGameStarted/OnFinalCrash)接到 NodeManager 对应的方法上。
     static void SetupNodeSystem(GameObject systems, BikeController bike, BikeDamageSystem damageSystem,
         RunManager runManager, EndlessTerrainGenerator terrain, ObstacleSpawner obstacleSpawner)
     {
+        StationMarkerSpawner markerSpawner = systems.AddComponent<StationMarkerSpawner>();
+        markerSpawner.Initialize(terrain);
+
         NodeManager nodeManager = systems.AddComponent<NodeManager>();
         nodeManager.ApplySettings(FindSettings<NodeSettings>());
-        nodeManager.Initialize(bike, damageSystem, runManager.transform);
+        nodeManager.Initialize(bike, damageSystem, runManager.transform, runManager, markerSpawner);
 
         terrain.overlapsSafeZone = nodeManager.OverlapsSafeZone;
         obstacleSpawner.isInSafeZone = nodeManager.IsInSafeZone;

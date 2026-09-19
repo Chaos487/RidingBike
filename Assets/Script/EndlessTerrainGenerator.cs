@@ -377,6 +377,30 @@ public class EndlessTerrainGenerator : MonoBehaviour
         return false;
     }
 
+    /// <summary>按 X 查询地面高度(取相邻两个采样点线性插值)。x 还没被生成到、或者已经被
+    /// 回收掉,查不到就返回 false。供 Station 世界标记这类需要贴地摆放的系统使用——
+    /// 跟 TryGetGapAt 一样是纯读查询，不影响生成状态。</summary>
+    public bool TryGetHeightAt(float x, out float groundY)
+    {
+        if (points.Count < 2 || x < points[0].x || x > points[points.Count - 1].x)
+        {
+            groundY = 0f;
+            return false;
+        }
+
+        for (int i = 0; i < points.Count - 1; i++)
+        {
+            if (x < points[i].x || x > points[i + 1].x) continue;
+
+            float t = (x - points[i].x) / Mathf.Max(0.0001f, points[i + 1].x - points[i].x);
+            groundY = Mathf.Lerp(points[i].y, points[i + 1].y, t);
+            return true;
+        }
+
+        groundY = 0f;
+        return false;
+    }
+
     bool TrimBehind(float xThreshold)
     {
         int removeCount = 0;

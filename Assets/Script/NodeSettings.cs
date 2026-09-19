@@ -60,14 +60,30 @@ public class ChoicePreset
 public class NodeSettings : ScriptableObject
 {
     [Header("触发间隔 (米)")]
-    [Tooltip("间隔必须明显大于地形的 generateAheadDistance(默认 50m)+安全区前段长度,否则安全区" +
-             "注册的时候,那段地形可能已经被提前生成过了,来不及避开断层/障碍物。")]
-    public float minNodeInterval = 80f;
-    public float maxNodeInterval = 100f;
+    [Tooltip("间隔必须明显大于地形的 generateAheadDistance(默认 50m)+安全区前段长度(约等于" +
+             "进站减速的安全区长度),否则安全区注册的时候,那段地形可能已经被提前生成过了," +
+             "来不及避开断层/障碍物。")]
+    public float minNodeInterval = 110f;
+    public float maxNodeInterval = 140f;
 
     [Header("安全区 (米)")]
-    public float safeZoneBefore = 15f;
-    public float safeZoneAfter = 15f;
+    [Tooltip("Station 前方的安全区长度——同时也是玩家开始看到\"即将进站\"提示、车速开始平滑" +
+             "下降的距离(Approaching 状态从这里开始)。")]
+    public float safeZoneBefore = 30f;
+    [Tooltip("Station 后方的安全区长度——车速从站内低速平滑加速回正常水平(Exiting 状态)" +
+             "需要跑完这段距离，跑完之前地形不会生成断层/致命障碍物。")]
+    public float safeZoneAfter = 30f;
+
+    [Header("Station 进站/出站节奏")]
+    [Tooltip("站内低速值 (km/h)——比正常保底速度还慢很多,让\"停下来\"这件事有实感。")]
+    public float stationSpeedKmh = 12f;
+    [Tooltip("进站减速动画时长(秒)——车速从正常封顶平滑降到站内低速用多久。")]
+    public float approachSlowdownDuration = 2.5f;
+    [Tooltip("出站加速动画时长(秒)——车速从站内低速平滑升回正常封顶用多久。")]
+    public float exitAccelerationDuration = 2f;
+    [Tooltip("车身真正停稳之后,再等这么久(秒)才弹出三选一面板——给玩家一个\"车停下来了\"的" +
+             "缓冲感,不是一到站就硬切出菜单。")]
+    public float stationUiDelay = 0.15f;
 
     [Header("Decision Curve (按第几个 Node 计数,从 1 开始)")]
     [Tooltip("第几个 Node 开始进入中期档(正面+负面混合)。")]

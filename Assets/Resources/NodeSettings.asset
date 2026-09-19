@@ -12,10 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9995bc68afaace7c4723ea1b7522cdb2, type: 3}
   m_Name: NodeSettings
   m_EditorClassIdentifier: 
-  minNodeInterval: 80
-  maxNodeInterval: 100
-  safeZoneBefore: 15
-  safeZoneAfter: 15
+  minNodeInterval: 110
+  maxNodeInterval: 140
+  safeZoneBefore: 30
+  safeZoneAfter: 30
+  stationSpeedKmh: 12
+  approachSlowdownDuration: 2.5
+  exitAccelerationDuration: 2
+  stationUiDelay: 0.15
   midTierStartIndex: 3
   lateTierStartIndex: 6
   choices:

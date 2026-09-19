@@ -39,13 +39,20 @@ public class BikeController : MonoBehaviour
     public float boostDecayPerSecondKmh = 30f;
 
     [Header("Speed / Stability Limits")]
-    [Tooltip("车身速度上限 (km/h)，模拟现实骑行速度，达到后车速不再增加，boost 也不能突破这个封顶。")]
+    [Tooltip("车身速度上限 (km/h)，模拟现实骑行速度，达到后车速不再增加，boost 也不能突破这个封顶。" +
+             "Node 系统的车速加成/减益直接改这个字段(永久生效)。")]
     public float maxSpeedKmh = 100f;
     [Tooltip("车身最大角速度 (deg/s)，防止失控空翻。")]
     public float maxAngularSpeed = 400f;
 
+    /// <summary>Station 进站/出站减速加速用的临时封顶(km/h),null = 不生效。故意跟 maxSpeedKmh 分开
+    /// 一个字段,不直接读写 maxSpeedKmh——那个是 Node 效果在永久改的值,两边如果共用同一个字段,
+    /// 出站之后要么把 Node 给的永久加成冲掉,要么被永久加成把临时限速顶穿。这里只取两者较小值,
+    /// 谁都不改谁。</summary>
+    public float? externalSpeedCapKmh;
+
     /// <summary>车身速度上限，换算成物理用的 m/s。</summary>
-    public float MaxLinearSpeed => maxSpeedKmh / 3.6f;
+    public float MaxLinearSpeed => Mathf.Min(maxSpeedKmh, externalSpeedCapKmh ?? float.MaxValue) / 3.6f;
 
     [Header("Balance")]
     [Tooltip("自动回正强度，车身倾斜时把它拉回水平。0 = 关闭。")]

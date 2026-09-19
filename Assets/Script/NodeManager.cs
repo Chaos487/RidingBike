@@ -1,44 +1,61 @@
+using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 
 /// <summary>
-/// Roguelike Node 系统的调度者:检测触发、算 Node 计数、管理安全区、暂停/恢复,
-/// 把"当前该出什么档位"交给 DecisionCurve、"三选一具体是哪三个"交给 NodeChoicePool、
+/// Roguelike Node 系统的调度者,现在以"物理化 Station"的方式呈现(见 Station/Pit Stop 设计讨论):
+/// Riding(正常骑行) → Approaching(预警+平滑减速) → Paused(真正停站、三选一) →
+/// Exiting(平滑加速) → 回到 Riding。触发/安全区/Node 计数/暂停这些底层机制不变,只是把原来
+/// "瞬间暂停"的呈现换成了这套减速进站/加速出站的过渡。
+///
+/// "当前该出什么档位"交给 DecisionCurve、"三选一具体是哪三个"交给 NodeChoicePool、
 /// "选中的效果怎么生效"交给 NodeEffectSystem、"面板怎么显示/怎么点"交给 NodeChoiceUI——
-/// 自己不重复实现这几块逻辑,只负责在正确的时机调用它们(架构见 GitHub #3 存档设计 + 后续讨论)。
+/// 自己不重复实现这几块逻辑,只负责在正确的时机调用它们。
 ///
 /// 安全区是反向查表:提前把"接下来这段 X 是安全区"登记进 safeZones,
 /// EndlessTerrainGenerator(断层)和 ObstacleSpawner(障碍物)通过 overlapsSafeZone/isInSafeZone
 /// 这两个委托反过来查——跟断层给 GapFallHandler 用的 TryGetGapAt 是同一类模式,但方向相反。
+/// 安全区现在覆盖的是"预警减速开始→...→出站加速结束"这一整段,不只是暂停点前后一小段缓冲。
 ///
-/// 下一个 Node 的安全区必须在当前 Node 一结束就立刻登记(不能等快到了再算),因为地形是提前
-/// generateAheadDistance(默认 50m)生成好的——触发间隔(默认 80~100m)减去安全区前段长度(默认 15m)
+/// 下一个 Station 的安全区必须在当前这次一结束就立刻登记(不能等快到了再算),因为地形是提前
+/// generateAheadDistance(默认 50m)生成好的——触发间隔减去安全区前段长度(= 进站减速距离)
 /// 必须明显大于 50m,否则登记的时候那段地形可能已经生成过了,来不及避开。
 /// </summary>
 public class NodeManager : MonoBehaviour
 {
-    float minNodeInterval = 80f;
-    float maxNodeInterval = 100f;
-    float safeZoneBefore = 15f;
-    float safeZoneAfter = 15f;
+    enum StationFlowState { Riding, Approaching, Paused, Exiting }
+
+    float minNodeInterval = 110f;
+    float maxNodeInterval = 140f;
+    float safeZoneBefore = 30f;
+    float safeZoneAfter = 30f;
+    float stationSpeedKmh = 12f;
+    float approachSlowdownDuration = 2.5f;
+    float exitAccelerationDuration = 2f;
+    float stationUiDelay = 0.15f;
     int midTierStartIndex = 3;
     int lateTierStartIndex = 6;
     List<ChoicePreset> choicePresets;
 
     BikeController bike;
     BikeDamageSystem damageSystem;
+    RunManager runManager;
+    StationMarkerSpawner markerSpawner;
     NodeChoiceUI ui;
     DecisionCurve decisionCurve;
     NodeChoicePool choicePool;
 
     readonly List<(float start, float end)> safeZones = new List<(float start, float end)>();
     List<ChoicePreset> currentChoices;
+    Tweener speedCapTweener;
 
+    StationFlowState flowState = StationFlowState.Riding;
     float nextTriggerX;
+    float approachStartX;
     int nodeCount;
     bool started;
     bool ended;
-    bool nodePanelOpen;
 
     public void ApplySettings(NodeSettings settings)
     {
@@ -52,15 +69,22 @@ public class NodeManager : MonoBehaviour
         maxNodeInterval = settings.maxNodeInterval;
         safeZoneBefore = settings.safeZoneBefore;
         safeZoneAfter = settings.safeZoneAfter;
+        stationSpeedKmh = settings.stationSpeedKmh;
+        approachSlowdownDuration = settings.approachSlowdownDuration;
+        exitAccelerationDuration = settings.exitAccelerationDuration;
+        stationUiDelay = settings.stationUiDelay;
         midTierStartIndex = settings.midTierStartIndex;
         lateTierStartIndex = settings.lateTierStartIndex;
         choicePresets = settings.choices;
     }
 
-    public void Initialize(BikeController bikeController, BikeDamageSystem bikeDamageSystem, Transform canvasRoot)
+    public void Initialize(BikeController bikeController, BikeDamageSystem bikeDamageSystem, Transform canvasRoot,
+        RunManager runManagerRef, StationMarkerSpawner stationMarkerSpawner)
     {
         bike = bikeController;
         damageSystem = bikeDamageSystem;
+        runManager = runManagerRef;
+        markerSpawner = stationMarkerSpawner;
 
         if (choicePresets == null || choicePresets.Count == 0) choicePresets = BuildFallbackChoices();
 
@@ -69,7 +93,7 @@ public class NodeManager : MonoBehaviour
 
         SetupUI(canvasRoot);
 
-        // 第一个 Node 的安全区必须在这里(EndlessRunBootstrap.Setup() 的同一帧、terrain 开始
+        // 第一个 Station 的安全区必须在这里(EndlessRunBootstrap.Setup() 的同一帧、terrain 开始
         // Update() 之前)就登记好,见类注释。
         ScheduleNextTrigger(bike.bikeRigidbody.position.x);
     }
@@ -91,24 +115,36 @@ public class NodeManager : MonoBehaviour
     }
 
     /// <summary>RunManager.OnGameStarted 触发时调用——开始界面静止期间不检查触发,不然玩家
-    /// 还没点 Start 就可能被判定"已经骑到了第一个 Node"。</summary>
+    /// 还没点 Start 就可能被判定"已经骑到了第一个 Station"。</summary>
     public void BeginRun()
     {
         started = true;
     }
 
-    /// <summary>BikeDamageSystem.OnFinalCrash 触发时调用——这一局已经结束,不用再触发新 Node。</summary>
+    /// <summary>BikeDamageSystem.OnFinalCrash 触发时调用——这一局已经结束,不用再触发新 Station,
+    /// 也不用再管进站/出站的速度渐变了。</summary>
     public void HandleFinalCrash()
     {
         ended = true;
+        speedCapTweener?.Kill();
     }
 
     void Update()
     {
-        if (!started || ended || nodePanelOpen) return;
+        if (!started || ended) return;
 
         float x = bike.bikeRigidbody.position.x;
-        if (x >= nextTriggerX) TriggerNode();
+
+        switch (flowState)
+        {
+            case StationFlowState.Riding:
+                if (x >= approachStartX) EnterApproaching();
+                break;
+            case StationFlowState.Approaching:
+                if (x >= nextTriggerX) EnterStation();
+                break;
+            // Paused/Exiting 不需要逐帧检查触发——Paused 等玩家确认,Exiting 的速度渐变交给 DOTween。
+        }
 
         safeZones.RemoveAll(z => z.end < x - 200f);
     }
@@ -117,14 +153,34 @@ public class NodeManager : MonoBehaviour
     {
         float interval = UnityEngine.Random.Range(minNodeInterval, maxNodeInterval);
         nextTriggerX = fromX + interval;
+        approachStartX = nextTriggerX - safeZoneBefore;
         safeZones.Add((nextTriggerX - safeZoneBefore, nextTriggerX + safeZoneAfter));
+
+        if (markerSpawner != null) markerSpawner.RequestMarkerAt(nextTriggerX);
     }
 
-    void TriggerNode()
+    /// <summary>接近 Station:弹一次"即将进站"提示,车速开始平滑降到站内低速——玩家依然能
+    /// 控制车身(跳跃/空翻),安全区保证这段路不会有环境性的致命内容,只有玩家自己操作失误
+    /// 才会摔车。</summary>
+    void EnterApproaching()
     {
-        nodePanelOpen = true;
-        nodeCount++;
+        flowState = StationFlowState.Approaching;
+        if (runManager != null) runManager.ShowStationApproachWarning();
+        StartSpeedRamp(stationSpeedKmh, approachSlowdownDuration);
+    }
 
+    /// <summary>到达 Station:真正冻结游戏、弹三选一。停稳(禁用 BikeController、真正暂停)
+    /// 和"面板出现"之间故意留一个 stationUiDelay 的间隔,不是一到站就硬切出菜单。</summary>
+    void EnterStation()
+    {
+        flowState = StationFlowState.Paused;
+        speedCapTweener?.Kill();
+        bike.externalSpeedCapKmh = null; // 交还给暂停本身去"定住"车身,不需要临时限速再管
+
+        Time.timeScale = 0f;
+        bike.enabled = false;
+
+        nodeCount++;
         NodeTier stage = decisionCurve.GetStage(nodeCount);
         currentChoices = choicePool.GenerateChoices(stage, 3);
 
@@ -134,10 +190,16 @@ public class NodeManager : MonoBehaviour
             lethalFlags.Add(NodeEffectSystem.WouldBeLethal(choice, damageSystem));
         }
 
-        if (ui != null) ui.ShowChoices(currentChoices, lethalFlags);
+        StartCoroutine(OpenPanelAfterDelay(lethalFlags));
+    }
 
-        Time.timeScale = 0f;
-        bike.enabled = false;
+    IEnumerator OpenPanelAfterDelay(List<bool> lethalFlags)
+    {
+        // 暂停期间 Time.timeScale = 0,WaitForSeconds 会被同步冻结,必须用 Realtime 版本。
+        if (stationUiDelay > 0f) yield return new WaitForSecondsRealtime(stationUiDelay);
+
+        if (StationBlurFeature.Instance != null) StationBlurFeature.Instance.SetActive(true);
+        if (ui != null) ui.ShowChoices(currentChoices, lethalFlags);
     }
 
     void HandleConfirmed(int selectedIndex)
@@ -148,33 +210,57 @@ public class NodeManager : MonoBehaviour
 
         // ApplyChoice 可能通过 ModifyMaxHp 直接把玩家扣死——damageSystem.OnFinalCrash 是同步
         // 触发的,RunManager/CameraDirector 这时候已经跑完摔车结算(锁 BikeController、接管镜头、
-        // 显示结算画面),HandleFinalCrash 也已经把 ended 置 true。这种情况绝不能再走 ClosePanel
-        // 那套"重新启用 BikeController + Time.timeScale 恢复 1 + 排下一个 Node"的流程,不然等于
-        // 把已经结束的一局又救活,车会继续往前跑。
+        // 显示结算画面),HandleFinalCrash 也已经把 ended 置 true。这种情况绝不能再走正常的
+        // "出站加速"流程,不然等于把已经结束的一局又救活,车会继续往前跑。
         if (ended)
         {
             if (ui != null) ui.Hide();
-            nodePanelOpen = false;
-            // timeScale 仍然要恢复(Node 面板暂停时压到了 0),不然摔车结算的镜头缓动/物理表现
-            // 会跟着一起冻结，效果跟正常摔车(此时 timeScale 本来就是 1)不一致。
+            if (StationBlurFeature.Instance != null) StationBlurFeature.Instance.SetActive(false);
+            // timeScale 仍然要恢复(暂停时压到了 0),不然摔车结算的镜头缓动/物理表现会跟着一起
+            // 冻结，效果跟正常摔车(此时 timeScale 本来就是 1)不一致。
             Time.timeScale = 1f;
             return;
         }
 
-        ClosePanel();
+        StartExiting();
     }
 
-    void ClosePanel()
+    /// <summary>离站:关面板、取消模糊、恢复暂停,车速从站内低速平滑加速回(刚生效的新)正常
+    /// 封顶——车速目标用 bike.maxSpeedKmh 而不是缓存的旧值,这样选中的车速类 Effect 会立刻
+    /// 反映在这次加速的终点上。</summary>
+    void StartExiting()
     {
         if (ui != null) ui.Hide();
-        nodePanelOpen = false;
+        if (StationBlurFeature.Instance != null) StationBlurFeature.Instance.SetActive(false);
 
+        flowState = StationFlowState.Exiting;
         Time.timeScale = 1f;
         bike.enabled = true;
+        bike.externalSpeedCapKmh = stationSpeedKmh;
 
-        // 从这个 Node 自己的触发点(而不是当前帧的车身位置)往后排——暂停期间车身没有移动,
-        // 两者数值上一样,但这样写意图更清楚:下一个安全区是接着这一个排的,不依赖物理有没有在暂停期间漂移。
+        StartSpeedRamp(bike.maxSpeedKmh, exitAccelerationDuration, FinishExiting);
+    }
+
+    void FinishExiting()
+    {
+        bike.externalSpeedCapKmh = null;
+        flowState = StationFlowState.Riding;
+
+        // 从这个 Station 自己的触发点(而不是出站加速跑完之后的当前车身位置)往后排——
+        // 意图更清楚:下一个 Station 是接着这一个排的,不依赖出站加速具体跑了多远。
         ScheduleNextTrigger(nextTriggerX);
+    }
+
+    void StartSpeedRamp(float targetKmh, float duration, TweenCallback onComplete = null)
+    {
+        speedCapTweener?.Kill();
+
+        float from = bike.externalSpeedCapKmh ?? bike.maxSpeedKmh;
+        bike.externalSpeedCapKmh = from;
+
+        speedCapTweener = DOTween.To(() => bike.externalSpeedCapKmh.Value, v => bike.externalSpeedCapKmh = v, targetKmh, duration)
+            .SetEase(Ease.InOutSine);
+        if (onComplete != null) speedCapTweener.OnComplete(onComplete);
     }
 
     /// <summary>[rangeStart, rangeEnd] 是否跟任意一个已登记的安全区有重叠。供 EndlessTerrainGenerator
