@@ -29,6 +29,16 @@ public class GearPickup : MonoBehaviour
     void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
+
+        // 兜底:万一 Prefab 上的材质引用又被清空(比如手滑改了 Gear.prefab),运行时自己补一个,
+        // 不至于又变回没材质的品红色——跟 EndlessTerrainGenerator/ObstacleSpawner 那几个
+        // 程序化 Mesh 用的是同一个"Shader.Find 兜底"手法。
+        if (spriteRenderer.sharedMaterial == null)
+        {
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader != null) spriteRenderer.sharedMaterial = new Material(shader);
+        }
+
         baseY = transform.position.y;
         baseScaleX = Mathf.Abs(transform.localScale.x);
         if (baseScaleX <= 0f) baseScaleX = 1f;
