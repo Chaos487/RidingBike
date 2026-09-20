@@ -11,12 +11,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a15d7127e9561b6fae84695f1eb02c1c, type: 3}
   m_Name: GroundForegroundLayerSettings
-  m_EditorClassIdentifier:
-  halfWidth: 20
-  sampleSpacing: 1
+  m_EditorClassIdentifier: 
+  halfWidth: 25
+  sampleSpacing: 0.4
   noiseScale: 0.03
   hillHeight: 2
   groundThickness: 60
   sinkDepth: 3
-  silhouetteColor: {r: 0.22, g: 0.14, b: 0.12, a: 1}
+  silhouetteColor: {r: 0.6698113, g: 0.5276344, b: 0.3001513, a: 1}
   sortingOrder: 10
