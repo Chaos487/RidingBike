@@ -8,33 +8,44 @@ using UnityEngine;
 /// 一样快"的上限,没法做出比真地形更快的滚动——这层想显得"更近",靠的是遮挡关系(画在最前面,
 /// sortingOrder 比车/地形都高)+ 常驻屏幕底部 + 颜色更深这三个视觉线索,不是滚动速度。
 ///
-/// 实现上更接近 EndlessTerrainGenerator(世界空间程序化 Mesh),但拿掉了碰撞体/断层/障碍物
-/// 挂钩,形状用独立的低频 Perlin Noise(不读真地形的坡度数据),而且整个 Mesh 是每帧跟着摄像机
-/// 当前位置重新生成的(不是只在延伸/回收时局部更新)——这样车爬坡/下坡导致摄像机 Y 变化时,
-/// 这层能立刻跟着贴到镜头底部，不会因为地形起伏而在画面里飘忽不定。顶点数量本来就很少
-/// (由 halfWidth/sampleSpacing 决定，通常一两百个)，每帧重建的开销可以忽略。
+/// 每个采样点的基准高度直接查 EndlessTerrainGenerator.TryGetHeightAt(实际地形高度),不是贴着
+/// 摄像机的 Y——摄像机会因为车起跳/落地/加速缩放上下晃,贴摄像机会让这层跟着一起没道理地跳动;
+/// 贴真地形高度则完全不受这些影响，车跳多高这层都纹丝不动，而且天然保证"任意位置都比真地形低
+/// sinkDepth 米"，不会有一段真地形比这层还低、导致这层意外"浮"到真地形上面的情况。
+///
+/// X 方向跟随车身(bike.transform),范围(halfWidth)必须明显小于地形的 generateAheadDistance
+/// (默认 50m)和 despawnBehindDistance(默认 25m),否则采样点会落在地形还没生成/已经回收的
+/// 区间，查不到真实高度。整个 Mesh 每帧都根据车身当前位置重新生成(不是增量延伸/回收)——
+/// 顶点数量本来就很少(由 halfWidth/sampleSpacing 决定，通常一两百个)，每帧重建的开销可以忽略，
+/// 换来的是车身位置变化时这层能立刻跟上，不用维护额外的延伸/回收状态。
 /// </summary>
 public class GroundForegroundLayer : MonoBehaviour
 {
-    [Tooltip("跟随的目标,用主摄像机的 Transform——这层要贴着镜头底部，不是贴着地形本身。")]
+    [Tooltip("跟随的目标,用车身 Transform——这层的每个采样点都直接查真地形在对应 X 的实际高度，" +
+             "只用这个字段确定生成窗口跟到哪。")]
     public Transform trackTarget;
+    [Tooltip("查询实际地形高度用的地形生成器。")]
+    public EndlessTerrainGenerator terrain;
 
     [Header("覆盖范围")]
-    [Tooltip("以摄像机为中心，左右各铺多宽(米)。要盖住镜头在最大缩放时的可视范围，留够余量。")]
-    public float halfWidth = 40f;
+    [Tooltip("以车身为中心，左右各铺多宽(米)。必须明显小于地形的 generateAheadDistance(默认 50m)" +
+             "和 despawnBehindDistance(默认 25m)，否则采样点会落在地形还没生成/已经回收的区间。")]
+    public float halfWidth = 20f;
     [Tooltip("采样间距(米)，越小曲线越平滑，但顶点数越多。")]
     public float sampleSpacing = 1f;
 
-    [Header("形状(独立于真地形的低频噪声曲线)")]
+    [Header("形状(独立于真地形起伏的低频噪声,叠加在真实高度之上)")]
     public float noiseScale = 0.03f;
-    [Tooltip("起伏幅度(米)，波峰到基准线的最大高度。")]
+    [Tooltip("起伏幅度(米)，波峰到基准线的最大高度。必须小于 Sink Depth，否则波峰可能反而" +
+             "高过真地形在同一位置的实际高度。")]
     public float hillHeight = 2f;
     [Tooltip("网格往下延伸多深(米)，保证镜头怎么缩放都看不到底边穿帮。")]
     public float groundThickness = 60f;
 
     [Header("位置/外观")]
-    [Tooltip("基准线比摄像机中心低多少米——需要在 Play 模式里实际盯着调:太小会整层铺满屏幕挡住玩法，" +
-             "太大又完全看不到，跟镜头缩放范围(CameraDirectorSettings 的 minOrthoSize~maxOrthoSize)配合着调。")]
+    [Tooltip("基准线比对应位置的真实地形低多少米——需要大于 Hill Height，保证这层任何时候都不会" +
+             "高过真地形；具体数值需要在 Play 模式里实际盯着调,太小会跟真地形贴太近看不出层次，" +
+             "太大又完全看不到。")]
     public float sinkDepth = 3f;
     public Color silhouetteColor = new Color(0.22f, 0.14f, 0.12f);
     [Tooltip("渲染排序，必须比车/障碍物(默认 0)和真地形(-1)都高，才能真的盖在最前面。")]
@@ -43,6 +54,8 @@ public class GroundForegroundLayer : MonoBehaviour
     MeshFilter meshFilter;
     MeshRenderer meshRenderer;
     Mesh mesh;
+    float lastKnownGroundY;
+    bool hasKnownGroundY;
 
     void Awake()
     {
@@ -56,28 +69,46 @@ public class GroundForegroundLayer : MonoBehaviour
         meshRenderer.sortingOrder = sortingOrder;
     }
 
-    public void Initialize(Transform cameraTransform)
+    public void Initialize(Transform bikeTransform, EndlessTerrainGenerator terrainGenerator)
     {
-        trackTarget = cameraTransform;
+        trackTarget = bikeTransform;
+        terrain = terrainGenerator;
     }
 
     void LateUpdate()
     {
-        if (trackTarget == null) return;
-        RebuildMesh(trackTarget.position);
+        if (trackTarget == null || terrain == null) return;
+        RebuildMesh(trackTarget.position.x);
     }
 
-    void RebuildMesh(Vector3 center)
+    void RebuildMesh(float centerX)
     {
         int columns = Mathf.Max(2, Mathf.CeilToInt(halfWidth * 2f / Mathf.Max(sampleSpacing, 0.05f)) + 1);
-        float startX = center.x - halfWidth;
+        float startX = centerX - halfWidth;
 
         Vector3[] verts = new Vector3[columns * 2];
         for (int i = 0; i < columns; i++)
         {
             float worldX = startX + i * sampleSpacing;
+
+            // 查不到真实高度(地形还没生成到/已经回收)就沿用上一个采样到的高度，保持一条
+            // 平的延伸，不会因为查不到就在 Mesh 上开一个洞或者塌到 0。
+            if (terrain.TryGetHeightAt(worldX, out float groundY))
+            {
+                lastKnownGroundY = groundY;
+                hasKnownGroundY = true;
+            }
+            else if (hasKnownGroundY)
+            {
+                groundY = lastKnownGroundY;
+            }
+            else
+            {
+                groundY = trackTarget.position.y; // 极端兜底：开局第一帧地形可能还没来得及生成
+            }
+
             float noise = Mathf.PerlinNoise(worldX * noiseScale, 0f);
-            float topY = center.y - sinkDepth + (noise - 0.5f) * 2f * hillHeight;
+            float topY = groundY - sinkDepth + (noise - 0.5f) * 2f * hillHeight;
 
             verts[i * 2] = new Vector3(worldX, topY, 0f);
             verts[i * 2 + 1] = new Vector3(worldX, topY - groundThickness, 0f);

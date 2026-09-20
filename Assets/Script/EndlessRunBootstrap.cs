@@ -44,7 +44,6 @@ public static class EndlessRunBootstrap
         EndlessRunSettings runSettings = FindSettings<EndlessRunSettings>();
 
         SetupParallaxBackground(bike);
-        SetupGroundForegroundLayer(bike);
 
         GameObject systems = new GameObject("EndlessRunSystems");
 
@@ -57,6 +56,7 @@ public static class EndlessRunBootstrap
         terrain.OnGroundSampled += obstacleSpawner.HandleGroundSampled;
 
         terrain.Initialize(startPoint);
+        SetupGroundForegroundLayer(bike, terrain);
 
         CrashDetector crashDetector = systems.AddComponent<CrashDetector>();
         crashDetector.bikeRigidbody = bike.bikeRigidbody != null ? bike.bikeRigidbody : bike.GetComponent<Rigidbody2D>();
@@ -202,15 +202,13 @@ public static class EndlessRunBootstrap
     }
 
     // 屏幕底部常驻的前景剪影层(GroundForegroundLayer)——纯装饰,不参与碰撞,
-    // 跟视差背景一样贴着摄像机走，不是贴着地形本身，见该类注释里的取舍说明。
-    static void SetupGroundForegroundLayer(BikeController bike)
+    // 贴着真地形(EndlessTerrainGenerator)的实际高度走，不是贴着摄像机，
+    // 这样车起跳/镜头缩放的时候这层不会跟着一起跳，见该类注释里的取舍说明。
+    static void SetupGroundForegroundLayer(BikeController bike, EndlessTerrainGenerator terrain)
     {
-        Camera mainCamera = Camera.main;
-        Transform trackTarget = mainCamera != null ? mainCamera.transform : bike.transform;
-
         GameObject foregroundObject = new GameObject("GroundForegroundLayer");
         GroundForegroundLayer foreground = foregroundObject.AddComponent<GroundForegroundLayer>();
-        foreground.Initialize(trackTarget);
+        foreground.Initialize(bike.transform, terrain);
     }
 
     static CameraDirector SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)
