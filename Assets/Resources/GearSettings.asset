@@ -11,11 +11,11 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3f3561205c5aecbe3d548ac518fab29f, type: 3}
   m_Name: GearSettings
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   minSpawnInterval: 15
   maxSpawnInterval: 30
   spawnChance: 1
-  heightAboveGround: 1.2
+  heightAboveGround: 0.5
   spinSpeed: 3
   darkenBackFace: 1
   backFaceBrightness: 0.6
