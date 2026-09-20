@@ -423,7 +423,7 @@ MonoBehaviour:
   backWheelJoint: {fileID: 1071903647423023620}
   frontWheelJoint: {fileID: 2091637169706335519}
   bikeRigidbody: {fileID: 4857637662962619861}
-  maxMotorSpeedKmh: 160
+  maxMotorSpeedKmh: 30
   cruiseAccelerationKmhPerSec: 220
   cruiseTorque: 2000
   driveDirection: -1
@@ -434,6 +434,7 @@ MonoBehaviour:
   boostDecayPerSecondKmh: 30
   maxSpeedKmh: 100
   maxAngularSpeed: 400
+  jumpAndBoostLocked: 0
   autoBalanceTorque: 25
   autoBalanceDamping: 4
   groundCheckDistance: 1.2
@@ -446,12 +447,12 @@ MonoBehaviour:
   frontWheelVisual: {fileID: 0}
   backWheelVisual: {fileID: 0}
   wheelSpinDirection: 1
-  jumpForce: 30
+  jumpForce: 15
   speedJumpBonus: 8
   downhillJumpBonus: 6
   maxDownhillAngleForBonus: 20
   spinHoldThreshold: 0.1
-  spinAngularSpeed: 360
+  spinAngularSpeed: 180
   invulnerabilityFlashInterval: 0.1
 --- !u!1 &8921212775599145840
 GameObject:
