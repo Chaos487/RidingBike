@@ -78,8 +78,11 @@ Odyssey 的沙丘剪影)。不用 `BackgroundScroller` 的摄像机视差公式(
 `GearSettings.cs` 配置)
 骑行沿途生成可拾取的齿轮(`Assets/Resources/Gear.prefab`,单张 sprite),车身碰到即拾取,
 数量立刻存 `PlayerPrefs`(货币比"最远距离"这种纯记录更经不起丢,不等结算才存)并实时刷新
-右上角 UI。生成用跟 `StationMarkerSpawner` 一样"轮询地形高度"的手法,独立一套间隔/概率,
-不跟 `ObstacleSpawner` 共用采样点;断层和 Station 安全区都不生成。旋转视觉是经典的单图假 3D
+右上角 UI。生成用跟 `StationMarkerSpawner` 一样"轮询地形高度"的手法,每个生成点放一组
+(数量在 `minGroupSize`~`maxGroupSize` 间随机,组内间距 `intraGroupSpacing`,组与组之间的
+间隔/概率才是 `minSpawnInterval`/`maxSpawnInterval`/`spawnChance` 管的),不跟
+`ObstacleSpawner` 共用采样点;断层、Station 安全区、还没生成到的位置只跳过组里命中的那
+几个,不影响同一组其他位置。旋转视觉是经典的单图假 3D
 手法——只缩放 X 轴按 cos 曲线挤压(`1 → 0 → -1 → 0` 循环,不需要 sprite sheet),转到"背面"
 (缩放为负)时顺带调暗颜色模拟光照角度变化,外加一点上下浮动。**现在只有"加"没有"花",
 花的机制留给以后的 Roguelike 局外商店(GitHub #3 存档设计提过的方向)。**

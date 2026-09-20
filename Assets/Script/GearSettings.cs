@@ -7,12 +7,21 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "GearSettings", menuName = "RidingBike/Gear Settings")]
 public class GearSettings : ScriptableObject
 {
-    [Header("生成间隔 (米)")]
+    [Header("组与组之间的间隔 (米)")]
+    [Tooltip("这一组的起点到下一组起点之间的距离。")]
     public float minSpawnInterval = 15f;
     public float maxSpawnInterval = 30f;
     [Range(0f, 1f)]
-    [Tooltip("每个排到的生成点实际生成齿轮的概率,小于 1 代表偶尔会跳过一个点,间隔更参差不齐。")]
+    [Tooltip("每个排到的生成点实际生成一组齿轮的概率,小于 1 代表偶尔会跳过一组,间隔更参差不齐。")]
     public float spawnChance = 1f;
+
+    [Header("组内(一次连续生成几个齿轮)")]
+    [Tooltip("每组最少生成几个齿轮。")]
+    public int minGroupSize = 3;
+    [Tooltip("每组最多生成几个齿轮。")]
+    public int maxGroupSize = 5;
+    [Tooltip("同一组里相邻两个齿轮之间的间距(米)。")]
+    public float intraGroupSpacing = 1.5f;
 
     [Header("位置")]
     [Tooltip("齿轮悬浮在地面上方多高(米)。")]

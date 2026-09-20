@@ -4,17 +4,23 @@ using UnityEngine;
 /// <summary>
 /// 沿赛道生成齿轮拾取物——跟 StationMarkerSpawner 同一个"轮询地形生成到目标 X 才摆放"的手法,
 /// 但用自己独立的一套间隔/概率,不跟 ObstacleSpawner 共用 OnGroundSampled 那个采样点,
-/// 避免两者偶尔挤在同一个位置。
+/// 避免两者偶尔挤在同一个位置。每个生成点不是放单个齿轮,而是放一组(数量在
+/// minGroupSize~maxGroupSize 之间随机,组内相邻齿轮间距 intraGroupSpacing),
+/// minSpawnInterval/maxSpawnInterval/spawnChance 管的是"这一组"整体的间隔/出现概率,
+/// 不是组内单个齿轮的。
 ///
-/// 断层(Gap)和 Station 安全区(减速进站/加速出站那一段)都不生成——前者是因为地面在深坑
-/// 底部摆一个齿轮画面很怪，后者是想让那一段路保持视觉干净。跳过的点不会卡住整条生成链,
-/// 照样正常排下一个目标 X。
+/// 断层(Gap)、Station 安全区(减速进站/加速出站那一段)、地形还没生成到的位置都不生成——
+/// 前者是因为地面在深坑底部摆一个齿轮画面很怪，安全区是想让那一段路保持视觉干净。这三种情况
+/// 只跳过组里命中的那几个齿轮,不影响同一组里其他位置正常生成,也不会卡住整条生成链。
 /// </summary>
 public class GearSpawner : MonoBehaviour
 {
     float minSpawnInterval = 15f;
     float maxSpawnInterval = 30f;
     float spawnChance = 1f;
+    int minGroupSize = 3;
+    int maxGroupSize = 5;
+    float intraGroupSpacing = 1.5f;
     float heightAboveGround = 1.2f;
     float spinSpeed = 3f;
     bool darkenBackFace = true;
@@ -40,6 +46,9 @@ public class GearSpawner : MonoBehaviour
         minSpawnInterval = settings.minSpawnInterval;
         maxSpawnInterval = settings.maxSpawnInterval;
         spawnChance = settings.spawnChance;
+        minGroupSize = settings.minGroupSize;
+        maxGroupSize = settings.maxGroupSize;
+        intraGroupSpacing = settings.intraGroupSpacing;
         heightAboveGround = settings.heightAboveGround;
         spinSpeed = settings.spinSpeed;
         darkenBackFace = settings.darkenBackFace;
@@ -61,9 +70,9 @@ public class GearSpawner : MonoBehaviour
     void Update()
     {
         if (trackTarget == null || terrain == null || gearPrefab == null) return;
-        if (!terrain.TryGetHeightAt(pendingX, out float groundY)) return;
+        if (!terrain.TryGetHeightAt(pendingX, out _)) return; // 等这一组的起点生成出来再处理整组
 
-        TrySpawn(pendingX, groundY);
+        if (UnityEngine.Random.value <= spawnChance) SpawnGroup(pendingX);
         ScheduleNext(pendingX);
     }
 
@@ -72,11 +81,20 @@ public class GearSpawner : MonoBehaviour
         pendingX = fromX + UnityEngine.Random.Range(minSpawnInterval, maxSpawnInterval);
     }
 
-    void TrySpawn(float x, float groundY)
+    void SpawnGroup(float groupStartX)
     {
+        int count = UnityEngine.Random.Range(minGroupSize, maxGroupSize + 1); // Range(int,int) 右开区间,+1 让 maxGroupSize 也能选到
+        for (int i = 0; i < count; i++)
+        {
+            TrySpawnAt(groupStartX + i * intraGroupSpacing);
+        }
+    }
+
+    void TrySpawnAt(float x)
+    {
+        if (!terrain.TryGetHeightAt(x, out float groundY)) return;
         if (terrain.TryGetGapAt(x, out _, out _)) return;
         if (isInSafeZone != null && isInSafeZone(x)) return;
-        if (UnityEngine.Random.value > spawnChance) return;
 
         GameObject instance = UnityEngine.Object.Instantiate(gearPrefab, new Vector3(x, groundY + heightAboveGround, 0f), Quaternion.identity);
         GearPickup pickup = instance.GetComponent<GearPickup>();
