@@ -208,6 +208,7 @@ public static class EndlessRunBootstrap
     {
         GameObject foregroundObject = new GameObject("GroundForegroundLayer");
         GroundForegroundLayer foreground = foregroundObject.AddComponent<GroundForegroundLayer>();
+        foreground.ApplySettings(FindSettings<GroundForegroundLayerSettings>());
         foreground.Initialize(bike.transform, terrain);
     }
 

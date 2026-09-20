@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a15d7127e9561b6fae84695f1eb02c1c, type: 3}
+  m_Name: GroundForegroundLayerSettings
+  m_EditorClassIdentifier:
+  halfWidth: 20
+  sampleSpacing: 1
+  noiseScale: 0.03
+  hillHeight: 2
+  groundThickness: 60
+  sinkDepth: 3
+  silhouetteColor: {r: 0.22, g: 0.14, b: 0.12, a: 1}
+  sortingOrder: 10

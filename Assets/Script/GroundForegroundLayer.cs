@@ -69,6 +69,29 @@ public class GroundForegroundLayer : MonoBehaviour
         meshRenderer.sortingOrder = sortingOrder;
     }
 
+    /// <summary>用 GroundForegroundLayerSettings 资产里的数值覆盖默认参数,方便在编辑器里手调,
+    /// Play 模式下改了也不会随着退出 Play 被重置。Awake() 已经用脚本默认值把材质/渲染顺序建好了,
+    /// 这里额外把这两个已经创建出来的运行时对象同步一遍，不是单纯改字段就够。</summary>
+    public void ApplySettings(GroundForegroundLayerSettings settings)
+    {
+        if (settings == null) return;
+
+        halfWidth = settings.halfWidth;
+        sampleSpacing = settings.sampleSpacing;
+        noiseScale = settings.noiseScale;
+        hillHeight = settings.hillHeight;
+        groundThickness = settings.groundThickness;
+        sinkDepth = settings.sinkDepth;
+        silhouetteColor = settings.silhouetteColor;
+        sortingOrder = settings.sortingOrder;
+
+        if (meshRenderer != null)
+        {
+            meshRenderer.sortingOrder = sortingOrder;
+            if (meshRenderer.sharedMaterial != null) meshRenderer.sharedMaterial.color = silhouetteColor;
+        }
+    }
+
     public void Initialize(Transform bikeTransform, EndlessTerrainGenerator terrainGenerator)
     {
         trackTarget = bikeTransform;
