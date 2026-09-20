@@ -78,7 +78,7 @@ public class GearSpawner : MonoBehaviour
         if (isInSafeZone != null && isInSafeZone(x)) return;
         if (UnityEngine.Random.value > spawnChance) return;
 
-        GameObject instance = Object.Instantiate(gearPrefab, new Vector3(x, groundY + heightAboveGround, 0f), Quaternion.identity);
+        GameObject instance = UnityEngine.Object.Instantiate(gearPrefab, new Vector3(x, groundY + heightAboveGround, 0f), Quaternion.identity);
         GearPickup pickup = instance.GetComponent<GearPickup>();
         if (pickup == null) pickup = instance.AddComponent<GearPickup>();
         pickup.Initialize(gearManager, spinSpeed, darkenBackFace, backFaceBrightness, bobAmplitude, bobSpeed);
