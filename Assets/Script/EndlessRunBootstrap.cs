@@ -44,6 +44,7 @@ public static class EndlessRunBootstrap
         EndlessRunSettings runSettings = FindSettings<EndlessRunSettings>();
 
         SetupParallaxBackground(bike);
+        SetupGroundForegroundLayer(bike);
 
         GameObject systems = new GameObject("EndlessRunSystems");
 
@@ -198,6 +199,18 @@ public static class EndlessRunBootstrap
         {
             layer.trackTarget = trackTarget;
         }
+    }
+
+    // 屏幕底部常驻的前景剪影层(GroundForegroundLayer)——纯装饰,不参与碰撞,
+    // 跟视差背景一样贴着摄像机走，不是贴着地形本身，见该类注释里的取舍说明。
+    static void SetupGroundForegroundLayer(BikeController bike)
+    {
+        Camera mainCamera = Camera.main;
+        Transform trackTarget = mainCamera != null ? mainCamera.transform : bike.transform;
+
+        GameObject foregroundObject = new GameObject("GroundForegroundLayer");
+        GroundForegroundLayer foreground = foregroundObject.AddComponent<GroundForegroundLayer>();
+        foreground.Initialize(trackTarget);
     }
 
     static CameraDirector SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)
