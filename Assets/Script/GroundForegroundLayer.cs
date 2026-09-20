@@ -13,24 +13,35 @@ using UnityEngine;
 /// 贴真地形高度则完全不受这些影响，车跳多高这层都纹丝不动，而且天然保证"任意位置都比真地形低
 /// sinkDepth 米"，不会有一段真地形比这层还低、导致这层意外"浮"到真地形上面的情况。
 ///
-/// X 方向跟随车身(bike.transform),范围(halfWidth)必须明显小于地形的 generateAheadDistance
-/// (默认 50m)和 despawnBehindDistance(默认 25m),否则采样点会落在地形还没生成/已经回收的
-/// 区间，查不到真实高度。整个 Mesh 每帧都根据车身当前位置重新生成(不是增量延伸/回收)——
-/// 顶点数量本来就很少(由 halfWidth/sampleSpacing 决定，通常一两百个)，每帧重建的开销可以忽略，
-/// 换来的是车身位置变化时这层能立刻跟上，不用维护额外的延伸/回收状态。
+/// X 方向以摄像机当前位置为中心，覆盖宽度不是写死的常量,而是每帧从摄像机当前的
+/// orthographicSize/aspect 实时算出"镜头实际看得到多宽"再加一截安全余量(edgeMargin)——
+/// 车接近 Station 减速、CameraDirector 跟着变焦(低速聚焦放大/加速拉远)的时候,镜头看得到的
+/// 范围会变,固定宽度早晚会在某个缩放状态下不够用,只有跟镜头实际视野绑定才能保证任何情况下
+/// 都不会穿帮。halfWidth 保留作为"最小宽度"下限,真正生效的宽度取它和镜头当前需求的较大值。
+/// 覆盖宽度也不能无限大,必须明显小于地形的 generateAheadDistance(默认 50m)和
+/// despawnBehindDistance(默认 25m),否则采样点会落在地形还没生成/已经回收的区间——这层用的
+/// 镜头缩放范围(CameraDirectorSettings 的 minOrthoSize~maxOrthoSize)决定了最大可能需要的宽度,
+/// 只要镜头缩放没有离谱地超出正常范围就不会撞到这个上限。
+///
+/// 整个 Mesh 每帧都根据摄像机当前位置/视野重新生成(不是增量延伸/回收)——顶点数量本来就很少
+/// (通常一两百个)，每帧重建的开销可以忽略，换来的是镜头状态变化时这层能立刻跟上，不用维护
+/// 额外的延伸/回收状态。
 /// </summary>
 public class GroundForegroundLayer : MonoBehaviour
 {
-    [Tooltip("跟随的目标,用车身 Transform——这层的每个采样点都直接查真地形在对应 X 的实际高度，" +
-             "只用这个字段确定生成窗口跟到哪。")]
-    public Transform trackTarget;
+    [Tooltip("跟随的目标摄像机——采样窗口的中心点和实际需要覆盖多宽都从它的当前状态实时算，" +
+             "不用车身,因为镜头会有 look-ahead/阻尼偏移，跟车身不完全同步。")]
+    public Camera trackCamera;
     [Tooltip("查询实际地形高度用的地形生成器。")]
     public EndlessTerrainGenerator terrain;
 
     [Header("覆盖范围")]
-    [Tooltip("以车身为中心，左右各铺多宽(米)。必须明显小于地形的 generateAheadDistance(默认 50m)" +
-             "和 despawnBehindDistance(默认 25m)，否则采样点会落在地形还没生成/已经回收的区间。")]
+    [Tooltip("左右各铺多宽(米)的下限——实际生效宽度是这个值和\"镜头当前视野 + Edge Margin\"" +
+             "两者的较大值,镜头缩放变化不会让覆盖宽度跌破这个下限。")]
     public float halfWidth = 20f;
+    [Tooltip("在镜头实际能看到的边缘之外，再多铺多少米(米)——防止镜头缩放/look-ahead 变化的" +
+             "那一两帧里，网格边缘还没来得及跟上就已经进入可视范围。")]
+    public float edgeMargin = 5f;
     [Tooltip("采样间距(米)，越小曲线越平滑，但顶点数越多。")]
     public float sampleSpacing = 1f;
 
@@ -77,6 +88,7 @@ public class GroundForegroundLayer : MonoBehaviour
         if (settings == null) return;
 
         halfWidth = settings.halfWidth;
+        edgeMargin = settings.edgeMargin;
         sampleSpacing = settings.sampleSpacing;
         noiseScale = settings.noiseScale;
         hillHeight = settings.hillHeight;
@@ -92,22 +104,28 @@ public class GroundForegroundLayer : MonoBehaviour
         }
     }
 
-    public void Initialize(Transform bikeTransform, EndlessTerrainGenerator terrainGenerator)
+    public void Initialize(Camera camera, EndlessTerrainGenerator terrainGenerator)
     {
-        trackTarget = bikeTransform;
+        trackCamera = camera;
         terrain = terrainGenerator;
     }
 
     void LateUpdate()
     {
-        if (trackTarget == null || terrain == null) return;
-        RebuildMesh(trackTarget.position.x);
+        if (trackCamera == null || terrain == null) return;
+
+        // 镜头实际能看到的半宽(正交摄像机:orthographicSize 是半高，乘 aspect 换算成半宽)，
+        // 加安全余量之后跟配置的下限取较大值——镜头缩放越大，这个数越大，网格自动跟着铺宽。
+        float visibleHalfWidth = trackCamera.orthographicSize * trackCamera.aspect + edgeMargin;
+        float effectiveHalfWidth = Mathf.Max(halfWidth, visibleHalfWidth);
+
+        RebuildMesh(trackCamera.transform.position.x, effectiveHalfWidth);
     }
 
-    void RebuildMesh(float centerX)
+    void RebuildMesh(float centerX, float currentHalfWidth)
     {
-        int columns = Mathf.Max(2, Mathf.CeilToInt(halfWidth * 2f / Mathf.Max(sampleSpacing, 0.05f)) + 1);
-        float startX = centerX - halfWidth;
+        int columns = Mathf.Max(2, Mathf.CeilToInt(currentHalfWidth * 2f / Mathf.Max(sampleSpacing, 0.05f)) + 1);
+        float startX = centerX - currentHalfWidth;
 
         Vector3[] verts = new Vector3[columns * 2];
         for (int i = 0; i < columns; i++)
@@ -127,7 +145,7 @@ public class GroundForegroundLayer : MonoBehaviour
             }
             else
             {
-                groundY = trackTarget.position.y; // 极端兜底：开局第一帧地形可能还没来得及生成
+                groundY = trackCamera.transform.position.y; // 极端兜底：开局第一帧地形可能还没来得及生成
             }
 
             float noise = Mathf.PerlinNoise(worldX * noiseScale, 0f);

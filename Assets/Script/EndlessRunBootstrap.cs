@@ -56,7 +56,7 @@ public static class EndlessRunBootstrap
         terrain.OnGroundSampled += obstacleSpawner.HandleGroundSampled;
 
         terrain.Initialize(startPoint);
-        SetupGroundForegroundLayer(bike, terrain);
+        SetupGroundForegroundLayer(terrain);
 
         CrashDetector crashDetector = systems.AddComponent<CrashDetector>();
         crashDetector.bikeRigidbody = bike.bikeRigidbody != null ? bike.bikeRigidbody : bike.GetComponent<Rigidbody2D>();
@@ -202,14 +202,22 @@ public static class EndlessRunBootstrap
     }
 
     // 屏幕底部常驻的前景剪影层(GroundForegroundLayer)——纯装饰,不参与碰撞,
-    // 贴着真地形(EndlessTerrainGenerator)的实际高度走，不是贴着摄像机，
-    // 这样车起跳/镜头缩放的时候这层不会跟着一起跳，见该类注释里的取舍说明。
-    static void SetupGroundForegroundLayer(BikeController bike, EndlessTerrainGenerator terrain)
+    // 高度贴着真地形(EndlessTerrainGenerator)的实际值走(不是贴摄像机),车起跳/落地不会带着
+    // 这层一起跳；覆盖宽度贴着摄像机当前视野实时算(不是写死的常量),镜头变焦/look-ahead
+    // 变化都不会让这层来不及铺够宽，见该类注释里的取舍说明。
+    static void SetupGroundForegroundLayer(EndlessTerrainGenerator terrain)
     {
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null)
+        {
+            Debug.LogError("EndlessRunBootstrap: 场景里找不到主摄像机，不生成前景剪影层。");
+            return;
+        }
+
         GameObject foregroundObject = new GameObject("GroundForegroundLayer");
         GroundForegroundLayer foreground = foregroundObject.AddComponent<GroundForegroundLayer>();
         foreground.ApplySettings(FindSettings<GroundForegroundLayerSettings>());
-        foreground.Initialize(bike.transform, terrain);
+        foreground.Initialize(mainCamera, terrain);
     }
 
     static CameraDirector SetupCamera(BikeController bike, BikeDamageSystem damageSystem, LandingDetector landingDetector)

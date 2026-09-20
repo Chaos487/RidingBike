@@ -12,9 +12,12 @@ using UnityEngine;
 public class GroundForegroundLayerSettings : ScriptableObject
 {
     [Header("覆盖范围")]
-    [Tooltip("以车身为中心，左右各铺多宽(米)。必须明显小于地形的 generateAheadDistance(默认 50m)" +
-             "和 despawnBehindDistance(默认 25m)，否则采样点会落在地形还没生成/已经回收的区间。")]
+    [Tooltip("左右各铺多宽(米)的下限——实际生效宽度是这个值和\"镜头当前视野 + Edge Margin\"" +
+             "两者的较大值,镜头缩放变化不会让覆盖宽度跌破这个下限。")]
     public float halfWidth = 20f;
+    [Tooltip("在镜头实际能看到的边缘之外，再多铺多少米(米)——防止镜头缩放/look-ahead 变化的" +
+             "那一两帧里，网格边缘还没来得及跟上就已经进入可视范围。")]
+    public float edgeMargin = 5f;
     [Tooltip("采样间距(米)，越小曲线越平滑，但顶点数越多。")]
     public float sampleSpacing = 1f;
 
