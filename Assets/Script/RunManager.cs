@@ -34,6 +34,8 @@ public class RunManager : MonoBehaviour
     Text statusText;
     Text hpLabelText;
     Text bestDistanceText;
+    Text gearText;
+    GearManager gearManager;
     Image hpBarFill;
     TMP_Text hpValueText;
     GameObject hpBarRoot;
@@ -92,11 +94,12 @@ public class RunManager : MonoBehaviour
         FindUIReferences();
     }
 
-    public void Initialize(Transform bike, BikeDamageSystem bikeDamageSystem, BikeController controller)
+    public void Initialize(Transform bike, BikeDamageSystem bikeDamageSystem, BikeController controller, GearManager gearManagerRef)
     {
         bikeTransform = bike;
         damageSystem = bikeDamageSystem;
         bikeController = controller;
+        gearManager = gearManagerRef;
         startX = bikeTransform.position.x;
         damageSystem.OnFinalCrash += HandleCrash;
         damageSystem.OnHpChanged += HandlePartialDamage;
@@ -105,7 +108,20 @@ public class RunManager : MonoBehaviour
         // 开局先按满血刷一次血条文字,不然要等到第一次扣血才会显示"100/100"。
         UpdateHpBar(damageSystem.maxHp, damageSystem.maxHp);
 
+        // GearManager.Initialize() 在这之前已经从存档读过一次数量并广播过事件了，那时候
+        // RunManager 还没订阅、接不到——这里直接读它当前的值先显示一次，之后靠事件保持实时更新。
+        if (gearManager != null)
+        {
+            HandleGearCountChanged(gearManager.CurrentGearCount);
+            gearManager.OnGearCountChanged += HandleGearCountChanged;
+        }
+
         EnterStartGate();
+    }
+
+    void HandleGearCountChanged(int count)
+    {
+        if (gearText != null) gearText.text = $"齿轮: {count}";
     }
 
     /// <summary>开局前的静止画面:按住 Play 之后的初始状态就是开始界面，只多一个 Start 按钮——
@@ -149,6 +165,7 @@ public class RunManager : MonoBehaviour
         if (hpBarRoot != null) hpBarRoot.SetActive(visible);
         if (boostButton != null) boostButton.gameObject.SetActive(visible);
         if (bestDistanceText != null) bestDistanceText.gameObject.SetActive(visible);
+        if (gearText != null) gearText.gameObject.SetActive(visible);
     }
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
@@ -360,6 +377,7 @@ public class RunManager : MonoBehaviour
         statusText = FindText("StatusText");
         hpLabelText = FindText("HpLabelText");
         bestDistanceText = FindText("BestDistanceText");
+        gearText = FindText("GearText");
         hpBarFill = FindImage("HpBarRoot/HpBarBackground/HpBarFill");
         hpValueText = FindTMPText("HpBarRoot/HpValueText");
         Transform hpBarRootTransform = transform.Find("HpBarRoot");

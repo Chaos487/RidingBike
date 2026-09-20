@@ -67,8 +67,11 @@ public static class EndlessRunBootstrap
         damageSystem.ApplySettings(damageSettings);
         damageSystem.Initialize(bike, crashDetector);
 
+        GearManager gearManager = systems.AddComponent<GearManager>();
+        gearManager.Initialize();
+
         RunManager runManager = SetupRunManagerUI();
-        runManager.Initialize(bike.transform, damageSystem, bike);
+        runManager.Initialize(bike.transform, damageSystem, bike, gearManager);
 
         LandingDetector landingDetector = systems.AddComponent<LandingDetector>();
         landingDetector.ApplySettings(FindSettings<LandingDetectorSettings>());
@@ -87,14 +90,15 @@ public static class EndlessRunBootstrap
         CameraDirector cameraDirector = SetupCamera(bike, damageSystem, landingDetector);
         SetupGapFallHandler(systems, bike, terrain, damageSystem, damageSettings, cameraDirector);
         SetupAudio(bike, crashDetector, landingDetector, runManager);
-        SetupNodeSystem(systems, bike, damageSystem, runManager, terrain, obstacleSpawner);
+        NodeManager nodeManager = SetupNodeSystem(systems, bike, damageSystem, runManager, terrain, obstacleSpawner);
+        SetupGearSystem(systems, bike, terrain, gearManager, nodeManager);
     }
 
     // Roguelike Node 三选一系统(GitHub Issue #3 存档方案,现在以物理化 Station 呈现)——
     // 触发/安全区/减速进站/加速出站/选择/生效全部交给 NodeManager,这里只负责接线:
     // 把 Station 世界标记的地形引用、安全区反向查询接到断层/障碍物生成器上,
     // 把开始/结束两个时机点(OnGameStarted/OnFinalCrash)接到 NodeManager 对应的方法上。
-    static void SetupNodeSystem(GameObject systems, BikeController bike, BikeDamageSystem damageSystem,
+    static NodeManager SetupNodeSystem(GameObject systems, BikeController bike, BikeDamageSystem damageSystem,
         RunManager runManager, EndlessTerrainGenerator terrain, ObstacleSpawner obstacleSpawner)
     {
         StationMarkerSpawner markerSpawner = systems.AddComponent<StationMarkerSpawner>();
@@ -109,6 +113,27 @@ public static class EndlessRunBootstrap
 
         runManager.OnGameStarted += nodeManager.BeginRun;
         damageSystem.OnFinalCrash += nodeManager.HandleFinalCrash;
+
+        return nodeManager;
+    }
+
+    // 齿轮(游戏内货币)拾取系统——GearManager 管持久化数量,GearSpawner 沿赛道生成
+    // (跟 StationMarkerSpawner 一样轮询地形高度,不跟障碍物共用采样点,断层/Station 安全区都跳过)。
+    static void SetupGearSystem(GameObject systems, BikeController bike, EndlessTerrainGenerator terrain,
+        GearManager gearManager, NodeManager nodeManager)
+    {
+        GameObject gearPrefab = FindPrefab("Gear");
+        if (gearPrefab == null)
+        {
+            Debug.LogError("EndlessRunBootstrap: 找不到 Assets/Resources/Gear.prefab，不生成齿轮。");
+            return;
+        }
+
+        GearSpawner gearSpawner = systems.AddComponent<GearSpawner>();
+        gearSpawner.ApplySettings(FindSettings<GearSettings>());
+        gearSpawner.Initialize(bike.transform, terrain, gearPrefab, gearManager);
+
+        if (nodeManager != null) gearSpawner.isInSafeZone = nodeManager.IsInSafeZone;
     }
 
     // 音频是直接挂在场景里的 AudioManager(不是这里生成的，运行时只拿它的单例来接线)。

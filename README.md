@@ -74,6 +74,16 @@ Odyssey 的沙丘剪影)。不用 `BackgroundScroller` 的摄像机视差公式(
 天然跟着车一直往前铺,不需要额外的延伸/回收逻辑。**`sinkDepth`/颜色这些数值目前是占位,
 需要在 Play 模式里实际盯着调。**
 
+**齿轮(游戏内货币)**(`GearManager.cs` 管持久化 + `GearSpawner.cs` 生成 + `GearPickup.cs` 拾取 +
+`GearSettings.cs` 配置)
+骑行沿途生成可拾取的齿轮(`Assets/Resources/Gear.prefab`,单张 sprite),车身碰到即拾取,
+数量立刻存 `PlayerPrefs`(货币比"最远距离"这种纯记录更经不起丢,不等结算才存)并实时刷新
+右上角 UI。生成用跟 `StationMarkerSpawner` 一样"轮询地形高度"的手法,独立一套间隔/概率,
+不跟 `ObstacleSpawner` 共用采样点;断层和 Station 安全区都不生成。旋转视觉是经典的单图假 3D
+手法——只缩放 X 轴按 cos 曲线挤压(`1 → 0 → -1 → 0` 循环,不需要 sprite sheet),转到"背面"
+(缩放为负)时顺带调暗颜色模拟光照角度变化,外加一点上下浮动。**现在只有"加"没有"花",
+花的机制留给以后的 Roguelike 局外商店(GitHub #3 存档设计提过的方向)。**
+
 **音频框架**(`AudioManager.cs`,3.10 节)
 挂在场景里的一个独立物体上,六个可配置槽位(BGM/环境音/骑行中/落地/加速/摔车),
 每个槽位支持多音频随机或顺序播放、延迟触发、是否循环。**目前只是空的架子,场景里
