@@ -18,7 +18,7 @@ public enum EffectType
     JumpForceFlat,
     /// <summary>满血值 (BikeDamageSystem.maxHp),直接加/减一个固定值,当前血量跟着同步变化。</summary>
     MaxHpFlat,
-    /// <summary>巡航加速手感 (BikeController.cruiseMotorAcceleration/cruiseTorque),按百分比加成/减益。</summary>
+    /// <summary>巡航加速手感 (BikeController.cruiseAccelerationKmhPerSec/cruiseTorque),按百分比加成/减益。</summary>
     AccelerationPercent,
     /// <summary>氮气充能所需距离 (BikeController.boostRechargeDistance),按百分比缩短/拉长
     /// (正值=缩短=回能更快,负值=拉长=回能更慢)。</summary>

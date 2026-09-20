@@ -40,7 +40,7 @@ public static class NodeEffectSystem
                 damageSystem.ModifyMaxHp(effect.value);
                 break;
             case EffectType.AccelerationPercent:
-                bike.cruiseMotorAcceleration *= 1f + effect.value / 100f;
+                bike.cruiseAccelerationKmhPerSec *= 1f + effect.value / 100f;
                 bike.cruiseTorque *= 1f + effect.value / 100f;
                 break;
             case EffectType.BoostRechargePercent:

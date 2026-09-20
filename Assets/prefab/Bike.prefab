@@ -423,8 +423,8 @@ MonoBehaviour:
   backWheelJoint: {fileID: 1071903647423023620}
   frontWheelJoint: {fileID: 2091637169706335519}
   bikeRigidbody: {fileID: 4857637662962619861}
-  maxMotorSpeed: 2800
-  cruiseMotorAcceleration: 3000
+  maxMotorSpeedKmh: 160
+  cruiseAccelerationKmhPerSec: 220
   cruiseTorque: 2000
   driveDirection: -1
   baselineSpeedKmh: 25

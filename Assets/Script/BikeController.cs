@@ -13,10 +13,14 @@ public class BikeController : MonoBehaviour
     public Rigidbody2D bikeRigidbody;
 
     [Header("Drive (自动巡航，玩家不再手动控制前进/后退)")]
-    [Tooltip("最大电机角速度 (deg/s)。绝对值越大极速越高，需要大于\"按轮径换算出 maxSpeedKmh 所需的角速度\"，否则电机转速会先于车速封顶。电机始终朝这个转速全力驱动，实际车速由地形坡度和下面的保底/封顶共同决定。")]
-    public float maxMotorSpeed = 2800f;
-    [Tooltip("电机角加速度 (deg/s^2)，控制起步/爬坡时电机转速追赶目标值的平滑度。")]
-    public float cruiseMotorAcceleration = 3000f;
+    [Tooltip("电机全力驱动时对应的轮子线速度 (km/h)，运行时按实测轮子半径换算成电机真正在用的" +
+             "角速度(deg/s)——半径变了(换车轮贴图/改缩放)这个值不用跟着重算。需要明显大于下面" +
+             "Speed / Stability Limits 里的 Max Speed Kmh，否则电机转速会先于车速封顶，车速被电机拖累。")]
+    public float maxMotorSpeedKmh = 160f;
+    [Tooltip("电机追赶目标转速的加速度，换算成\"轮子线速度每秒能提升多少 (km/h/s)\"表示，同样按" +
+             "实测轮子半径实时换算成角加速度——不是车身实际线加速度(那还要看 Cruise Torque 够不够用)，" +
+             "只控制起步/爬坡时电机转速追赶目标值的平滑度。")]
+    public float cruiseAccelerationKmhPerSec = 220f;
     [Tooltip("巡航扭矩，决定电机能扛住多陡的坡、多快追回保底速度。过大会让车头翘起、轮子甩飞。")]
     public float cruiseTorque = 2000f;
     [Tooltip("电机方向，+1 或 -1。如果车反而往左开请改成 -1。")]
@@ -476,8 +480,14 @@ public class BikeController : MonoBehaviour
     {
         if (backWheelJoint == null) return;
 
+        // maxMotorSpeedKmh/cruiseAccelerationKmhPerSec 是给设计师看的"轮子线速度"单位，
+        // 电机马达实际吃的是角速度(deg/s)——按实测轮子半径每次都重新换算，而不是缓存一次，
+        // 这样 Play 模式下在 Inspector 里改这两个 km/h 字段能立刻看到效果，不用重进场景。
+        float maxMotorSpeedDegPerSec = LinearKmhToWheelDegPerSec(maxMotorSpeedKmh, backWheelRadius);
+        float cruiseMotorAccelerationDegPerSec = LinearKmhToWheelDegPerSec(cruiseAccelerationKmhPerSec, backWheelRadius);
+
         // 始终全力朝前巡航，不再读玩家输入——实际车速由地形坡度、保底下限、封顶上限共同决定。
-        float targetSpeed = driveDirection * maxMotorSpeed;
+        float targetSpeed = driveDirection * maxMotorSpeedDegPerSec;
 
         // 已经到达速度上限时不再加速 —— 否则轮子继续狂转、车身被限速，
         // 二者速度不匹配会把 WheelJoint 的悬挂拉到极限，视觉上轮子飞出去。
@@ -490,7 +500,7 @@ public class BikeController : MonoBehaviour
         currentMotorSpeed = Mathf.MoveTowards(
             currentMotorSpeed,
             targetSpeed,
-            cruiseMotorAcceleration * Time.fixedDeltaTime
+            cruiseMotorAccelerationDegPerSec * Time.fixedDeltaTime
         );
 
         JointMotor2D motor = backWheelJoint.motor;
@@ -498,6 +508,15 @@ public class BikeController : MonoBehaviour
         motor.maxMotorTorque = cruiseTorque;
         backWheelJoint.motor = motor;
         backWheelJoint.useMotor = true;
+    }
+
+    /// <summary>把"轮子线速度 (km/h)"换算成对应的电机角速度 (deg/s)。轮子半径为 0(比如没找到
+    /// CircleCollider2D)时兜底成一个很小的值，避免除零导致角速度炸成无穷大。</summary>
+    static float LinearKmhToWheelDegPerSec(float kmh, float wheelRadius)
+    {
+        float linearMetersPerSec = kmh / 3.6f;
+        float angularRadPerSec = linearMetersPerSec / Mathf.Max(wheelRadius, 0.01f);
+        return angularRadPerSec * Mathf.Rad2Deg;
     }
 
     void ApplyBalance()
