@@ -38,6 +38,7 @@ public class GearSpawner : MonoBehaviour
     public Func<float, bool> isInSafeZone;
 
     float pendingX;
+    int pendingGroupSize = -1; // -1 = 还没为下一组预先掷出组内数量
 
     public void ApplySettings(GearSettings settings)
     {
@@ -70,9 +71,21 @@ public class GearSpawner : MonoBehaviour
     void Update()
     {
         if (trackTarget == null || terrain == null || gearPrefab == null) return;
-        if (!terrain.TryGetHeightAt(pendingX, out _)) return; // 等这一组的起点生成出来再处理整组
 
-        if (UnityEngine.Random.value <= spawnChance) SpawnGroup(pendingX);
+        // 组内数量提前掷好、缓存住,不要每帧重新掷——不然下面算"组的最远端在哪"会跟着每帧变,
+        // 永远等不到一个稳定的目标点。
+        if (pendingGroupSize < 0) pendingGroupSize = UnityEngine.Random.Range(minGroupSize, maxGroupSize + 1); // Range(int,int) 右开区间,+1 让 maxGroupSize 也能选到
+
+        // 必须等整组(包括最靠后那一个)都在地形已生成范围内才能开始摆放，只等组的起点是不够的——
+        // 组跨度可能有好几米(maxGroupSize * intraGroupSpacing),起点刚好够到的那一帧，
+        // 地形前沿往往还没推进到组尾那么远，之前就是因为只查起点，组尾那几个单帧查询失败后
+        // 直接被跳过且不会重试，出现"配置了至少 3 个、实际只生成 1 个"的问题。
+        float groupEndX = pendingX + (pendingGroupSize - 1) * intraGroupSpacing;
+        if (!terrain.TryGetHeightAt(groupEndX, out _)) return;
+
+        if (UnityEngine.Random.value <= spawnChance) SpawnGroup(pendingX, pendingGroupSize);
+
+        pendingGroupSize = -1;
         ScheduleNext(pendingX);
     }
 
@@ -81,9 +94,8 @@ public class GearSpawner : MonoBehaviour
         pendingX = fromX + UnityEngine.Random.Range(minSpawnInterval, maxSpawnInterval);
     }
 
-    void SpawnGroup(float groupStartX)
+    void SpawnGroup(float groupStartX, int count)
     {
-        int count = UnityEngine.Random.Range(minGroupSize, maxGroupSize + 1); // Range(int,int) 右开区间,+1 让 maxGroupSize 也能选到
         for (int i = 0; i < count; i++)
         {
             TrySpawnAt(groupStartX + i * intraGroupSpacing);
