@@ -45,11 +45,12 @@ public class ScreenBlurFeature : ScriptableRendererFeature
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        // 临时诊断日志,排查完这一轮就删掉——先确认这个 Feature 到底有没有被调用、
-        // pass 是不是成功建出来了(blurShader 找不到/建 Material 失败都会导致 pass==null)、
-        // ScreenBlurState 是不是真的算出"有弹窗开着"。
-        Debug.Log($"[ScreenBlur] AddRenderPasses: pass={(pass != null ? "ok" : "NULL")}, BlurActive={ScreenBlurState.BlurActive}");
-
+        // 只给真正的 Game 摄像机跑——Editor 里 Scene 视图自己的摄像机也走这同一个 Renderer,
+        // 会用它自己的分辨率把下面 ScreenBlurPass 唯一共用的那张 finalTexture 重新分配一遍、
+        // 塞进不相关的内容。两台摄像机谁后画谁把 _ScreenBlurTexture 这个全局贴图覆盖成自己的
+        // 结果,顺序不固定——这才是实测"日志显示两种分辨率交替出现、画面却一直没模糊"的真正
+        // 原因:Game 摄像机算出来的正确模糊贴图,时不时被 Scene 视图摄像机的结果覆盖掉了。
+        if (renderingData.cameraData.cameraType != CameraType.Game) return;
         if (pass == null || !ScreenBlurState.BlurActive) return;
         renderer.EnqueuePass(pass);
     }
@@ -96,17 +97,11 @@ class ScreenBlurPass : ScriptableRenderPass
         UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
 
         TextureHandle source = resourceData.activeColorTexture;
-        if (!source.IsValid())
-        {
-            Debug.LogWarning("[ScreenBlur] RecordRenderGraph: activeColorTexture 无效,本帧直接跳过,没有更新模糊贴图");
-            return;
-        }
+        if (!source.IsValid()) return;
 
         GraphicsFormat format = cameraData.cameraTargetDescriptor.graphicsFormat;
         int screenWidth = cameraData.cameraTargetDescriptor.width;
         int screenHeight = cameraData.cameraTargetDescriptor.height;
-
-        Debug.Log($"[ScreenBlur] RecordRenderGraph: 正常记录,format={format}, screen={screenWidth}x{screenHeight}");
 
         // 全部用显式的整数宽高算,不用 TextureDesc(Vector2 scale) 那种"相对 RTHandleSystem
         // 参考尺寸缩放"的写法——那种缩放出来的实际像素尺寸跟这里手动算的 finalTexture 尺寸
