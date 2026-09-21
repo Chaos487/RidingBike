@@ -54,6 +54,11 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   轮子 `CircleCollider2D` 用的 `WheelMaterial.physicsMaterial2D` 弹性系数(`bounciness`)一直是 0.1，导致车身即便静止不动也会持续小幅弹跳/俯仰震荡——已归零，同时把一个越界的 `m_BounceCombine` 枚举值(4，Unity 合法范围是 0~3)顺手改回合法值
 -   `EndlessRunBootstrap.FindPrefab()` 原来用 `AssetDatabase.FindAssets` 的模糊文本搜索按名字找 `Assets/prefab` 下的预制体，"Ground" 会模糊命中同目录下的 "Background.prefab"（Back-**Ground**），导致地形一度被错误实例化成背景预制体——改成精确文件名匹配
 
+**2026-09-21 补充（不在 09-17 快照核实范围内，是之后新增的）：**
+
+-   **齿轮（游戏内货币）**（`GearManager.cs`/`GearSpawner.cs`/`GearPickup.cs`/`GearSettings.cs`）：已实现并接入 `EndlessRunBootstrap`，见 3.13 节。只有"加"没有"花"，花的机制留给以后的局外商店
+-   **开始画面 / 主菜单**（`MainMenuController.cs`）：已实现并接入 `EndlessRunBootstrap`，见 3.14 节。Menu 入口下的 Goals/Settings/Language/Stats 四个 Tab **目前都只是占位文字**，没有接任何真实数据/逻辑
+
 ------------------------------------------------------------------------
 
 # 1. 核心玩法
@@ -316,6 +321,50 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
     那一版专用的 `RunManager` 的 `VoidPromptText` 提示、`CameraDirector.ReattachFollow`
     (复活后重新接回跟随)、`BikeDamageSystem.ApplyDamage`(非致命扣血)都已经删掉；
     `DetachFollow` 留下来了，但语义变了(不再是"暂停跟随等复活"，是"停止跟随到此为止")
+
+------------------------------------------------------------------------
+
+## 3.13 齿轮（游戏内货币）`GearManager.cs` + `GearSpawner.cs` + `GearPickup.cs` + `GearSettings.cs`
+
+-   沿赛道随机生成可拾取的齿轮(`Assets/Resources/Gear.prefab`，单张 sprite，不是 sprite
+    sheet)，车身碰到(`WheelContactSensor`)即拾取
+-   生成用跟 `StationMarkerSpawner` 一样"轮询地形高度生成到目标 X"的手法；每个生成点不是
+    放单个齿轮，而是放一组，组内数量(`minGroupSize`~`maxGroupSize`)、组内间距
+    (`intraGroupSpacing`)可调，组与组之间的间隔/出现概率才是
+    `minSpawnInterval`/`maxSpawnInterval`/`spawnChance` 管的
+-   断层、Station 安全区、已生成的障碍物附近(`obstacleAvoidMargin`，反向查询
+    `ObstacleSpawner.IsNearObstacle`)都会跳过——只跳过组里命中的那几个齿轮，不影响同一组
+    其他位置正常生成，也不会卡住整条生成链
+-   拾取数量立刻存 `PlayerPrefs`(`RidingBike_GearCount`)——不等结算才存，货币比"最远距离"
+    这种纯记录更经不起丢
+-   右上角 UI 实时显示(`GearText`)，`GearManager.OnGearCountChanged` 事件驱动，
+    `RunManager` 在 `Initialize()` 时先读一次当前值再订阅事件(`GearManager.Initialize()`
+    在 `RunManager` 创建之前就已经从存档读完、广播过一次事件了，那次广播 `RunManager`
+    接不到)
+-   视觉是经典单图假 3D 旋转——只缩放 X 轴按 cos 曲线挤压(`1 → 0 → -1 → 0` 循环，不需要
+    sprite sheet)，转到"背面"(缩放为负)时顺带把颜色调暗一点模拟光照角度变化，外加一点
+    上下浮动
+-   现在只有"加"没有"花"，花的机制留给以后的局外商店(见 17 节局外 Meta Progression、
+    [GitHub #3](https://github.com/Chaos487/RidingBike/issues/3))
+
+------------------------------------------------------------------------
+
+## 3.14 开始画面 / 主菜单 `MainMenuController.cs`
+
+-   开始前不是单独一个不透明的主菜单画面，是把原来的"Start"按钮换成铺满全屏、完全透明
+    的点击层("tap to start")——背后的骑行场景(地形/车)还是能看到，只是暂停着，参考
+    Alto's Odyssey 开始画面的手感
+-   左上角一个 Menu 入口，点开是一个几乎不透明的面板，顶部横排 Goals/Settings/
+    Language/Stats 四个 Tab 切换(选中的加粗变白，其余灰色)，右下角 Back 按钮退回开始
+    画面
+-   **四个 Tab 目前都只是占位文字**，没有接任何真实数据/逻辑——存档进度(Goals)、
+    音量/暂停位置这些设置项(Settings)、多语言切换(Language)、跑分统计(Stats)都还没做
+-   Menu 入口只在"开始前"这个阶段有意义：`RunManager.OnGameStarted` 一触发(玩家点了
+    "tap to start")就自动把 Menu 入口和面板一起收起来，暂停中/结算画面目前都没有 Menu
+    入口
+-   跟 `RunManager` 一样按名字在 `EndlessRunCanvas.prefab` 里 `Find` 子物体，改预制体
+    层级/改物体名字的话这个脚本里对应的路径也要跟着改；两个脚本一起挂在 Canvas 根节点上
+    (`EndlessRunBootstrap.SetupRunManagerUI`)
 
 ------------------------------------------------------------------------
 
