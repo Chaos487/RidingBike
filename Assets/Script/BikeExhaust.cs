@@ -6,6 +6,11 @@ using UnityEngine;
 /// 组件上调,这个脚本只管"什么时候喷、喷多猛"——通过 EmissionModule.enabled/
 /// rateOverTimeMultiplier 控制,不直接碰粒子系统的其它任何字段。
 ///
+/// rateOverTimeMultiplier 在曲线模式是 Constant(默认)时直接就是 Rate over Time 那个常量本身,
+/// 不是叠在它上面的独立倍率——所以不能直接把 0.3~2.2 这种系数写进去(那样等于把美术配的密度
+/// 直接覆盖成"每秒 0.3~2.2 个"),必须先在 Initialize() 里把美术配的原始值读出来存一份
+/// (baseRateOverTime),每帧拿它乘系数再写回去。
+///
 /// 预制体放在 Assets/Resources/ 而不是 Assets/prefab/ 是因为 EndlessRunBootstrap.FindPrefab
 /// 的 Editor 内搜索(AssetDatabase)在设备构建里会被编译掉，只有 Resources.Load 兜底分支能在
 /// 真机上生效——这个项目之前踩过一次坑(iOS 空白屏，根因就是资产没放在 Resources 下),
@@ -24,6 +29,7 @@ public class BikeExhaust : MonoBehaviour
     BikeController bike;
     ParticleSystem particles;
     ParticleSystem.EmissionModule emission;
+    float baseRateOverTime = 1f;
 
     public void ApplySettings(BikeExhaustSettings settings)
     {
@@ -47,7 +53,17 @@ public class BikeExhaust : MonoBehaviour
 
         particles = instance.GetComponent<ParticleSystem>();
         if (particles == null) particles = instance.GetComponentInChildren<ParticleSystem>();
-        if (particles != null) emission = particles.emission;
+        if (particles != null)
+        {
+            emission = particles.emission;
+
+            // rateOverTimeMultiplier 不是叠在"美术在 Inspector 里配的 Rate over Time"上面的
+            // 独立倍率——曲线模式是 Constant(默认)时，这个字段直接就是那个常量本身，读/写的是
+            // 同一个值。这里先把美术配的原始值读出来存一份，往后每帧只拿它乘我们自己的系数再写
+            // 回去，不然会直接把 0.3~2.2 这种系数当成"每秒几个粒子"写进去，把原本配的密度直接
+            // 覆盖掉——之前就是这样，导致喷得极稀疏。
+            baseRateOverTime = Mathf.Max(emission.rateOverTimeMultiplier, 0.01f);
+        }
     }
 
     void Update()
@@ -61,8 +77,9 @@ public class BikeExhaust : MonoBehaviour
         if (!shouldEmit) return;
 
         float speedRatio = Mathf.Clamp01(speedMs / Mathf.Max(bike.MaxLinearSpeed, 0.01f));
-        emission.rateOverTimeMultiplier = bike.IsBoosting
+        float multiplier = bike.IsBoosting
             ? boostEmissionMultiplier
             : Mathf.Lerp(minEmissionMultiplier, maxEmissionMultiplier, speedRatio);
+        emission.rateOverTimeMultiplier = baseRateOverTime * multiplier;
     }
 }
