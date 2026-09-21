@@ -26,6 +26,8 @@ public class GearSettings : ScriptableObject
     [Header("位置")]
     [Tooltip("齿轮悬浮在地面上方多高(米)。")]
     public float heightAboveGround = 1.2f;
+    [Tooltip("跟障碍物的水平距离小于这个值就跳过,避免齿轮生成在障碍物身上或紧贴着障碍物。")]
+    public float obstacleAvoidMargin = 1f;
 
     [Header("视觉(单张图的假 3D 旋转,cos 缩放挤压)")]
     [Tooltip("旋转速度,数值越大转得越快。")]

@@ -36,6 +36,22 @@ public class ObstacleSpawner : MonoBehaviour
     Material sharedMaterial;
     float lastObstacleX = float.NegativeInfinity;
 
+    // 障碍物一旦生成就不会被销毁(见类注释),这份列表会随一局的时长单调增长；
+    // 但障碍物本来就按 6~12 米一个的间隔生成,就算跑几公里也就几百个 float,线性扫描的
+    // 开销可以忽略,不值得为此另外搭一套按 X 分桶的空间索引。
+    readonly System.Collections.Generic.List<float> obstacleXPositions = new System.Collections.Generic.List<float>();
+
+    /// <summary>给其它生成器(比如 GearSpawner)用的反向查询:x 是否落在任意一个已生成障碍物
+    /// 的 margin 范围内。margin 由调用方按自己的碰撞体大小传入,这里不关心"多近算太近"。</summary>
+    public bool IsNearObstacle(float x, float margin)
+    {
+        for (int i = 0; i < obstacleXPositions.Count; i++)
+        {
+            if (Mathf.Abs(obstacleXPositions[i] - x) <= margin) return true;
+        }
+        return false;
+    }
+
     void Awake()
     {
         Shader shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
@@ -69,6 +85,7 @@ public class ObstacleSpawner : MonoBehaviour
 
         SpawnObstacle(groundPoint, slopeAngleDeg);
         lastObstacleX = groundPoint.x;
+        obstacleXPositions.Add(groundPoint.x);
     }
 
     void SpawnObstacle(Vector2 groundPos, float groundAngleDeg)

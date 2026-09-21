@@ -91,7 +91,7 @@ public static class EndlessRunBootstrap
         SetupGapFallHandler(systems, bike, terrain, damageSystem, damageSettings, cameraDirector);
         SetupAudio(bike, crashDetector, landingDetector, runManager);
         NodeManager nodeManager = SetupNodeSystem(systems, bike, damageSystem, runManager, terrain, obstacleSpawner);
-        SetupGearSystem(systems, bike, terrain, gearManager, nodeManager);
+        SetupGearSystem(systems, bike, terrain, gearManager, nodeManager, obstacleSpawner);
     }
 
     // Roguelike Node 三选一系统(GitHub Issue #3 存档方案,现在以物理化 Station 呈现)——
@@ -120,7 +120,7 @@ public static class EndlessRunBootstrap
     // 齿轮(游戏内货币)拾取系统——GearManager 管持久化数量,GearSpawner 沿赛道生成
     // (跟 StationMarkerSpawner 一样轮询地形高度,不跟障碍物共用采样点,断层/Station 安全区都跳过)。
     static void SetupGearSystem(GameObject systems, BikeController bike, EndlessTerrainGenerator terrain,
-        GearManager gearManager, NodeManager nodeManager)
+        GearManager gearManager, NodeManager nodeManager, ObstacleSpawner obstacleSpawner)
     {
         GameObject gearPrefab = FindPrefab("Gear");
         if (gearPrefab == null)
@@ -134,6 +134,7 @@ public static class EndlessRunBootstrap
         gearSpawner.Initialize(bike.transform, terrain, gearPrefab, gearManager);
 
         if (nodeManager != null) gearSpawner.isInSafeZone = nodeManager.IsInSafeZone;
+        gearSpawner.obstacleSpawner = obstacleSpawner;
     }
 
     // 音频是直接挂在场景里的 AudioManager(不是这里生成的，运行时只拿它的单例来接线)。

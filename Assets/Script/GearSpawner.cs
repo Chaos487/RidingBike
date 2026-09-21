@@ -3,15 +3,18 @@ using UnityEngine;
 
 /// <summary>
 /// 沿赛道生成齿轮拾取物——跟 StationMarkerSpawner 同一个"轮询地形生成到目标 X 才摆放"的手法,
-/// 但用自己独立的一套间隔/概率,不跟 ObstacleSpawner 共用 OnGroundSampled 那个采样点,
-/// 避免两者偶尔挤在同一个位置。每个生成点不是放单个齿轮,而是放一组(数量在
+/// 但用自己独立的一套间隔/概率,不跟 ObstacleSpawner 共用 OnGroundSampled 那个采样点。
+/// 两者的生成点是独立随机的,单靠"不共用采样点"并不能保证不挤在一起,所以额外用
+/// ObstacleSpawner.IsNearObstacle 做反向查询,离已生成的障碍物太近(obstacleAvoidMargin 内)
+/// 就跳过。每个生成点不是放单个齿轮,而是放一组(数量在
 /// minGroupSize~maxGroupSize 之间随机,组内相邻齿轮间距 intraGroupSpacing),
 /// minSpawnInterval/maxSpawnInterval/spawnChance 管的是"这一组"整体的间隔/出现概率,
 /// 不是组内单个齿轮的。
 ///
-/// 断层(Gap)、Station 安全区(减速进站/加速出站那一段)、地形还没生成到的位置都不生成——
-/// 前者是因为地面在深坑底部摆一个齿轮画面很怪，安全区是想让那一段路保持视觉干净。这三种情况
-/// 只跳过组里命中的那几个齿轮,不影响同一组里其他位置正常生成,也不会卡住整条生成链。
+/// 断层(Gap)、Station 安全区(减速进站/加速出站那一段)、障碍物附近、地形还没生成到的位置
+/// 都不生成——断层是因为地面在深坑底部摆一个齿轮画面很怪，安全区是想让那一段路保持视觉干净，
+/// 障碍物附近是避免齿轮跟障碍物视觉重叠或挡住判定。这几种情况只跳过组里命中的那几个齿轮,
+/// 不影响同一组里其他位置正常生成,也不会卡住整条生成链。
 /// </summary>
 public class GearSpawner : MonoBehaviour
 {
@@ -22,6 +25,7 @@ public class GearSpawner : MonoBehaviour
     int maxGroupSize = 5;
     float intraGroupSpacing = 1.5f;
     float heightAboveGround = 1.2f;
+    float obstacleAvoidMargin = 1f;
     float spinSpeed = 3f;
     bool darkenBackFace = true;
     float backFaceBrightness = 0.6f;
@@ -37,6 +41,10 @@ public class GearSpawner : MonoBehaviour
     /// 视为永远不在安全区内,不影响齿轮照常生成。</summary>
     public Func<float, bool> isInSafeZone;
 
+    /// <summary>障碍物反向查询(ObstacleSpawner.IsNearObstacle),避免齿轮生成在障碍物身上或
+    /// 紧贴着障碍物。为空(没接线)时视为永远没有障碍物冲突,不影响齿轮照常生成。</summary>
+    public ObstacleSpawner obstacleSpawner;
+
     float pendingX;
     int pendingGroupSize = -1; // -1 = 还没为下一组预先掷出组内数量
 
@@ -51,6 +59,7 @@ public class GearSpawner : MonoBehaviour
         maxGroupSize = settings.maxGroupSize;
         intraGroupSpacing = settings.intraGroupSpacing;
         heightAboveGround = settings.heightAboveGround;
+        obstacleAvoidMargin = settings.obstacleAvoidMargin;
         spinSpeed = settings.spinSpeed;
         darkenBackFace = settings.darkenBackFace;
         backFaceBrightness = settings.backFaceBrightness;
@@ -107,6 +116,7 @@ public class GearSpawner : MonoBehaviour
         if (!terrain.TryGetHeightAt(x, out float groundY)) return;
         if (terrain.TryGetGapAt(x, out _, out _)) return;
         if (isInSafeZone != null && isInSafeZone(x)) return;
+        if (obstacleSpawner != null && obstacleSpawner.IsNearObstacle(x, obstacleAvoidMargin)) return;
 
         GameObject instance = UnityEngine.Object.Instantiate(gearPrefab, new Vector3(x, groundY + heightAboveGround, 0f), Quaternion.identity);
         GearPickup pickup = instance.GetComponent<GearPickup>();
