@@ -60,6 +60,7 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   **开始画面 / 主菜单**（`MainMenuController.cs`）：已实现并接入 `EndlessRunBootstrap`，见 3.14 节。Menu 入口下的 Goals/Settings/Language/Stats 四个 Tab **目前都只是占位文字**，没有接任何真实数据/逻辑
 -   **骑行中暂停**（`PauseController.cs`，`RunManager.TogglePause()`）：已实现并接入 `EndlessRunBootstrap`，见 3.15 节。左下角按钮/`Esc` 键触发，面板复用开始画面 Menu 同一套 `TabGroupController`（这次连带把 Tab 逻辑抽出来给两处共用了）；Home/Restart 现在都是"重开场景"，Photo Mode 没做
 -   **开场引入动画**（`CameraDirector.EnterIntroFraming`/`PlayIntroReveal`）：已实现，见 3.6 节末尾补充的一条。tap to start 画面车藏在镜头外，点击后车从画面外滑进来接上正常骑行，纯镜头偏移技巧，车身物理状态没被动过
+-   **尾气/扬尘粒子效果**（`BikeExhaust.cs`/`BikeExhaustSettings.cs`）：代码已接入 `EndlessRunBootstrap`，见 3.16 节。**`Assets/Resources/ExhaustTrail.prefab` 这份粒子预制体还没有人做**，找不到就跳过、只打一条 Warning，等美术把预制体放上去就能直接看到效果，不用再改代码
 
 ------------------------------------------------------------------------
 
@@ -408,6 +409,27 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   摔车结算(`RunManager.OnRunEnded`，新增事件，`HandleCrash` 判死那一刻触发)会把暂停
     按钮和面板一起收起来——正常情况下摔车不可能发生在暂停中(暂停时物理和输入都停了)，
     这里只是保险
+
+------------------------------------------------------------------------
+
+## 3.16 尾气/扬尘粒子效果 `BikeExhaust.cs` + `BikeExhaustSettings.cs`
+
+-   挂在车身根节点(`Bike`)上，实例化 `Assets/Resources/ExhaustTrail.prefab`——一个
+    `ParticleSystem`，视觉参数(形状/颜色/大小/生命周期)完全由美术在预制体上调，脚本只管
+    "什么时候喷、喷多猛"，只碰 `EmissionModule.enabled`/`rateOverTimeMultiplier` 这两个字段
+-   挂点是车身根节点而不是后轮——后轮是真实物理体，转动很快，粒子系统的发射方向会跟着
+    乱转；车身根节点转得慢得多(只有上下坡带来的姿态变化)，喷口方向更稳定，效果上也更
+    合理(排气管本来就是装在车架上，不是装在轮子上)
+-   触发条件：`BikeController.IsWheelGrounded` 且车速超过 `minSpeedKmhForEmission`(默认
+    3km/h)——静止/腾空都不喷
+-   强度：按车速在 `minEmissionMultiplier`~`maxEmissionMultiplier` 之间插值，Boost 时直接
+    覆盖成 `boostEmissionMultiplier`(不等车速真的追上去，按下那一下就该有反应，跟
+    `CameraDirector.UpdateZoom` 里 Boost 直接拉满目标是同一个思路)
+-   **预制体现在还没有人做**——找不到就在 `EndlessRunBootstrap` 里打一条 `Debug.LogWarning`
+    直接跳过，不影响其它系统。预制体要放在 `Assets/Resources/`（不是 `Assets/prefab/`），
+    因为 `FindPrefab` 的 Editor 内 `AssetDatabase` 搜索在真机构建里会被编译掉，只有
+    `Resources.Load` 兜底分支在真机上生效——这个项目之前在 iOS 上因为资产没放
+    Resources 下出过一次空白屏的坑（见第 0 节），这次直接按已经验证过的路子走
 
 ------------------------------------------------------------------------
 

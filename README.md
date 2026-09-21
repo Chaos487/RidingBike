@@ -97,6 +97,12 @@ Odyssey 的沙丘剪影)。不用 `BackgroundScroller` 的摄像机视差公式(
 天然跟着车一直往前铺,不需要额外的延伸/回收逻辑。**`sinkDepth`/颜色这些数值目前是占位,
 需要在 Play 模式里实际盯着调。**
 
+**尾气/扬尘粒子效果**(`BikeExhaust.cs` + `BikeExhaustSettings.cs`)
+挂在车身根节点上,实例化 `Assets/Resources/ExhaustTrail.prefab`(一个 `ParticleSystem`,视觉
+参数——形状/颜色/大小/生命周期——完全由美术在预制体上调,脚本只管"什么时候喷、喷多猛"：
+接地且车速超过阈值才喷,喷发强度按车速插值、Boost 时额外拉满)。**这个预制体现在还没有人
+做**,`EndlessRunBootstrap` 找不到就跳过、只打一条 Warning,不影响其它系统——纯装饰功能。
+
 **齿轮(游戏内货币)**(`GearManager.cs` 管持久化 + `GearSpawner.cs` 生成 + `GearPickup.cs` 拾取 +
 `GearSettings.cs` 配置)
 骑行沿途生成可拾取的齿轮(`Assets/Resources/Gear.prefab`,单张 sprite),车身碰到即拾取,

@@ -44,6 +44,7 @@ public static class EndlessRunBootstrap
         EndlessRunSettings runSettings = FindSettings<EndlessRunSettings>();
 
         SetupParallaxBackground(bike);
+        SetupBikeExhaust(bike);
 
         GameObject systems = new GameObject("EndlessRunSystems");
 
@@ -246,6 +247,22 @@ public static class EndlessRunBootstrap
         {
             layer.trackTarget = trackTarget;
         }
+    }
+
+    // 车身尾气/扬尘粒子效果——纯装饰,找不到预制体就跳过,不影响其它系统。预制体放在
+    // Assets/Resources/(不是 Assets/prefab/),原因见 BikeExhaust.cs 顶部注释。
+    static void SetupBikeExhaust(BikeController bike)
+    {
+        GameObject exhaustPrefab = FindPrefab("ExhaustTrail");
+        if (exhaustPrefab == null)
+        {
+            Debug.LogWarning("EndlessRunBootstrap: 找不到 Assets/Resources/ExhaustTrail.prefab，不生成尾气效果(纯装饰，不影响其它系统)。");
+            return;
+        }
+
+        BikeExhaust exhaust = bike.gameObject.AddComponent<BikeExhaust>();
+        exhaust.ApplySettings(FindSettings<BikeExhaustSettings>());
+        exhaust.Initialize(bike, exhaustPrefab);
     }
 
     // 屏幕底部常驻的前景剪影层(GroundForegroundLayer)——纯装饰,不参与碰撞,
