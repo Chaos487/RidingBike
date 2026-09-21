@@ -176,7 +176,14 @@ public static class EndlessRunBootstrap
 
         GameObject canvasInstance = Object.Instantiate(canvasPrefab);
         canvasInstance.name = canvasPrefab.name;
-        return canvasInstance.AddComponent<RunManager>();
+        RunManager runManager = canvasInstance.AddComponent<RunManager>();
+
+        // 开始画面左上角的 Menu 入口(Goals/Settings/Language/Stats 四个占位 Tab)——骑行真正
+        // 开始后就没用了,接到 RunManager.OnGameStarted 上让它自己收起来。
+        MainMenuController mainMenu = canvasInstance.AddComponent<MainMenuController>();
+        runManager.OnGameStarted += mainMenu.HandleGameStarted;
+
+        return runManager;
     }
 
     // 地形几何体是运行时按曲线生成的，没法预先摆好，但视觉(材质/贴图)可以在 Editor 里调——
