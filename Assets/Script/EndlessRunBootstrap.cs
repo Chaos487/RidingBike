@@ -199,11 +199,19 @@ public static class EndlessRunBootstrap
         // 改成 Screen Space - Camera、挂上主摄像机，让这个 Canvas 也走摄像机的渲染路径。
         // 这个引用没法存进预制体里——Camera 是场景里的物体，不属于这份 Canvas 预制体自己的
         // 层级，只能在这里运行时接。
+        // Canvas.sortingOrder/sortingLayerID 只用来跟"其它 Canvas"比前后，不会跟场景里的
+        // SpriteRenderer/MeshRenderer(比如 GroundForegroundLayer)参与同一套排序——Screen
+        // Space - Camera 模式下 UI 是不是盖得住世界空间的东西，靠的是真实的空间深度:Canvas
+        // 被摆在摄像机前方 planeDistance 这么远，跟场景里其它东西比谁离摄像机更近。默认
+        // planeDistance=100 比游戏内容本身(摄像机在 z=-10，内容大致在 z=0，离摄像机约 10)
+        // 还远，所以会被挡住。改小到 2(远大于摄像机 near clip plane 0.3，又比游戏内容近得多)，
+        // UI 就稳稳贴在镜头前面，不用去手动调地形前景层这类世界空间物体的 Z 来"躲" UI。
         Canvas canvas = canvasInstance.GetComponent<Canvas>();
         if (canvas != null)
         {
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
             canvas.worldCamera = Camera.main;
+            canvas.planeDistance = 2f;
         }
 
         RunManager runManager = canvasInstance.AddComponent<RunManager>();
