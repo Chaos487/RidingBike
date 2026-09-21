@@ -108,14 +108,28 @@ class ScreenBlurPass : ScriptableRenderPass
 
         Debug.Log($"[ScreenBlur] RecordRenderGraph: 正常记录,format={format}, screen={screenWidth}x{screenHeight}");
 
-        EnsureFinalTexture(screenWidth / 2, screenHeight / 2, format);
+        // 全部用显式的整数宽高算,不用 TextureDesc(Vector2 scale) 那种"相对 RTHandleSystem
+        // 参考尺寸缩放"的写法——那种缩放出来的实际像素尺寸跟这里手动算的 finalTexture 尺寸
+        // 不一定严格相等(哪怕理论上都是"一半"，取整方式、参考尺寸本身是否同步都可能有一两像素
+        // 的出入)，Render Graph 校验最后一趟写入 finalTexture 时两边尺寸对不上，会直接报
+        // "Attachments in renderpass do not match!" 然后整个 Execute() 直接抛异常、什么都没画出来
+        // ——这正是之前一直是纯黑的真正原因。改成全链路统一用同一套整数除法算出来的显式尺寸，
+        // 保证严丝合缝。
+        int halfW = Mathf.Max(screenWidth / 2, 4);
+        int halfH = Mathf.Max(screenHeight / 2, 4);
+        int quarterW = Mathf.Max(screenWidth / 4, 4);
+        int quarterH = Mathf.Max(screenHeight / 4, 4);
+        int eighthW = Mathf.Max(screenWidth / 8, 4);
+        int eighthH = Mathf.Max(screenHeight / 8, 4);
+
+        EnsureFinalTexture(halfW, halfH, format);
         TextureHandle finalHandle = renderGraph.ImportTexture(finalTexture);
 
         // 降采样 3 趟(1/2、1/4、1/8),升采样 2 趟回到 1/4、1/2——最后一趟直接写进上面那张
         // 手动持有的 finalTexture,不用 Render Graph 内部再临时分配一张。
-        TextureHandle level1 = CreateLevel(renderGraph, 0.5f, format, "_ScreenBlurDown1");
-        TextureHandle level2 = CreateLevel(renderGraph, 0.25f, format, "_ScreenBlurDown2");
-        TextureHandle level3 = CreateLevel(renderGraph, 0.125f, format, "_ScreenBlurDown3");
+        TextureHandle level1 = CreateLevel(renderGraph, halfW, halfH, format, "_ScreenBlurDown1");
+        TextureHandle level2 = CreateLevel(renderGraph, quarterW, quarterH, format, "_ScreenBlurDown2");
+        TextureHandle level3 = CreateLevel(renderGraph, eighthW, eighthH, format, "_ScreenBlurDown3");
 
         BlitPass(renderGraph, "Blur Downsample 1", source, level1, DownsamplePassIndex);
         BlitPass(renderGraph, "Blur Downsample 2", level1, level2, DownsamplePassIndex);
@@ -144,9 +158,9 @@ class ScreenBlurPass : ScriptableRenderPass
         finalHeight = height;
     }
 
-    TextureHandle CreateLevel(RenderGraph renderGraph, float scale, GraphicsFormat format, string name)
+    TextureHandle CreateLevel(RenderGraph renderGraph, int width, int height, GraphicsFormat format, string name)
     {
-        TextureDesc desc = new TextureDesc(new Vector2(scale, scale))
+        TextureDesc desc = new TextureDesc(width, height)
         {
             format = format,
             name = name,
