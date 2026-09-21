@@ -57,11 +57,11 @@ public class NodeManager : MonoBehaviour
     bool started;
     bool ended;
 
-    /// <summary>Station 三选一面板是否正开着(游戏已经因为这个原因暂停)。PauseController 用这个
-    /// 挡住骑行中的暂停入口——这两套暂停(Node 系统的进站暂停、玩家主动按 Esc/点暂停按钮)都是
-    /// 直接摆 Time.timeScale/BikeController.enabled，互不知道对方存在，同时生效会互相踩：点了
-    /// Resume 只会把玩家暂停这一层退掉，NodePanel 还开着但游戏已经被恢复了，等于三选一卡在
-    /// 半途、车却又能动了。</summary>
+    /// <summary>Station 三选一面板是否正开着(游戏已经因为这个原因暂停)。RunManager 通过
+    /// isPausedByOtherSystem 反向查询这个值——玩家在三选一开着的时候依然可以打开/关闭骑行中的
+    /// 暂停面板，但这种情况下 TogglePause() 不会真的去碰 Time.timeScale/BikeController.enabled
+    /// (那两个已经被这里冻结了，且要冻结到玩家真正选完为止)，只切换暂停面板本身的显示状态，
+    /// 见 RunManager.TogglePause 的注释。</summary>
     public bool IsStationPaused => flowState == StationFlowState.Paused;
 
     public void ApplySettings(NodeSettings settings)

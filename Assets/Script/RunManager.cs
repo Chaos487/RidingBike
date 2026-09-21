@@ -101,8 +101,16 @@ public class RunManager : MonoBehaviour
 
     public bool IsPaused => paused;
 
-    /// <summary>只有正常骑行中(不在开始前/不在结算画面)才允许暂停。</summary>
+    /// <summary>只有正常骑行中(不在开始前/不在结算画面)才允许暂停。Station 三选一期间也算
+    /// "正常骑行中"——玩家可以在三选一开着的时候照样打开暂停面板,见 TogglePause 的注释。</summary>
     public bool CanPause => !waitingForStart && !runEnded;
+
+    /// <summary>反向查询:游戏是不是已经因为别的系统而处于暂停状态(目前只有 Station 三选一,
+    /// 接的是 NodeManager.IsStationPaused)。为空时视为没有,不影响暂停正常工作。
+    /// TogglePause() 靠这个判断"这次切换要不要真的去动 Time.timeScale/BikeController"——
+    /// 不能用 NodeManager 的直接引用(RunManager 比 NodeManager 先创建,方向反了),所以用
+    /// Func 反向查询,跟 GearSpawner.isInSafeZone 这类接线是同一个套路。</summary>
+    public Func<bool> isPausedByOtherSystem;
 
     void Awake()
     {
@@ -173,14 +181,25 @@ public class RunManager : MonoBehaviour
     /// <summary>骑行中途暂停/恢复——跟 EnterStartGate 一样，光靠 Time.timeScale 挡不住
     /// BikeController.Update() 里的按键判定，所以也要把它显式禁用掉，不然暂停面板开着的时候
     /// 点屏幕会被误读成一次跳跃输入。PauseController 的暂停按钮点击和 Esc 键都走这一个方法，
-    /// 保证两条触发路径最终是同一个状态。</summary>
+    /// 保证两条触发路径最终是同一个状态。
+    ///
+    /// Station 三选一期间也允许打开这个暂停面板，但那时候游戏已经因为三选一本身被冻结了
+    /// (Time.timeScale=0、BikeController 已禁用)——这两下 Toggle(打开/关闭暂停面板)都不能
+    /// 真的去碰 Time.timeScale/BikeController，不然点 Resume 会把三选一还没处理完的这段
+    /// 解冻掉，车在玩家选完之前就先动起来了。isPausedByOtherSystem 为真时，这里只切换
+    /// paused 这个状态给 PauseController 用来显示/隐藏暂停面板，物理这块交给三选一自己收尾。</summary>
     public void TogglePause()
     {
         if (!CanPause && !paused) return; // 开始前/结算画面不允许暂停；已经暂停的话允许恢复
 
         paused = !paused;
-        Time.timeScale = paused ? 0f : 1f;
-        if (bikeController != null) bikeController.enabled = !paused;
+
+        bool frozenByOtherSystem = isPausedByOtherSystem != null && isPausedByOtherSystem();
+        if (!frozenByOtherSystem)
+        {
+            Time.timeScale = paused ? 0f : 1f;
+            if (bikeController != null) bikeController.enabled = !paused;
+        }
 
         OnPauseStateChanged?.Invoke(paused);
     }

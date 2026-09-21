@@ -15,7 +15,6 @@ using UnityEngine.UI;
 public class PauseController : MonoBehaviour
 {
     RunManager runManager;
-    NodeManager nodeManager;
 
     GameObject pauseButtonObject;
     GameObject pausePanel;
@@ -31,14 +30,6 @@ public class PauseController : MonoBehaviour
         runManager.OnPauseStateChanged += HandlePauseStateChanged;
     }
 
-    /// <summary>NodeManager 是在 RunManager 之后才创建的(EndlessRunBootstrap.Setup() 里的顺序),
-    /// 这里单独补一刀接线，不能塞进 Initialize()。用来在 Station 三选一开着的时候挡住骑行中的
-    /// 暂停入口——见 NodeManager.IsStationPaused 的注释。</summary>
-    public void SetNodeManager(NodeManager manager)
-    {
-        nodeManager = manager;
-    }
-
     void Awake()
     {
         FindUIReferences();
@@ -52,7 +43,6 @@ public class PauseController : MonoBehaviour
     {
         if (runManager == null || !Input.GetKeyDown(KeyCode.Escape)) return;
         if (!runManager.IsPaused && !runManager.CanPause) return; // 开始前/结算画面不响应 Esc
-        if (nodeManager != null && nodeManager.IsStationPaused) return; // Station 三选一开着,不响应 Esc
 
         TogglePause();
     }
@@ -95,14 +85,10 @@ public class PauseController : MonoBehaviour
 
     void TogglePause()
     {
-        if (runManager == null) return;
-        // Station 三选一开着的时候游戏已经因为那个原因暂停了,不能再让玩家这层暂停插进来——
-        // 点 Resume 会把玩家这层退掉,但三选一那层还开着,游戏却已经被恢复,车会在选完之前就
-        // 动起来。左下角暂停按钮在 Station 期间还是可点的(没有另外隐藏),所以这个挡不能只放在
-        // Update() 的 Esc 分支里,这里必须再挡一次。
-        if (nodeManager != null && nodeManager.IsStationPaused && !runManager.IsPaused) return;
-
-        runManager.TogglePause();
+        // Station 三选一开着时也允许打开/关闭这个暂停面板——RunManager.TogglePause() 自己会
+        // 判断游戏是不是已经因为三选一被冻结了，冻结的话只切换 UI 状态，不会去碰
+        // Time.timeScale/BikeController，所以这里不用关心 Station 状态。
+        if (runManager != null) runManager.TogglePause();
     }
 
     /// <summary>Restart 和 Home 现在是同一个行为——项目没有单独的主菜单场景,"回到主菜单"
