@@ -8,6 +8,9 @@
         },
         {
             "m_Id": "d09e82e322014e249f5c17656aa7382e"
+        },
+        {
+            "m_Id": "961331e47b82477c90b8b7de3c701d7b"
         }
     ],
     "m_Keywords": [],
@@ -2024,6 +2027,36 @@
 
 {
     "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Internal.Texture2DShaderProperty",
+    "m_ObjectId": "961331e47b82477c90b8b7de3c701d7b",
+    "m_Guid": {
+        "m_GuidSerialized": "65ac5613-562f-4404-9052-53e797bf514a"
+    },
+    "m_Name": "Main Tex",
+    "m_DefaultRefNameVersion": 1,
+    "m_RefNameGeneratedByDisplayName": "Main Tex",
+    "m_DefaultReferenceName": "_Main_Tex",
+    "m_OverrideReferenceName": "_MainTex",
+    "m_GeneratePropertyBlock": true,
+    "m_UseCustomSlotLabel": false,
+    "m_CustomSlotLabel": "",
+    "m_DismissedVersion": 0,
+    "m_Precision": 0,
+    "overrideHLSLDeclaration": false,
+    "hlslDeclarationOverride": 0,
+    "m_Hidden": false,
+    "m_Value": {
+        "m_SerializedTexture": "",
+        "m_Guid": ""
+    },
+    "isMainTexture": false,
+    "useTilingAndOffset": false,
+    "m_Modifiable": true,
+    "m_DefaultType": 0
+}
+
+{
+    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.DivideNode",
     "m_ObjectId": "961b19e60ed34f52a45b0809a5ba576f",
     "m_Group": {
@@ -2569,6 +2602,9 @@
         },
         {
             "m_Id": "d09e82e322014e249f5c17656aa7382e"
+        },
+        {
+            "m_Id": "961331e47b82477c90b8b7de3c701d7b"
         }
     ]
 }
