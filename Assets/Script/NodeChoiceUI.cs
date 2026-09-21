@@ -63,11 +63,13 @@ public class NodeChoiceUI : MonoBehaviour
             if (cardImages[i] != null) cardImages[i].color = cardLethal[i] ? CardLethalColor : CardNormalColor;
         }
 
+        if (!gameObject.activeSelf) ScreenBlurState.BeginBlur();
         gameObject.SetActive(true);
     }
 
     public void Hide()
     {
+        if (gameObject.activeSelf) ScreenBlurState.EndBlur();
         gameObject.SetActive(false);
     }
 

@@ -113,12 +113,24 @@ public class PauseController : MonoBehaviour
     void HandleRunEnded()
     {
         if (pauseButtonObject != null) pauseButtonObject.SetActive(false);
-        if (pausePanel != null) pausePanel.SetActive(false);
+        SetPausePanelOpen(false);
     }
 
     void HandlePauseStateChanged(bool paused)
     {
-        if (pausePanel != null) pausePanel.SetActive(paused);
+        SetPausePanelOpen(paused);
         if (pauseButtonObject != null) pauseButtonObject.SetActive(!paused);
+    }
+
+    /// <summary>面板显示状态和 ScreenBlurState 的开关绑在一起管——只有真的发生"开↔关"切换
+    /// 才喊 ScreenBlurState,HandleRunEnded 在面板本来就没开的时候强制关一次不应该额外
+    /// 影响计数(虽然 EndBlur() 自己夹了下限,这里保持语义清楚)。</summary>
+    void SetPausePanelOpen(bool open)
+    {
+        if (pausePanel == null || pausePanel.activeSelf == open) return;
+
+        pausePanel.SetActive(open);
+        if (open) ScreenBlurState.BeginBlur();
+        else ScreenBlurState.EndBlur();
     }
 }

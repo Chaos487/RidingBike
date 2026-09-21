@@ -50,13 +50,13 @@ public class MainMenuController : MonoBehaviour
 
     void OpenMenu()
     {
-        if (menuPanel != null) menuPanel.SetActive(true);
+        SetMenuOpen(true);
         if (menuButtonObject != null) menuButtonObject.SetActive(false);
     }
 
     void CloseMenu()
     {
-        if (menuPanel != null) menuPanel.SetActive(false);
+        SetMenuOpen(false);
         if (menuButtonObject != null) menuButtonObject.SetActive(true);
     }
 
@@ -66,6 +66,19 @@ public class MainMenuController : MonoBehaviour
     public void HandleGameStarted()
     {
         if (menuButtonObject != null) menuButtonObject.SetActive(false);
-        if (menuPanel != null) menuPanel.SetActive(false);
+        SetMenuOpen(false);
+    }
+
+    /// <summary>面板显示状态和 ScreenBlurState 的开关绑在一起管,不分散在好几个调用点各自
+    /// 判断——只有真的从"开着"变成"关着"(或反过来)才会喊 ScreenBlurState,不然
+    /// HandleGameStarted() 在面板本来就没开的时候也调一次 CloseMenu 逻辑,会把计数减到负数
+    /// 之外的地方去(虽然 EndBlur() 自己有夹到 0 的保护,但语义上还是应该只在真的关闭时喊)。</summary>
+    void SetMenuOpen(bool open)
+    {
+        if (menuPanel == null || menuPanel.activeSelf == open) return;
+
+        menuPanel.SetActive(open);
+        if (open) ScreenBlurState.BeginBlur();
+        else ScreenBlurState.EndBlur();
     }
 }
