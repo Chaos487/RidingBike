@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cf7d5a8d4ff04bf79281bb981002d021, type: 3}
+  m_Name: BikeExhaustSettings
+  m_EditorClassIdentifier: 
+  minSpeedKmhForEmission: 3
+  minEmissionMultiplier: 3
+  maxEmissionMultiplier: 6
+  boostEmissionMultiplier: 2.2
+  localOffset: {x: -0.5, y: 0.05, z: 0}
