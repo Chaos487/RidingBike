@@ -58,4 +58,11 @@ public class CameraDirectorSettings : ScriptableObject
     [Header("更新节流")]
     [Tooltip("速度/状态变化多大才重新设定一次缓动目标，避免每帧都重启缓动导致画面发抖。")]
     public float retargetThreshold = 0.03f;
+
+    [Header("开场引入 (tap to start 时车藏在画面外，点击后滑入)")]
+    [Tooltip("tap to start 画面时镜头目标点相对车身往前偏移多少米，需要大于半屏宽(约 orthoSize×宽高比)才能真的把车推出画面，默认值按 minOrthoSize≈2.4、16:9 估算留了余量。")]
+    public float introOffsetX = 7f;
+    [Tooltip("点击 tap to start 之后，镜头从引入偏移量缓动回 0(车滑入画面)的时长。")]
+    public float introRevealDuration = 1.1f;
+    public Ease introRevealEase = Ease.OutSine;
 }

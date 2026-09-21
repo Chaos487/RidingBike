@@ -71,6 +71,12 @@ Menu 入口只在"开始前"这个阶段有意义,骑行真正开始后会自动
 Goals/Settings/Language/Stats Tab 逻辑(抽成了 `TabGroupController.cs` 给两处复用,内容依然
 占位)。摔车结算后暂停入口会跟着收起来。
 
+**开场引入动画**(`CameraDirector.EnterIntroFraming`/`PlayIntroReveal`)
+tap to start 画面车不直接可见——把镜头前瞻偏移(跟满速时"往前看"用的是同一个
+`CinemachinePositionComposer.TargetOffset.x`)一次性顶到很大,车就被推出画面外;点击后
+用 DOTween 把这个偏移缓动回 0,车从画面外滑进来正好接上正常骑行(参考 Alto's Odyssey
+开场的手感)。纯镜头技巧,车身实际位置/物理状态完全没动。
+
 **速度反应式镜头**(`CameraDirector.cs` + `CameraDirectorSettings.cs`,3.6 节)
 基于 Cinemachine 跟拍,车速越快镜头越拉远、越慢/摔车越聚焦,落地按质量给回弹反馈,
 摔车瞬间接管镜头。

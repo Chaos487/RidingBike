@@ -52,13 +52,19 @@ public class CameraDirector : MonoBehaviour
     float detachDuration = 0.4f;
     float detachDampingTarget = 30f; // 阻尼拉到这么大之后，短时间内实际观感上已经跟"没在跟随"没区别
 
+    float introOffsetX = 7f;
+    float introRevealDuration = 1.1f;
+    Ease introRevealEase = Ease.OutSine;
+
     Tweener zoomTweener;
     Tweener lookaheadTweener;
     Tweener detachTweener;
+    Tweener introTweener;
     Sequence landingPunchSequence;
 
     bool isCrashed;
     bool punchInProgress;
+    bool introFramingActive;
     float lastZoomTarget;
     float lastLookaheadTarget;
     float lookaheadDirection = 1f;
@@ -141,6 +147,43 @@ public class CameraDirector : MonoBehaviour
         lookaheadDuration = settings.lookaheadDuration;
         lookaheadEase = settings.lookaheadEase;
         retargetThreshold = settings.retargetThreshold;
+        introOffsetX = settings.introOffsetX;
+        introRevealDuration = settings.introRevealDuration;
+        introRevealEase = settings.introRevealEase;
+    }
+
+    /// <summary>tap to start 画面用——把镜头目标点直接顶到车身前方很远的地方，车就被推出画面外
+    /// (复用 UpdateLookahead 本来就在驱动的 Composer.TargetOffset.x，跟"满速前瞻"是同一个
+    /// 字段，只是这次是开场专用的一次性大偏移，不经过缓动，玩家不该看到"车飞出画面"这一下)。
+    /// 这一步必须在这一帧渲染之前(Setup() 里同步调用)完成，Cinemachine vcam 首次评估时
+    /// (PreviousStateIsValid 还是 false)本来就是直接摆到目标位置、没有阻尼过渡，不会有
+    /// "镜头飘过去"的瞬间。EnterStartGate() 那段时间 bike 静止，UpdateLookahead() 算出来的
+    /// 目标一直是 0，如果不把它暂停掉,每帧都会把这个偏移拉回去，所以额外用
+    /// introFramingActive 挡住 Update() 里的 UpdateLookahead() 调用。</summary>
+    public void EnterIntroFraming()
+    {
+        if (composer == null) return;
+
+        introFramingActive = true;
+        lookaheadTweener?.Kill();
+        SetLookaheadX(introOffsetX);
+        lastLookaheadTarget = introOffsetX;
+    }
+
+    /// <summary>玩家点了 tap to start 之后调用——把开场偏移缓动回 0，车从画面外滑进来，
+    /// 完成后把控制权交回 UpdateLookahead() 正常的速度前瞻逻辑。</summary>
+    public void PlayIntroReveal()
+    {
+        if (!introFramingActive) return;
+
+        introTweener?.Kill();
+        introTweener = DOTween.To(GetLookaheadX, SetLookaheadX, 0f, introRevealDuration)
+            .SetEase(introRevealEase)
+            .OnComplete(() =>
+            {
+                introFramingActive = false;
+                lastLookaheadTarget = 0f;
+            });
     }
 
     void Update()
@@ -153,7 +196,7 @@ public class CameraDirector : MonoBehaviour
         {
             UpdateZoom(bike.IsGrounded());
         }
-        UpdateLookahead();
+        if (!introFramingActive) UpdateLookahead();
     }
 
     void UpdateZoom(bool grounded)
@@ -293,6 +336,7 @@ public class CameraDirector : MonoBehaviour
         zoomTweener?.Kill();
         lookaheadTweener?.Kill();
         detachTweener?.Kill();
+        introTweener?.Kill();
         landingPunchSequence?.Kill();
         if (damageSystem != null)
         {

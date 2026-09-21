@@ -88,6 +88,15 @@ public static class EndlessRunBootstrap
         runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner);
 
         CameraDirector cameraDirector = SetupCamera(bike, damageSystem, landingDetector);
+        if (cameraDirector != null)
+        {
+            // tap to start 画面车藏在镜头外，点了之后滑进来——见 CameraDirector 里
+            // EnterIntroFraming/PlayIntroReveal 的注释。EnterIntroFraming 必须在本帧渲染前
+            // 同步调用一次(不能等到某个事件回调，那样第一帧可能已经把车渲染出来了)；
+            // PlayIntroReveal 反过来正好要等 OnGameStarted(玩家点了 tap to start 那一刻)才触发。
+            cameraDirector.EnterIntroFraming();
+            runManager.OnGameStarted += cameraDirector.PlayIntroReveal;
+        }
         SetupGapFallHandler(systems, bike, terrain, damageSystem, damageSettings, cameraDirector);
         SetupAudio(bike, crashDetector, landingDetector, runManager);
         NodeManager nodeManager = SetupNodeSystem(systems, bike, damageSystem, runManager, terrain, obstacleSpawner);

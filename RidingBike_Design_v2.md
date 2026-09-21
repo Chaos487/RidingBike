@@ -59,6 +59,7 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   **齿轮（游戏内货币）**（`GearManager.cs`/`GearSpawner.cs`/`GearPickup.cs`/`GearSettings.cs`）：已实现并接入 `EndlessRunBootstrap`，见 3.13 节。只有"加"没有"花"，花的机制留给以后的局外商店
 -   **开始画面 / 主菜单**（`MainMenuController.cs`）：已实现并接入 `EndlessRunBootstrap`，见 3.14 节。Menu 入口下的 Goals/Settings/Language/Stats 四个 Tab **目前都只是占位文字**，没有接任何真实数据/逻辑
 -   **骑行中暂停**（`PauseController.cs`，`RunManager.TogglePause()`）：已实现并接入 `EndlessRunBootstrap`，见 3.15 节。左下角按钮/`Esc` 键触发，面板复用开始画面 Menu 同一套 `TabGroupController`（这次连带把 Tab 逻辑抽出来给两处共用了）；Home/Restart 现在都是"重开场景"，Photo Mode 没做
+-   **开场引入动画**（`CameraDirector.EnterIntroFraming`/`PlayIntroReveal`）：已实现，见 3.6 节末尾补充的一条。tap to start 画面车藏在镜头外，点击后车从画面外滑进来接上正常骑行，纯镜头偏移技巧，车身物理状态没被动过
 
 ------------------------------------------------------------------------
 
@@ -186,6 +187,19 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   扣血但没死这一局（`BikeDamageSystem.OnHpChanged`）：只给一次轻微 Impulse 震动，镜头继续跟随/缩放，不接管
 -   血量归零真摔车（`BikeDamageSystem.OnFinalCrash`）：镜头才快速聚焦 + 更强的 Impulse 抖动，并停止跟随
 -   参数集中到 `CameraDirectorSettings`
+-   **开场引入(`EnterIntroFraming`/`PlayIntroReveal`)**：tap to start 画面车不可见——把
+    look-ahead 用的同一个 `TargetOffset.x` 一次性顶到 `introOffsetX`(默认 7，需要大于
+    半屏宽才能真正把车推出画面），车就被推出画面外；`EnterStartGate` 期间车静止，
+    `UpdateLookahead()` 算出来的目标一直是 0，会把这个偏移拉回去，所以额外用
+    `introFramingActive` 挡住那部分 `Update()` 逻辑。玩家点击 `tap to start`
+    (`RunManager.OnGameStarted`)后用 DOTween 把偏移缓动回 0(`introRevealDuration`/
+    `introRevealEase`)，车从画面外滑进来，此时车的物理/输入已经同时恢复
+    (`HandleStartClicked` 里 `bikeController.enabled = true`)，车身本身也在往前走，
+    两个效果叠加、不冲突。这一步必须在场景加载那一帧渲染前同步调用完
+    (`EndlessRunBootstrap.Setup()` 里紧跟着 `SetupCamera` 之后)，不能等某个事件回调，
+    不然第一帧可能已经把车渲染出来了；好在 Cinemachine vcam 首次评估
+    (`PreviousStateIsValid` 还是 false)本来就是直接摆到目标位置、没有阻尼过渡，
+    不会有"镜头飘过去"那一下。纯镜头技巧，车身实际 Transform/物理状态完全没被动过
 
 ------------------------------------------------------------------------
 
