@@ -398,7 +398,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u6700\u8FDC\u8DDD\u79BB: 0 m"
+  m_Text: "Best: 0 m"
 --- !u!1 &9200000401
 GameObject:
   m_ObjectHideFlags: 0
@@ -678,7 +678,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u9009\u9879A"
+  m_Text: "Title"
 --- !u!1 &9200000420
 GameObject:
   m_ObjectHideFlags: 0
@@ -757,7 +757,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u63CF\u8FF0"
+  m_Text: "Description"
 --- !u!1 &9200000440
 GameObject:
   m_ObjectHideFlags: 0
@@ -958,7 +958,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u9009\u9879B"
+  m_Text: "Title"
 --- !u!1 &9200000450
 GameObject:
   m_ObjectHideFlags: 0
@@ -1037,7 +1037,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u63CF\u8FF0"
+  m_Text: "Description"
 --- !u!1 &9200000470
 GameObject:
   m_ObjectHideFlags: 0
@@ -1238,7 +1238,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u9009\u9879C"
+  m_Text: "Title"
 --- !u!1 &9200000480
 GameObject:
   m_ObjectHideFlags: 0
@@ -1317,7 +1317,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u63CF\u8FF0"
+  m_Text: "Description"
 --- !u!1 &9200000500
 GameObject:
   m_ObjectHideFlags: 0
@@ -1517,7 +1517,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u786E\u8BA4"
+  m_Text: "Confirm"
 --- !u!1 &306637986601884471
 GameObject:
   m_ObjectHideFlags: 0
@@ -1596,7 +1596,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u8DDD\u79BB: 8 m"
+  m_Text: "Distance: 8 m"
 --- !u!1 &475772998891774344
 GameObject:
   m_ObjectHideFlags: 0
@@ -1675,7 +1675,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u8FDE\u51FB x2"
+  m_Text: "Combo x2"
 --- !u!1 &726491516504685215
 GameObject:
   m_ObjectHideFlags: 0
@@ -2105,7 +2105,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u65F6\u901F: 44 km/h"
+  m_Text: "Speed: 44 km/h"
 --- !u!1 &3750171588482060920
 GameObject:
   m_ObjectHideFlags: 0
@@ -2184,7 +2184,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u6C2E\u6C14: \u8FD8\u5DEE 142 m"
+  m_Text: "Boost: 142 m to go"
 --- !u!1 &4219473036235788246
 GameObject:
   m_ObjectHideFlags: 0
@@ -2668,7 +2668,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 齿轮: 0
+  m_Text: Gears: 0
 --- !u!1 &9200000700
 GameObject:
   m_ObjectHideFlags: 0

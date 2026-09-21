@@ -136,7 +136,7 @@ public class RunManager : MonoBehaviour
 
     void HandleGearCountChanged(int count)
     {
-        if (gearText != null) gearText.text = $"齿轮: {count}";
+        if (gearText != null) gearText.text = $"Gears: {count}";
     }
 
     /// <summary>开局前的静止画面:按住 Play 之后的初始状态就是开始界面，只多一个 Start 按钮——
@@ -229,7 +229,7 @@ public class RunManager : MonoBehaviour
         }
 
         float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
-        distanceText.text = $"距离: {distance:0} m";
+        distanceText.text = $"Distance: {distance:0} m";
 
         // 破纪录的时候实时更新——玩家能看到"最远距离"这个数字跟着当前距离一起往上跳，
         // 比只在结算画面才告诉他"破紀錄了"更有即时反馈。PlayerPrefs.SetFloat 本身只是写内存缓存，
@@ -238,18 +238,18 @@ public class RunManager : MonoBehaviour
         {
             bestDistance = distance;
             PlayerPrefs.SetFloat(BestDistanceKey, bestDistance);
-            if (bestDistanceText != null) bestDistanceText.text = $"最远距离: {bestDistance:0} m";
+            if (bestDistanceText != null) bestDistanceText.text = $"Best: {bestDistance:0} m";
         }
 
         float speedKmh = bikeController != null ? Mathf.Abs(bikeController.bikeRigidbody.linearVelocity.x) * 3.6f : 0f;
-        speedText.text = $"时速: {speedKmh:0} km/h";
+        speedText.text = $"Speed: {speedKmh:0} km/h";
 
         if (bikeController != null)
         {
             bool ready = bikeController.IsBoostReady;
             boostText.text = ready
-                ? "氮气: 就绪 (Shift)"
-                : $"氮气: 还差 {bikeController.DistanceUntilBoostReady:0} m";
+                ? "Boost: Ready (Shift)"
+                : $"Boost: {bikeController.DistanceUntilBoostReady:0} m to go";
 
             if (boostButtonImage != null) boostButtonImage.color = ready ? boostReadyColor : boostNotReadyColor;
         }
@@ -268,7 +268,7 @@ public class RunManager : MonoBehaviour
 
     void HandleTrickFailed(float degrees)
     {
-        ShowToast($"特技失败 ({degrees:0}°)");
+        ShowToast($"Trick Failed ({degrees:0}°)");
     }
 
     void HandleNearMiss()
@@ -281,14 +281,14 @@ public class RunManager : MonoBehaviour
     /// (BikeController.jumpAndBoostLocked),不是无缘无故的减速/操作失灵。</summary>
     public void ShowStationApproachWarning()
     {
-        ShowToast("即将进站，禁止跳跃/加速");
+        ShowToast("Approaching station — jump/boost disabled");
     }
 
     void HandlePartialDamage(float currentHp, float maxHp)
     {
         UpdateHpBar(currentHp, maxHp);
         PlayHpBarPunch();
-        ShowToast($"摔车了! 剩余血量 {Mathf.CeilToInt(currentHp)}/{Mathf.CeilToInt(maxHp)}");
+        ShowToast($"Crashed! HP {Mathf.CeilToInt(currentHp)}/{Mathf.CeilToInt(maxHp)}");
     }
 
     /// <summary>满血值被 Node 系统这类"非摔车"来源改动时触发——只静默刷新血条,不弹"摔车了"
@@ -354,7 +354,7 @@ public class RunManager : MonoBehaviour
 
     void HandleComboChanged(int comboCount)
     {
-        comboText.text = comboCount > 0 ? $"连击 x{comboCount}" : string.Empty;
+        comboText.text = comboCount > 0 ? $"Combo x{comboCount}" : string.Empty;
     }
 
     void ShowToast(string message)
@@ -390,7 +390,7 @@ public class RunManager : MonoBehaviour
         }
 
         float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
-        statusText.text = $"摔车了! 距离 {distance:0} m\n按 R / 点击屏幕重新开始";
+        statusText.text = $"Crashed! Distance {distance:0} m\nPress R / tap screen to restart";
         statusText.gameObject.SetActive(true);
 
         // 摔车结算是个自然的存盘点——真正落盘一次，防止手机端切后台/被系统杀掉的时候丢掉这一局刚破的纪录
@@ -423,7 +423,7 @@ public class RunManager : MonoBehaviour
         if (statusText != null) statusText.gameObject.SetActive(false);
 
         bestDistance = PlayerPrefs.GetFloat(BestDistanceKey, 0f);
-        if (bestDistanceText != null) bestDistanceText.text = $"最远距离: {bestDistance:0} m";
+        if (bestDistanceText != null) bestDistanceText.text = $"Best: {bestDistance:0} m";
         if (startButton != null)
         {
             startButton.gameObject.SetActive(false); // EnterStartGate() 会在 Initialize() 里再打开，这里先关掉避免第一帧闪一下

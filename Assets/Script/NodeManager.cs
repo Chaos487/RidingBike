@@ -282,8 +282,8 @@ public class NodeManager : MonoBehaviour
         {
             new ChoicePreset
             {
-                title = "轻装上阵",
-                description = "跳跃力度 +3",
+                title = "Light Load",
+                description = "Jump Force +3",
                 minStage = NodeTier.Early,
                 riskLevel = RiskLevel.Safe,
                 weight = 10f,
@@ -291,8 +291,8 @@ public class NodeManager : MonoBehaviour
             },
             new ChoicePreset
             {
-                title = "强化引擎",
-                description = "车速上限 +8%",
+                title = "Engine Boost",
+                description = "Max Speed +8%",
                 minStage = NodeTier.Early,
                 riskLevel = RiskLevel.Safe,
                 weight = 10f,
@@ -300,8 +300,8 @@ public class NodeManager : MonoBehaviour
             },
             new ChoicePreset
             {
-                title = "快速补给",
-                description = "氮气回能距离 -20%",
+                title = "Fast Refuel",
+                description = "Boost Recharge -20%",
                 minStage = NodeTier.Early,
                 riskLevel = RiskLevel.Safe,
                 weight = 10f,

@@ -100,8 +100,8 @@ public class NodeSettings : ScriptableObject
         {
             new ChoicePreset
             {
-                title = "轻装上阵",
-                description = "跳跃力度 +3",
+                title = "Light Load",
+                description = "Jump Force +3",
                 minStage = NodeTier.Early,
                 riskLevel = RiskLevel.Safe,
                 weight = 10f,
@@ -109,8 +109,8 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
-                title = "强化引擎",
-                description = "车速上限 +8%",
+                title = "Engine Boost",
+                description = "Max Speed +8%",
                 minStage = NodeTier.Early,
                 riskLevel = RiskLevel.Safe,
                 weight = 10f,
@@ -118,8 +118,8 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
-                title = "快速补给",
-                description = "氮气回能距离 -20%",
+                title = "Fast Refuel",
+                description = "Boost Recharge -20%",
                 minStage = NodeTier.Early,
                 riskLevel = RiskLevel.Safe,
                 weight = 10f,
@@ -127,8 +127,8 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
-                title = "越野改装",
-                description = "跳跃力度 +6\n车速上限 -5%",
+                title = "Off-Road Kit",
+                description = "Jump Force +6\nMax Speed -5%",
                 minStage = NodeTier.Mid,
                 riskLevel = RiskLevel.Low,
                 weight = 8f,
@@ -140,8 +140,8 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
-                title = "极限调校",
-                description = "车速上限 +15%\n最大 HP -15",
+                title = "Extreme Tuning",
+                description = "Max Speed +15%\nMax HP -15",
                 minStage = NodeTier.Mid,
                 riskLevel = RiskLevel.Medium,
                 weight = 7f,
@@ -153,8 +153,8 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
-                title = "轻量车架",
-                description = "加速度 +20%\n最大 HP -10",
+                title = "Lightweight Frame",
+                description = "Acceleration +20%\nMax HP -10",
                 minStage = NodeTier.Mid,
                 riskLevel = RiskLevel.Medium,
                 weight = 7f,
@@ -166,8 +166,8 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
-                title = "疯狂氮气",
-                description = "氮气回能距离 -50%\n车速上限 -10%",
+                title = "Nitro Overdrive",
+                description = "Boost Recharge -50%\nMax Speed -10%",
                 minStage = NodeTier.Late,
                 riskLevel = RiskLevel.Medium,
                 weight = 6f,
@@ -179,8 +179,8 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
-                title = "破风涡轮",
-                description = "车速上限 +30%\n最大 HP -30",
+                title = "Turbo Charger",
+                description = "Max Speed +30%\nMax HP -30",
                 minStage = NodeTier.Late,
                 riskLevel = RiskLevel.High,
                 weight = 5f,
@@ -192,8 +192,8 @@ public class NodeSettings : ScriptableObject
             },
             new ChoicePreset
             {
-                title = "孤注一掷",
-                description = "跳跃力度 +15\n最大 HP -40",
+                title = "All or Nothing",
+                description = "Jump Force +15\nMax HP -40",
                 minStage = NodeTier.Late,
                 riskLevel = RiskLevel.High,
                 weight = 4f,
