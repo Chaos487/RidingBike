@@ -16,8 +16,8 @@ MonoBehaviour:
   maxSpawnInterval: 30
   spawnChance: 1
   minGroupSize: 3
-  maxGroupSize: 5
-  intraGroupSpacing: 1.5
+  maxGroupSize: 10
+  intraGroupSpacing: 1
   heightAboveGround: 0.5
   spinSpeed: 3
   darkenBackFace: 1

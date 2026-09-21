@@ -15,10 +15,10 @@ MonoBehaviour:
   minNodeInterval: 110
   maxNodeInterval: 140
   safeZoneBefore: 30
-  safeZoneAfter: 30
-  stationSpeedKmh: 12
-  approachSlowdownDuration: 2.5
-  exitAccelerationDuration: 2
+  safeZoneAfter: 10
+  stationSpeedKmh: 30
+  approachSlowdownDuration: 1.5
+  exitAccelerationDuration: 1
   stationUiDelay: 0.15
   midTierStartIndex: 3
   lateTierStartIndex: 6
