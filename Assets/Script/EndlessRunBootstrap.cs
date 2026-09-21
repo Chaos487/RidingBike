@@ -191,6 +191,21 @@ public static class EndlessRunBootstrap
 
         GameObject canvasInstance = Object.Instantiate(canvasPrefab);
         canvasInstance.name = canvasPrefab.name;
+
+        // 背景模糊材质(BackgroundBlur,贴在 NodePanel/MenuPanel/PausePanel 背景上)靠 Shader
+        // Graph 的 Scene Color 节点采样 _CameraOpaqueTexture——这张纹理是摄像机走 URP 渲染
+        // 管线时生成的，Screen Space - Overlay 模式的 Canvas 不经过摄像机的渲染流程(是 Unity
+        // UI 系统在摄像机渲染完之后单独合成上去的)，采样不到，画面会直接黑掉(实测确认过)。
+        // 改成 Screen Space - Camera、挂上主摄像机，让这个 Canvas 也走摄像机的渲染路径。
+        // 这个引用没法存进预制体里——Camera 是场景里的物体，不属于这份 Canvas 预制体自己的
+        // 层级，只能在这里运行时接。
+        Canvas canvas = canvasInstance.GetComponent<Canvas>();
+        if (canvas != null)
+        {
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = Camera.main;
+        }
+
         RunManager runManager = canvasInstance.AddComponent<RunManager>();
 
         // 开始画面左上角的 Menu 入口(Goals/Settings/Language/Stats 四个占位 Tab)——骑行真正
