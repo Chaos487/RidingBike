@@ -45,6 +45,11 @@ public class ScreenBlurFeature : ScriptableRendererFeature
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+        // 临时诊断日志,排查完这一轮就删掉——先确认这个 Feature 到底有没有被调用、
+        // pass 是不是成功建出来了(blurShader 找不到/建 Material 失败都会导致 pass==null)、
+        // ScreenBlurState 是不是真的算出"有弹窗开着"。
+        Debug.Log($"[ScreenBlur] AddRenderPasses: pass={(pass != null ? "ok" : "NULL")}, BlurActive={ScreenBlurState.BlurActive}");
+
         if (pass == null || !ScreenBlurState.BlurActive) return;
         renderer.EnqueuePass(pass);
     }
@@ -91,11 +96,17 @@ class ScreenBlurPass : ScriptableRenderPass
         UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
 
         TextureHandle source = resourceData.activeColorTexture;
-        if (!source.IsValid()) return;
+        if (!source.IsValid())
+        {
+            Debug.LogWarning("[ScreenBlur] RecordRenderGraph: activeColorTexture 无效,本帧直接跳过,没有更新模糊贴图");
+            return;
+        }
 
         GraphicsFormat format = cameraData.cameraTargetDescriptor.graphicsFormat;
         int screenWidth = cameraData.cameraTargetDescriptor.width;
         int screenHeight = cameraData.cameraTargetDescriptor.height;
+
+        Debug.Log($"[ScreenBlur] RecordRenderGraph: 正常记录,format={format}, screen={screenWidth}x{screenHeight}");
 
         EnsureFinalTexture(screenWidth / 2, screenHeight / 2, format);
         TextureHandle finalHandle = renderGraph.ImportTexture(finalTexture);
