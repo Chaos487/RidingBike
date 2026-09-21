@@ -183,6 +183,11 @@ public static class EndlessRunBootstrap
         MainMenuController mainMenu = canvasInstance.AddComponent<MainMenuController>();
         runManager.OnGameStarted += mainMenu.HandleGameStarted;
 
+        // 骑行中的暂停入口(左下角按钮 + Esc 键),跟 Menu 共用同一套 Tab 面板逻辑——见
+        // PauseController 内部注释。真正的暂停状态机在 RunManager 里，这里只是接上事件。
+        PauseController pauseController = canvasInstance.AddComponent<PauseController>();
+        pauseController.Initialize(runManager);
+
         return runManager;
     }
 

@@ -83,11 +83,26 @@ public class RunManager : MonoBehaviour
     float startX;
     bool runEnded;
     bool waitingForStart;
+    bool paused;
 
     /// <summary>玩家点了 Start、真正开始骑行的那一刻触发——比如 AudioManager 的骑行音效循环
     /// 要等这个，不能在 EndlessRunBootstrap.Setup() 里一创建就放，不然开始界面还静止着，
     /// 引擎声就已经在响了。</summary>
     public event Action OnGameStarted;
+
+    /// <summary>真正判死(摔车结算)那一刻触发——PauseController 用来把暂停入口收起来，
+    /// 结算画面不需要能暂停。</summary>
+    public event Action OnRunEnded;
+
+    /// <summary>暂停状态切换时触发(true = 刚暂停，false = 刚恢复)，参数就是切换后的新状态。
+    /// PauseController 点按钮/按 Esc 都走 TogglePause()，靠这个事件同步面板显示，不用两边
+    /// 分别维护一份"是否暂停"。</summary>
+    public event Action<bool> OnPauseStateChanged;
+
+    public bool IsPaused => paused;
+
+    /// <summary>只有正常骑行中(不在开始前/不在结算画面)才允许暂停。</summary>
+    public bool CanPause => !waitingForStart && !runEnded;
 
     void Awake()
     {
@@ -155,6 +170,21 @@ public class RunManager : MonoBehaviour
         OnGameStarted?.Invoke();
     }
 
+    /// <summary>骑行中途暂停/恢复——跟 EnterStartGate 一样，光靠 Time.timeScale 挡不住
+    /// BikeController.Update() 里的按键判定，所以也要把它显式禁用掉，不然暂停面板开着的时候
+    /// 点屏幕会被误读成一次跳跃输入。PauseController 的暂停按钮点击和 Esc 键都走这一个方法，
+    /// 保证两条触发路径最终是同一个状态。</summary>
+    public void TogglePause()
+    {
+        if (!CanPause && !paused) return; // 开始前/结算画面不允许暂停；已经暂停的话允许恢复
+
+        paused = !paused;
+        Time.timeScale = paused ? 0f : 1f;
+        if (bikeController != null) bikeController.enabled = !paused;
+
+        OnPauseStateChanged?.Invoke(paused);
+    }
+
     void SetHudVisible(bool visible)
     {
         if (distanceText != null) distanceText.gameObject.SetActive(visible);
@@ -185,6 +215,7 @@ public class RunManager : MonoBehaviour
     void Update()
     {
         if (waitingForStart) return; // 按钮点击走 HandleStartClicked，这里不用轮询任何输入
+        if (paused) return; // Time.timeScale = 0 挡不住 Update() 本身还在跑，这里顺便短路掉
 
         if (runEnded)
         {
@@ -365,6 +396,8 @@ public class RunManager : MonoBehaviour
         // 摔车结算是个自然的存盘点——真正落盘一次，防止手机端切后台/被系统杀掉的时候丢掉这一局刚破的纪录
         // (Update() 里 SetFloat 只更新内存缓存，不保证真的写到磁盘)。
         PlayerPrefs.Save();
+
+        OnRunEnded?.Invoke();
     }
 
     void FindUIReferences()

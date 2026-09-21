@@ -60,8 +60,16 @@
 左上角一个 Menu 入口,点开是 Goals/Settings/Language/Stats 四个 Tab 切换的面板,布局照抄
 参考图的交互(顶部横排 Tab + 内容区 + 右下角 Back),**目前每个 Tab 内容都只是占位文字,
 不接任何真实数据**(存档进度、音量/暂停位置这些设置项、多语言切换、跑分统计都还没做)。
-Menu 入口只在"开始前"这个阶段有意义,骑行真正开始后会自动收起来,暂停中/结算画面
-暂时不需要 Menu。
+Menu 入口只在"开始前"这个阶段有意义,骑行真正开始后会自动收起来。
+
+**骑行中暂停**(`RunManager.cs` 的 `TogglePause()` + `PauseController.cs`)
+左下角一个暂停按钮(手机端点它),桌面端 `Esc` 键效果相同,两条路径最终都走
+`RunManager.TogglePause()`(逻辑跟开始前的 gate 一样:`Time.timeScale = 0` + 禁用
+`BikeController`)。暂停面板照参考图做成左右分屏——左边 Home/Restart/Resume 三个按钮
+(Home 和 Restart 现在是同一个行为:直接重新加载场景,项目没有单独的主菜单场景,重开
+自然会落回 tap to start;Photo Mode 这次不做),右边是跟开始画面 Menu **完全同一套**
+Goals/Settings/Language/Stats Tab 逻辑(抽成了 `TabGroupController.cs` 给两处复用,内容依然
+占位)。摔车结算后暂停入口会跟着收起来。
 
 **速度反应式镜头**(`CameraDirector.cs` + `CameraDirectorSettings.cs`,3.6 节)
 基于 Cinemachine 跟拍,车速越快镜头越拉远、越慢/摔车越聚焦,落地按质量给回弹反馈,

@@ -58,6 +58,7 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 
 -   **齿轮（游戏内货币）**（`GearManager.cs`/`GearSpawner.cs`/`GearPickup.cs`/`GearSettings.cs`）：已实现并接入 `EndlessRunBootstrap`，见 3.13 节。只有"加"没有"花"，花的机制留给以后的局外商店
 -   **开始画面 / 主菜单**（`MainMenuController.cs`）：已实现并接入 `EndlessRunBootstrap`，见 3.14 节。Menu 入口下的 Goals/Settings/Language/Stats 四个 Tab **目前都只是占位文字**，没有接任何真实数据/逻辑
+-   **骑行中暂停**（`PauseController.cs`，`RunManager.TogglePause()`）：已实现并接入 `EndlessRunBootstrap`，见 3.15 节。左下角按钮/`Esc` 键触发，面板复用开始画面 Menu 同一套 `TabGroupController`（这次连带把 Tab 逻辑抽出来给两处共用了）；Home/Restart 现在都是"重开场景"，Photo Mode 没做
 
 ------------------------------------------------------------------------
 
@@ -360,11 +361,39 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   **四个 Tab 目前都只是占位文字**，没有接任何真实数据/逻辑——存档进度(Goals)、
     音量/暂停位置这些设置项(Settings)、多语言切换(Language)、跑分统计(Stats)都还没做
 -   Menu 入口只在"开始前"这个阶段有意义：`RunManager.OnGameStarted` 一触发(玩家点了
-    "tap to start")就自动把 Menu 入口和面板一起收起来，暂停中/结算画面目前都没有 Menu
-    入口
+    "tap to start")就自动把 Menu 入口和面板一起收起来
 -   跟 `RunManager` 一样按名字在 `EndlessRunCanvas.prefab` 里 `Find` 子物体，改预制体
     层级/改物体名字的话这个脚本里对应的路径也要跟着改；两个脚本一起挂在 Canvas 根节点上
     (`EndlessRunBootstrap.SetupRunManagerUI`)
+-   Goals/Settings/Language/Stats 四个 Tab 之间的切换逻辑本身抽成了独立的
+    `TabGroupController`(不是 `MonoBehaviour`，纯逻辑类)，跟 3.15 节的骑行中暂停面板
+    共用同一份，以后要改 Tab 内容/加真实数据只用改这一处
+
+------------------------------------------------------------------------
+
+## 3.15 骑行中暂停 `PauseController.cs`
+
+-   左下角一个暂停按钮(手机端点它)，桌面端 `Esc` 键效果相同，两条触发路径最终都调用
+    `RunManager.TogglePause()`——保证按钮和快捷键不会导致两边状态不同步
+-   真正的"暂停"复用了开始前 `EnterStartGate` 那一套机制：`Time.timeScale = 0` +
+    显式禁用 `BikeController`(光靠 `timeScale` 挡不住 `BikeController.Update()` 里的按键
+    判定)。`RunManager` 新增 `IsPaused`/`CanPause`(开始前、结算画面都不允许暂停)两个
+    只读属性和 `OnPauseStateChanged`(bool 参数：true=刚暂停，false=刚恢复)事件，
+    `PauseController` 只订阅事件同步 UI，不自己维护一份"是否暂停"
+-   面板布局照参考图(Alto's Odyssey 的暂停画面)做成左右分屏：左边 `ActionList` 竖排
+    Home/Restart/Resume 三个按钮，右边 `TabArea` 装的是跟开始画面 Menu 面板结构完全一致的
+    `TabBar`/`ContentArea`(`TabGroupController` 认的就是这两个相对路径)，四个 Tab 内容
+    同样是占位文字
+-   Home 和 Restart 现在是同一个行为——项目没有单独的主菜单场景，"回到主菜单"就是
+    `SceneManager.LoadScene` 重新加载当前场景，自然会落回 `EnterStartGate` 的
+    tap to start 画面；跟摔车结算画面已有的"R / 点屏幕重开"走的是同一条重载场景的路径，
+    区别只是这里允许骑行中途、没摔车也能直接重开。重开前会先把 `Time.timeScale` 显式
+    复位成 1(它是全局静态值，`LoadScene` 不会自动重置，虽然新场景的 `EnterStartGate`
+    后面也会设一次，这里显式复位更保险)
+-   Photo Mode(参考图左侧列表里的第一项)这次没做，项目没有对应的拍照/回放功能
+-   摔车结算(`RunManager.OnRunEnded`，新增事件，`HandleCrash` 判死那一刻触发)会把暂停
+    按钮和面板一起收起来——正常情况下摔车不可能发生在暂停中(暂停时物理和输入都停了)，
+    这里只是保险
 
 ------------------------------------------------------------------------
 
