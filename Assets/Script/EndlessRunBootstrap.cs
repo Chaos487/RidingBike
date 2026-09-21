@@ -102,6 +102,12 @@ public static class EndlessRunBootstrap
         SetupAudio(bike, crashDetector, landingDetector, runManager);
         NodeManager nodeManager = SetupNodeSystem(systems, bike, damageSystem, runManager, terrain, obstacleSpawner);
         SetupGearSystem(systems, bike, terrain, gearManager, nodeManager, obstacleSpawner);
+
+        // PauseController 是在 NodeManager 之前创建的(挂在 SetupRunManagerUI 里的 Canvas 根节点
+        // 上),这里补一刀接线，让它知道 Station 三选一什么时候开着，好挡住骑行中的暂停入口——
+        // 见 PauseController.SetNodeManager / NodeManager.IsStationPaused 的注释。
+        PauseController pauseController = runManager.GetComponent<PauseController>();
+        if (pauseController != null) pauseController.SetNodeManager(nodeManager);
     }
 
     // Roguelike Node 三选一系统(GitHub Issue #3 存档方案,现在以物理化 Station 呈现)——
