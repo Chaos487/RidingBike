@@ -136,12 +136,21 @@ Station/Pit Stop 讨论)
 `externalSpeedCapKmh`(可空临时封顶)跟 Node 效果永久改的 `maxSpeedKmh` 分开,互不覆盖。
 安全区覆盖"预警减速开始→出站加速结束"整段,`EndlessTerrainGenerator` / `ObstacleSpawner`
 通过反向查询跳过这段范围内的断层/障碍物生成。`StationMarkerSpawner` 在世界里贴地摆一个
-占位旗子标记 Station 位置。**暂停时的背景虚化暂时搁置**:`Assets/Shaders/StationBlur.shader` +
-`StationBlurFeature.cs` 这套真实屏幕空间模糊(URP Renderer Feature,手写 HLSL)代码还在,
-但在这个项目实际用的 Render Graph 渲染路径下跑不起来(`ScriptableRenderPass.Execute` 是
-Compatibility Mode 专用的老 API,Render Graph 模式下整个 Pass 不生效),`NodeManager` 已经不再
-调用它,`NodePanel` 暂时还是用原来那层半透明黑色遮罩顶着——以后要么把 Pass 重写成
-`RecordRenderGraph` 新 API,要么在 Player Settings 里切到 Compatibility Mode。
+占位旗子标记 Station 位置。**背景虚化目前没做出来,暂时搁置**,细节和排查记录见
+[GitHub #4](https://github.com/Chaos487/RidingBike/issues/4)——先后试过三版:
+`StationBlur.shader`/`StationBlurFeature.cs`(最早那版,手写 HLSL,用的是 Compatibility Mode
+专用的 `Execute()` 老 API,这个项目实际跑 Render Graph,整个 Pass 不生效)、
+`BackgroundBlur.shadergraph`/`.mat`(Shader Graph 里用 Scene Color 节点单 Pass 采 5 个点取平均,
+实测半径加大只会让画面"变灰变浑浊",到不了真正柔和的模糊,这条路线本身有天花板)、
+`ScreenBlurFeature.cs`/`ScreenBlur.shader`(当前这版,用 Render Graph 新 API 写的真正多趟
+降采样→模糊→升采样,排查掉了黑屏/`Attachments in renderpass do not match`报错/Editor
+Scene 视图摄像机抢占共享贴图这几个问题之后,视觉上依然没有模糊效果,原因还没定位)。
+这三版文件都还留在项目里(`Assets/Shaders/StationBlur.shader`、
+`Assets/Shaders/BackgroundBlur.shadergraph`/`.mat`、`Assets/Script/StationBlurFeature.cs`、
+`Assets/Script/ScreenBlurFeature.cs`、`Assets/Shaders/ScreenBlur.shader`),都没有被实际调用/
+生效,`NodePanel`/`MenuPanel`/`PausePanel` 背景目前用的是 `BlurredPanelBackground.shader`+
+`.mat`(采样 `_ScreenBlurTexture` 全局贴图,理论上接的就是 `ScreenBlurFeature` 算出来的结果,
+但视觉上还看不出模糊)。
 `DecisionCurve` 按"第几个 Station"把进度换算成早/中/后期档位;`NodeChoicePool` 按 Choice 的
 `Min Stage`(从这档开始一直到后面所有档都可能出现,不是只在对应档出现一次)过滤、按 `Weight`
 加权抽取,并保证呈现的三个选项尽量覆盖低/中/高 `Risk Level`,不是纯随机抽奖;`NodeEffectSystem`

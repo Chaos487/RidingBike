@@ -61,6 +61,7 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   **骑行中暂停**（`PauseController.cs`，`RunManager.TogglePause()`）：已实现并接入 `EndlessRunBootstrap`，见 3.15 节。左下角按钮/`Esc` 键触发，面板复用开始画面 Menu 同一套 `TabGroupController`（这次连带把 Tab 逻辑抽出来给两处共用了）；Home/Restart 现在都是"重开场景"，Photo Mode 没做
 -   **开场引入动画**（`CameraDirector.EnterIntroFraming`/`PlayIntroReveal`）：已实现，见 3.6 节末尾补充的一条。tap to start 画面车藏在镜头外，点击后车从画面外滑进来接上正常骑行，纯镜头偏移技巧，车身物理状态没被动过
 -   **尾气/扬尘粒子效果**（`BikeExhaust.cs`/`BikeExhaustSettings.cs`）：代码已接入 `EndlessRunBootstrap`，见 3.16 节。**`Assets/Resources/ExhaustTrail.prefab` 这份粒子预制体还没有人做**，找不到就跳过、只打一条 Warning，等美术把预制体放上去就能直接看到效果，不用再改代码
+-   **弹窗背景真实模糊**（`ScreenBlurFeature.cs`/`ScreenBlur.shader`/`BlurredPanelBackground.shader`）：**没做成，已搁置**，详细排查记录见 [GitHub #4](https://github.com/Chaos487/RidingBike/issues/4)。`NodePanel`/`MenuPanel`/`PausePanel` 背景现在挂的是 `BlurredPanelBackground.mat`，理论上接的是这套 Render Graph 多趟降采样/升采样算出来的模糊贴图，但视觉上看不出模糊效果，原因还没定位——下一个 session 要么继续查（建议先用 Frame Debugger 逐帧核实每一趟 Pass 的实际输出），要么换路线
 
 ------------------------------------------------------------------------
 
@@ -1295,6 +1296,7 @@ P0 范围内仍欠账（见 0 节展开）：
 
 -   [#1](https://github.com/Chaos487/RidingBike/issues/1) `IsGrounded()` 地面检测射线不够长，车身静止时误判为空中——已修复并实机验证，issue 待手动关闭
 -   [#2](https://github.com/Chaos487/RidingBike/issues/2) 空中长按空格无法触发旋转，A/D 也无法控制空中姿态——待排查
+-   [#4](https://github.com/Chaos487/RidingBike/issues/4) `NodePanel`/`MenuPanel`/`PausePanel` 背景的真实屏幕模糊一直没有视觉效果——先后试过三版技术路线(手写 Renderer Feature 用错 API、Shader Graph 单 Pass 采样有天花板、Render Graph 新 API 多趟降采样/升采样),最新这版排查掉了黑屏/Render Graph 报错/Editor Scene 视图摄像机抢占共享贴图这几个问题之后依然没有模糊效果，原因待查，已搁置
 
 ------------------------------------------------------------------------
 
