@@ -25,6 +25,11 @@ public class WheelContactSensor : MonoBehaviour
     [Tooltip("接触点法线跟正上方的夹角超过这个角度(度)就不算\"贴地\"，只当作撞到了墙/悬崖峭壁——" +
              "地形最陡的正常坡大约 50°多，断层两侧的峭壁接近 90°，中间留了余量。")]
     public float maxGroundAngle = 70f;
+    [Tooltip("是否要求接触点法线朝上(在 maxGroundAngle 以内)才算\"触地\"。轮子需要这个来区分" +
+             "真正踩在地面上、还是贴着断层峭壁/墙面蹭；车架(BikeController.BodyContact)不需要——" +
+             "车架撞到障碍物大多是正面/侧面撞、法线接近水平，这种情况也应该算数(判摔车)，" +
+             "所以给车架用的那个实例要把这个开关关掉。")]
+    public bool requireUpwardContact = true;
 
     bool groundedThisStep;
     bool groundedLastStep;
@@ -48,7 +53,7 @@ public class WheelContactSensor : MonoBehaviour
     void MarkGroundedIfGroundLayer(Collision2D collision)
     {
         if (!IsGroundLayer(collision.gameObject.layer)) return;
-        if (!HasUpwardContact(collision)) return;
+        if (requireUpwardContact && !HasUpwardContact(collision)) return;
         groundedThisStep = true;
     }
 

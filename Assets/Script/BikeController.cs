@@ -272,25 +272,31 @@ public class BikeController : MonoBehaviour
         }
     }
 
-    /// <summary>车架本身的碰撞体不在这里创建——直接在 Scene 里手动加/调，形状比代码里定几个数字直观。
-    /// 这里只负责:不管 Inspector 里挂的是什么形状的碰撞体，都关掉它跟自己两个轮子的物理碰撞
-    /// (不然车架碰撞体只要跟悬挂行程内的轮子有一点重叠，就会被当成真碰撞去解算，天天跟
-    /// WheelJoint2D 的悬挂力打架，把车晃得站不住)，并把 WheelContactSensor 接上去。</summary>
+    /// <summary>车架本身的碰撞体不在这里创建——直接在 Scene 里手动加/调，形状比代码里定几个数字直观
+    /// (实际是 Bike.prefab 下 "rack" 子物体上的 PolygonCollider2D；Unity 2D 物理里父物体
+    /// 挂 Rigidbody2D、子物体挂 Collider2D 时，两边只要各自有对应脚本，碰撞回调都会收到，
+    /// 所以直接挂在车身根物体上就能读到子物体碰撞体的接触)。这里只负责:不管 Inspector 里
+    /// 挂的是什么形状的碰撞体，都关掉它跟自己两个轮子的物理碰撞(不然车架碰撞体只要跟悬挂
+    /// 行程内的轮子有一点重叠，就会被当成真碰撞去解算，天天跟 WheelJoint2D 的悬挂力打架，
+    /// 把车晃得站不住)，并把 WheelContactSensor 接上去。</summary>
     void SetupBodyContact()
     {
         if (frontWheelJoint != null) frontWheelJoint.enableCollision = false;
         if (backWheelJoint != null) backWheelJoint.enableCollision = false;
 
-        BodyContact = AttachContactSensor(transform);
+        // 车架撞到障碍物大多是正面/侧面撞，接触点法线接近水平——跟轮子需要的"必须朝上
+        // 才算贴地"正好相反，这里关掉那条过滤，车架碰到任何方向的东西都应该算数(判摔车)。
+        BodyContact = AttachContactSensor(transform, requireUpwardContact: false);
     }
 
-    WheelContactSensor AttachContactSensor(Transform wheel)
+    WheelContactSensor AttachContactSensor(Transform wheel, bool requireUpwardContact = true)
     {
         if (wheel == null) return null;
 
         WheelContactSensor sensor = wheel.GetComponent<WheelContactSensor>();
         if (sensor == null) sensor = wheel.gameObject.AddComponent<WheelContactSensor>();
         sensor.groundLayer = groundLayer;
+        sensor.requireUpwardContact = requireUpwardContact;
         return sensor;
     }
 
