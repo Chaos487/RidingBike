@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 无限滚动地形:按"平地 -> 上坡 -> 下坡 -> 平地 -> ..."的顺序循环生成,
+/// 无限滚动地形:按"平地 -> 下坡 -> 平地 -> ..."的顺序循环生成,不再有上坡——
+/// 地形整体是持续下降的单向坡,呼应 Alto's Odyssey 那种"一直往下滑"的手感,
+/// 不是"上坡蓄力、下坡释放"来回滚动的丘陵(2026-09-22 改的,原来是
+/// "平地 -> 上坡 -> 下坡 -> 平地"循环，上坡爬升多高、下坡就落回同样的高度)。
 /// 每个阶段的长度、坡的高度差都可以单独配置(见 EndlessRunSettings)。
 /// 阶段之间用 SmoothStep 过渡(两端导数为 0),所以任意相邻阶段衔接处都不会有尖角,
 /// 地形整体是一条连续光滑的曲线,不是拼接直线段。
@@ -22,7 +25,7 @@ using UnityEngine;
 public class EndlessTerrainGenerator : MonoBehaviour
 {
     public enum SlopeDirection { Flat, Uphill, Downhill, Gap }
-    enum Phase { Flat, Rising, Falling, GapDrop, GapFloor, GapRise }
+    enum Phase { Flat, Falling, GapDrop, GapFloor, GapRise }
 
     [Header("Reference")]
     [Tooltip("跟随生成的目标,通常是骑行者。")]
@@ -40,10 +43,6 @@ public class EndlessTerrainGenerator : MonoBehaviour
     [Header("平地段长度 (米)")]
     public float minFlatLength = 4f;
     public float maxFlatLength = 12f;
-
-    [Header("上坡段长度 (米)")]
-    public float minUphillLength = 15f;
-    public float maxUphillLength = 35f;
 
     [Header("下坡段长度 (米)")]
     public float minDownhillLength = 15f;
@@ -135,7 +134,7 @@ public class EndlessTerrainGenerator : MonoBehaviour
     float phaseEndHeight;
     float pendingGapStartX;
     float pendingGapGroundY;
-    float pendingHeightDelta; // 小山坡的"爬升多高"、断层的"陷下去多深"共用这一个字段，用完在下一次 AdvancePhase 里原样加回来，保证海拔不漂移
+    float pendingHeightDelta; // 下坡段"下降多少"、断层的"陷下去多深"共用这一个字段；断层那边用完还要在下一次 AdvancePhase 里原样加回来(升回掉下去之前的高度)，下坡这边就是单纯的下降量，不需要加回来
 
     void Awake()
     {
@@ -174,8 +173,6 @@ public class EndlessTerrainGenerator : MonoBehaviour
         groundThickness = settings.groundThickness;
         minFlatLength = settings.minFlatLength;
         maxFlatLength = settings.maxFlatLength;
-        minUphillLength = settings.minUphillLength;
-        maxUphillLength = settings.maxUphillLength;
         minDownhillLength = settings.minDownhillLength;
         maxDownhillLength = settings.maxDownhillLength;
         minHillHeight = settings.minHillHeight;
@@ -271,9 +268,9 @@ public class EndlessTerrainGenerator : MonoBehaviour
 
     static bool IsGapPhase(Phase p) => p == Phase.GapDrop || p == Phase.GapFloor || p == Phase.GapRise;
 
-    // 平地 -> 上坡 -> 下坡 -> 平地 -> ... 循环，或者平地 -> 断层陡降 -> 断层谷底 -> 断层陡升 -> 平地。
-    // 上坡/下坡、陡降/陡升都是同一套"落回出发前的高度"逻辑(用同一个 pendingHeightDelta)，
-    // 所以海拔不会累计漂移,不需要额外的海拔带修正逻辑。
+    // 平地 -> 下坡 -> 平地 -> ... 循环，或者平地 -> 断层陡降 -> 断层谷底 -> 断层陡升 -> 平地。
+    // 不再有上坡，地形只会往下走或者持平，没有"落回出发前的高度"这回事——断层的陡降/陡升
+    // 还是走同一套"落回掉下去之前的高度"逻辑(用 pendingHeightDelta)，这个不受影响。
     void AdvancePhase()
     {
         float nextPhaseStartX = phaseStartX + phaseLength;
@@ -282,7 +279,7 @@ public class EndlessTerrainGenerator : MonoBehaviour
         switch (phase)
         {
             case Phase.Flat:
-                // Node 安全区内不生成断层(见 3.11a 节)——即使概率骰中了也强制退回小山坡。
+                // Node 安全区内不生成断层(见 3.11a 节)——即使概率骰中了也强制退回下坡。
                 bool gapWouldOverlapSafeZone = overlapsSafeZone != null &&
                     overlapsSafeZone(nextPhaseStartX, nextPhaseStartX + gapEdgeLength * 2f + maxGapSpan);
                 if (!gapWouldOverlapSafeZone && UnityEngine.Random.value < gapChance)
@@ -297,18 +294,13 @@ public class EndlessTerrainGenerator : MonoBehaviour
                 }
                 else
                 {
-                    phase = Phase.Rising;
+                    // 平地直接接下坡，不再经过上坡——地形整体持续下降。
+                    phase = Phase.Falling;
                     pendingHeightDelta = UnityEngine.Random.Range(minHillHeight, maxHillHeight);
-                    phaseLength = UnityEngine.Random.Range(minUphillLength, maxUphillLength);
+                    phaseLength = UnityEngine.Random.Range(minDownhillLength, maxDownhillLength);
                     phaseStartHeight = baseHeight;
-                    phaseEndHeight = baseHeight + pendingHeightDelta;
+                    phaseEndHeight = baseHeight - pendingHeightDelta;
                 }
-                break;
-            case Phase.Rising:
-                phase = Phase.Falling;
-                phaseLength = UnityEngine.Random.Range(minDownhillLength, maxDownhillLength);
-                phaseStartHeight = baseHeight;
-                phaseEndHeight = baseHeight - pendingHeightDelta;
                 break;
             case Phase.GapDrop:
                 phase = Phase.GapFloor;

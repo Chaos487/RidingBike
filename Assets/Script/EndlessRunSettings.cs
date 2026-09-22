@@ -29,10 +29,6 @@ public class EndlessRunSettings : ScriptableObject
     public float minFlatLength = 4f;
     public float maxFlatLength = 12f;
 
-    [Header("上坡段长度 (米)")]
-    public float minUphillLength = 15f;
-    public float maxUphillLength = 35f;
-
     [Header("下坡段长度 (米)")]
     public float minDownhillLength = 15f;
     public float maxDownhillLength = 35f;
