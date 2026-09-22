@@ -14,16 +14,16 @@ Unity 6 (`6000.0.63f1`) + URP + 2D 物理，目前是 PC
 
 **P0 —— 核心体验**
 
--   [x] Landing Quality —— 已实现，见 4.1 节
--   [x] Trick Score —— 已实现，`TrickSystem.cs` + `TrickSystemSettings`
--   [x] Combo —— 已实现，`ComboSystem.cs` + `ComboSystemSettings`
+-   [x] Landing Quality —— 已实现，见 4.1 节（2026-09-22 已重构，改成只看前后轮 Δt，不再是原来的多信号判定，细节见本节末尾补充）
+-   [x] Trick Score —— 已实现，`TrickSystem.cs` + `TrickSystemSettings`（2026-09-22 已重构，改成按完整圈数计分，不再是原来的精确角度档位，细节见本节末尾补充）
+-   [x] ~~Combo~~ —— **已移除**：实现过一版（`ComboSystem.cs`，纯计数器，落地质量/贴身险触发 `comboCount++`，超时或摔车清零），2026-09-22 评估后认为太复杂、没有真正接入分数（见下面这条欠账），直接砍掉，不再是 P0 范围内的系统；第 6 节的 Combo 设计仍留着作为历史记录，但已经不在当前实现计划内
 -   [x] Near Miss —— 已实现，`NearMissDetector.cs`（挂在 `ObstacleSpawner` 生成的每个障碍物上）
 
-P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunManager` 已能弹字/显示 Combo 数），但还有几块明确的欠账，暂不算已完成：
+P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭环（`EndlessRunBootstrap` 已接好），但还有几块明确的欠账，暂不算已完成：
 
--   没有统一的 `ScoreSystem`——Distance、Trick 分数各自独立显示，`ComboSystem` 目前只是个纯计数器（`comboCount`），并没有像第 6 节要求的那样真正乘到 Trick 分数上；`TrickSystem.ScoreForDegrees()` 完全不读 Combo 数
--   没有"PERFECT!"落地专属弹字——`LandingDetector.EvaluateLanding()` 现在只有一行 `Debug.Log` 输出质量分级，代码注释自己写着"临时验证用……接了 UI/ScoreSystem 之后可以删掉"，落地质量本身依然没有专属 UI/音效反馈（`AudioManager` 的 `landing` 槽位现在对 Perfect/Good/Bad 播的是同一个音效，没有分级）
--   摔车结算画面信息不全——`RunManager.HandleCrash()` 目前只拼 `距离 {distance} m`，第 16 节要求的 Score / Best Distance / Highest Combo / Best Trick 都还没有；也完全没有任何跨局的最佳记录持久化（没有 `PlayerPrefs`/存档，每次重开都从零开始）
+-   没有统一的 `ScoreSystem`——Distance、Trick 分数各自独立显示；Trick Score 已经累计成一个右上角实时显示的 Score（`RunManager.score`），但这只是 Trick 自己的累计值，不是真正把 Distance/Trick 揉到一起的统一分数系统
+-   **已补上**"PERFECT!"落地专属弹字——2026-09-22 给 `RunManager` 接了 `LandingDetector.OnLanded`，落地会弹 `PERFECT!`/`GOOD`/`NOT BAD`（独立的 `ToastText`），转出特技的话下面还会纵向堆叠一行 `Backflip x{圈数}`（独立的 `TrickToastText`），两者互不打断；仍然欠账的是**音效**分级——`AudioManager` 的 `landing` 槽位现在对三档质量播的还是同一个音效
+-   摔车结算画面信息不全——`RunManager.HandleCrash()` 目前只拼 `距离 {distance} m`，Score / Best Distance / Best Trick 都还没有（Combo 已移除，不需要再要 Highest Combo 了）；也完全没有任何跨局的最佳记录持久化（`bestDistance` 除外，那个已经用 `PlayerPrefs` 存了）
 -   已知 bug，仍然 OPEN，本次没有实机验证条件、只做了代码核对：
     -   [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)（跳跃偶发不生效）：代码里 `groundCheckDistance` 确实已经是修复后的 `1.2`（issue 描述的修复已经落进当前代码），但 issue 本身写明"还没有实机验证过、用户要求先搁置"，本次没有条件复测，状态维持 OPEN，不要当成已解决
     -   [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2)（空中无法触发旋转 / A、D 无法控制空中姿态）：**这个 issue 的后半段已经不是 bug 了，是设计变了**——`BikeController.ApplyBalance()` 现在的注释明确写着"空中不再响应方向键……方向键在空中彻底不影响车身角度"，也就是说"空中用 A/D 压头抬头"这个预期行为本身被主动拿掉了，改成完全交给自动回正 + 空格旋转两条路径，不是还没修好。前半段"长按空格触发不了空中旋转"本次没有条件实机验证，`HandleJumpAndSpin()`/`StartSpin()` 代码逻辑读起来是完整的，但读代码不能代替实机测试，issue 继续保持 OPEN
@@ -64,6 +64,14 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   **弹窗背景真实模糊**（`ScreenBlurFeature.cs`/`ScreenBlur.shader`/`BlurredPanelBackground.shader`）：**没做成，已搁置**，详细排查记录见 [GitHub #4](https://github.com/Chaos487/RidingBike/issues/4)。`NodePanel`/`MenuPanel`/`PausePanel` 背景现在挂的是 `BlurredPanelBackground.mat`，理论上接的是这套 Render Graph 多趟降采样/升采样算出来的模糊贴图，但视觉上看不出模糊效果，原因还没定位——下一个 session 要么继续查（建议先用 Frame Debugger 逐帧核实每一趟 Pass 的实际输出），要么换路线
 
 **2026-09-22 订正**：第 24 节"目前尚未完成"清单里好几条已经过时——**Roguelike Station 三选一（`NodeManager.cs`）其实早就做完了**，清单上一直写着"未完成"没人去掉，导致新开一个 session 只看这份文档、没去核对代码库，直接把这条当成事实转述给了用户。顺带查的时候发现"正式美术"（背景/车身已经是真实美术，只有地形/障碍物还是占位）、"音效/音乐"（`bgm`/`ambient` 两个槽位已经接了真实音频文件，见 3.10 节这次一起订正）、"存档/进度持久化"（最远距离、齿轮数量早就用 `PlayerPrefs` 存了）这三条也都写得比实际情况悲观。24 节已经改成准确状态。**教训**：这种"尚未完成"清单是会跟实际进度分叉的，不能只看它判断某个功能做没做，做完/做一半都要随手回来划掉或者订正，不要攒着等下次大审计。
+
+**2026-09-22 补充（同一天晚些时候，Landing Quality / Trick / Combo 三个系统重构）：**
+
+-   **Landing Quality 正式简化**：判据从"车身角度偏差 + 角速度 + 垂直速度"三项综合，改成**只看前后轮有效接地的时间差（Δt）**——不再读坡度/角度/角速度/垂直速度，三档也从 Perfect/Good/Bad 改名成 Perfect/Good/**Not Bad**（最低档改叫 Not Bad，强调"完成了一次有效落地"，不是失败）。默认阈值 `perfectThreshold=0.02s`/`goodThreshold=0.05s`，超过 `goodThreshold` 还等不到第二只轮子(`landingTimeout=0.15s`)直接判 Not Bad。`ContactOrder`（Simultaneous/FrontFirst/BackFirst）跟 Quality 完全解耦，只是共用同一个 `goodThreshold` 当"够不够接近"的边界。`LandingDetector.cs` 内部改成显式状态机（Airborne/Pending/Grounded）。
+-   **Trick Score 正式简化**：判据从"精确旋转角度档位"（90/180/360/540/720°）改成**按完整转了几圈**计分——`laps = Floor(Abs(SpinAccumulatedDegrees) / 360)`，不足一圈不计分，默认每圈分数 `50/150/300/500/750`（`TrickSystemSettings.scorePerLap`，超过 5 圈沿用最后一档）。**跟 Landing Quality 彻底解耦**：`TrickSystem` 完全不读 `LandingDetector.Quality`，好落地/差落地转出同样的圈数拿一样的分（旧版"转够但落地差、奖励归零"的规则已经拿掉，`OnTrickFailed` 事件也跟着删了）。
+-   **`BikeController.SpinAccumulatedDegrees` 改成读真实物理旋转**：不再是"按住空格的时长 × 固定角速度"，改成持续追踪 `bikeRigidbody.rotation` 相对离地那一刻的差值——松手后惯性/自动回正带着车身继续转的那一截也算进去，不然玩家视觉上转完了一圈，计分却在松手那一刻提前停了。过程中还修了两个更隐蔽的 bug：① 圈数计算之前在任意一只轮子先触地时就冻结，但 `LandingDetector` 要等两只轮子都触地才真正判定落地，中间那段窗口的旋转被漏记，导致前后轮谁先落地会读出不同圈数；② 腾空途中蹭一下地面（单帧假触地）会被当成"真的落地"，把同一次连续转体腰斩成两段——`BikeController` 新增 `landingConfirmTime`（默认 0.05s）触地防抖 + `IsConfirmedGrounded`，`LandingDetector` 的 Pending 状态也改成"先触地那只轮子自己又弹开、另一只轮子没跟上"就取消判定、不再傻等超时。**这三个问题修完之后 Trick 判定仍然偶尔感觉不够稳定**，已经建了 [GitHub #5](https://github.com/Chaos487/RidingBike/issues/5) 留到后面继续查，`TrickSystem.cs` 里还留着一段调试用的 `Debug.Log`（打腾空开始/每圈完成/落地结算），方便下次继续用同样的方法定位。
+-   **UI**：落地质量和 Trick 结果不再抢同一个 Toast，`EndlessRunCanvas.prefab` 里新增了独立的 `TrickToastText`（纵向堆叠在原来的 `ToastText` 下面），Trick 弹字从"xxx° +分数"改成"Backflip x{圈数}"；新增右上角常驻 `ScoreText`，累计显示 Trick Score，弹字淡出之后分数才真正计入（参考 Alto's Odyssey 的反馈节奏）。
+-   **Combo 连击系统整体移除**：`ComboSystem.cs`/`ComboSystemSettings.cs` 已删除，`EndlessRunCanvas.prefab` 里的 `ComboText` 节点也删了。移除原因是评估后认为这个系统太复杂、且一直没有真正接入分数（纯计数器，不影响 Trick Score/金币），跟"先把 P0 三个核心系统做扎实"的优先级冲突。**第 6 节的 Combo 设计文字还留着**，作为历史设计记录保留，但已经不在当前实现范围内——如果以后要重新考虑连击机制，建议先重新讨论要不要做、怎么接入分数，不要直接照抄第 6 节。第 12/13/16/21/25/26 节里提到 Combo 的地方（Roguelike Build、UI 设计方向、最终设计原则等）暂时没有跟着改，这些是更偏"长期设计愿景"的段落，要不要一并调整没有在这次改动范围内拍板。
 
 ------------------------------------------------------------------------
 
@@ -168,11 +176,17 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
     -   距离
     -   时速
     -   氮气(Boost)是否就绪，没就绪时显示还差多少米回满
-    -   当前连击数（`ComboSystem.OnComboChanged`）
--   顶部弹字提示（同一个 Toast，新的会打断上一个）：特技得分/特技失败、Near Miss、摔车扣血剩余血量
+-   右上角实时显示：HP、Best Distance、齿轮数量、Score（Trick Score 累计值）
+-   顶部弹字提示：落地质量（`ToastText`：PERFECT!/GOOD/NOT BAD）和 Trick 结果（独立的
+    `TrickToastText`：Backflip x{圈数}）纵向堆叠、各自独立淡出，互不打断；Near Miss、
+    摔车扣血剩余血量、Station 接近提示走的是跟落地质量共用的 `ToastText`（同一个 Toast，
+    新的会打断上一个）
 -   HP 血条（`HpBarBackground/HpBarFill`），跟着 `BikeDamageSystem.OnHpChanged` 实时更新
 -   摔车结算后显示结算信息（目前只有距离，见第 0 节的欠账记录）
 -   `R` 重开（重新加载当前场景）
+
+**Combo（连击）已移除**——原来这里显示"当前连击数"，2026-09-22 评估后认为系统太复杂、
+没有真正接入分数，整体砍掉了（见第 0 节 2026-09-22 补充），不再有这项显示。
 
 ------------------------------------------------------------------------
 
@@ -447,29 +461,27 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 
 ## 4.1 Landing Quality：落地质量系统
 
-> **已实现** —— `LandingDetector.cs` + `WheelContactSensor.cs`，参数集中在
-> `LandingDetectorSettings`（ScriptableObject，Inspector 可调）。
+> **已实现，2026-09-22 正式重构过一版** —— `LandingDetector.cs` + `WheelContactSensor.cs`，
+> 参数集中在 `LandingDetectorSettings`（ScriptableObject，Inspector 可调）。
 >
-> 车身从空中转为触地的那一帧采样一次，综合三个数值判出
-> **Perfect / Good / Bad** 三档（三项都不超过对应阈值才算这一档）：
+> 判据从最初"车身角度偏差 + 角速度 + 垂直速度"三项综合，**简化成只看前后轮有效接地的
+> 时间差（Δt）**——不再读坡度/角度/角速度/垂直速度。三档也改名成
+> **Perfect / Good / Not Bad**（不再叫 Bad，强调"完成了一次有效落地"）：
 >
-> -   车身角度与当地地面坡度的偏差（`perfectMaxAngleError` / `goodMaxAngleError`）
-> -   落地瞬间车身角速度（`perfectMaxAngularSpeed` / `goodMaxAngularSpeed`）
-> -   落地瞬间垂直速度（`perfectMaxVerticalSpeed` / `goodMaxVerticalSpeed`）
+> -   `Δt <= perfectThreshold`（默认 0.02s）→ Perfect
+> -   `Δt <= goodThreshold`（默认 0.05s）→ Good
+> -   超过 `goodThreshold`，或等到 `landingTimeout`（默认 0.15s）另一只轮子还没落地 → Not Bad
 >
-> 另外靠两个轮子各自的触地传感器（`WheelContactSensor`）记录接触时间戳，
-> 判断前后轮接触顺序（`Simultaneous` / `FrontFirst` / `BackFirst`，
-> `simultaneousContactWindow` 控制多接近算同时），目前这个维度只对外抛出，
-> 不参与 Perfect/Good/Bad 分级。
+> `ContactOrder`（`Simultaneous`/`FrontFirst`/`BackFirst`）跟 Quality 是两个独立结果，
+> 但共用 `goodThreshold` 当"够不够接近"的边界。`LandingDetector.cs` 内部是一个显式状态机
+> （Airborne → Pending → Grounded），一次腾空只判定一次，落地这一刻结果就固定了。
 >
-> `CameraDirector` 已经订阅了这个判定结果：质量越差，落地回弹镜头越明显
-> （对应下面 4.1 节原本设想的"轻微镜头回弹"这条反馈，已经接上）。
+> `CameraDirector` 订阅了这个判定结果：质量越差，落地回弹镜头越明显。`RunManager` 也已经
+> 接了 `OnLanded`，会弹 `PERFECT!`/`GOOD`/`NOT BAD`（独立的 `ToastText`，见 3.5 节）。
 >
-> **还没做的**：UI 反馈（"PERFECT!" 弹字）、分数/Combo 加成——这两项依赖还没做的
-> `ScoreSystem`，逻辑判定本身已经闭环。`ComboSystem` 本身已经实现（3.6/6 节），
-> 但落地质量目前不影响连击数的增量，只区分"加不加"(Bad 不加)。
-> `AudioManager` 的 `landing` 音效槽位（3.10 节）现在对 Perfect/Good/Bad 播的是
-> 同一个音效，还没有按质量分级。三档阈值是估的第一版数字，还没有经过大量实机测试微调手感。
+> **还没做的**：`AudioManager` 的 `landing` 音效槽位（3.10 节）现在对三档播的还是同一个
+> 音效，没有分级；三档阈值是估的第一版数字，还没有经过大量实机测试微调手感。
+> **Combo 加成已经不需要了**——Combo 系统本身已经整体移除，见第 0 节 2026-09-22 补充。
 
 这是目前最重要的玩法增强。
 
@@ -519,9 +531,17 @@ Perfect Landing 应该明显比普通落地更有反馈：
 
 # 5. Trick / 空中特技系统
 
+> **已实现，2026-09-22 正式改成按圈数计分**——`TrickSystem.cs`，最初是照下面 5.1 节的
+> 精确角度档位（90/180/360/540/720°）实现的，重构后改成**只看完整转了几圈**：
+> `laps = Floor(Abs(SpinAccumulatedDegrees) / 360)`，不足一圈不计分，默认每圈
+> `50/150/300/500/750` 分（`TrickSystemSettings.scorePerLap`）。**"720° 但落地失败、
+> 奖励归零"这条规则已经拿掉**——`TrickSystem` 现在完全不读 `LandingDetector.Quality`，
+> 好落地/差落地转出同样的圈数拿一样的分，两个系统彻底解耦。下面 5.1/5.2 节的精确角度档位
+> 设计已经不是实现依据了，留着作为历史记录。
+
 目前的 360° 空翻需要从"一个操作功能"升级成"风险---奖励系统"。
 
-## 5.1 旋转计分
+## 5.1 旋转计分（已被上面的圈数计分取代，仅作历史记录）
 
 根据实际旋转角度给予不同奖励：
 
@@ -537,7 +557,7 @@ Perfect Landing 应该明显比普通落地更有反馈：
 
 > 奖励归零 + 摔车
 
-这样才能形成真正的 Risk / Reward。
+这样才能形成真正的 Risk / Reward。（**这条"落地失败奖励归零"的规则已经不再生效**，见上方状态说明。）
 
 ## 5.2 Trick Chain
 
@@ -561,6 +581,12 @@ Perfect Landing 应该明显比普通落地更有反馈：
 ------------------------------------------------------------------------
 
 # 6. Combo 连击系统
+
+> **已移除，不在当前实现范围内**（2026-09-22）：实现过一版（`ComboSystem.cs`，纯计数器，
+> Perfect/Good 落地或 Near Miss 触发 `comboCount++`，超时或摔车清零），评估后认为太复杂、
+> 又一直没有真正落地这一节要求的"真正影响 Score Multiplier/Trick Score/金币"，直接砍掉了，
+> 详见第 0 节 2026-09-22 补充。下面的设计内容留着作为历史记录——以后要重新考虑连击机制，
+> 先重新拍板要不要做、打算怎么接入分数，不要直接照抄这里重新实现一版纯计数器。
 
 Combo 是连接"物理系统"和"分数系统"的重要桥梁。
 
@@ -1121,7 +1147,7 @@ Combo 不应该只影响 UI，而应该真正影响：
 -   CrashDetector
 -   LandingDetector
 -   TrickSystem
--   ComboSystem
+-   ~~ComboSystem~~（已实现又整体移除，见第 0/6 节 2026-09-22 的记录）
 -   ScoreSystem
 -   UpgradeSystem
 -   TerrainGenerator
@@ -1140,8 +1166,8 @@ Combo 不应该只影响 UI，而应该真正影响：
 ``` text
 LandingDetector.cs        [已完成]
 WheelContactSensor.cs     [已完成，原文档未列出，LandingDetector 的前置依赖]
-TrickSystem.cs
-ComboSystem.cs
+TrickSystem.cs            [已完成]
+ComboSystem.cs            [已实现又整体移除，2026-09-22，见第 0/6 节]
 ScoreSystem.cs
 NearMissDetector.cs
 TerrainChunkData.cs
@@ -1170,7 +1196,7 @@ UpgradeData.cs
 -   Trick Type
 -   Trick Score
 
-### ComboSystem
+### ComboSystem（已移除，见第 0/6 节，以下负责范围仅作历史记录）
 
 负责：
 
@@ -1187,7 +1213,7 @@ UpgradeData.cs
 -   Trick Score
 -   Landing Score
 -   Near Miss Score
--   Combo Multiplier
+-   ~~Combo Multiplier~~（Combo 已移除，不需要这一项了）
 
 ### NearMissDetector
 
@@ -1218,7 +1244,7 @@ UpgradeData.cs
 
 1.  ~~Landing Quality~~ **已完成**
 2.  ~~Trick Score~~ **已完成**
-3.  ~~Combo~~ **已完成**
+3.  ~~Combo~~ **已实现又整体移除**（2026-09-22，太复杂、没真正接入分数，见第 0/6 节）
 4.  ~~Near Miss~~ **已完成**
 
 目标：
@@ -1277,14 +1303,14 @@ UpgradeData.cs
 
 -   Landing Quality
 -   Trick Score
--   Combo
+-   ~~Combo~~（已实现又整体移除，2026-09-22，见第 0/6 节）
 -   Near Miss
 
 P0 范围内仍欠账（见 0 节展开）：
 
--   统一的 ScoreSystem（Combo 真正影响 Score Multiplier）
--   "PERFECT!" 落地专属弹字
--   摔车结算画面的 Score / Best Distance / Highest Combo / Best Trick
+-   统一的 ScoreSystem（把 Distance/Trick 揉到一起；Combo 已移除，不用再考虑它的 Multiplier 了）
+-   ~~"PERFECT!" 落地专属弹字~~ —— **已完成**（2026-09-22，见第 0/4.1 节）
+-   摔车结算画面的 Score / Best Distance / Best Trick（Combo 已移除，不用再要 Highest Combo 了）
 
 目前尚未完成：
 
@@ -1314,6 +1340,7 @@ P0 范围内仍欠账（见 0 节展开）：
 -   [#1](https://github.com/Chaos487/RidingBike/issues/1) `IsGrounded()` 地面检测射线不够长，车身静止时误判为空中——已修复并实机验证，issue 待手动关闭
 -   [#2](https://github.com/Chaos487/RidingBike/issues/2) 空中长按空格无法触发旋转，A/D 也无法控制空中姿态——待排查
 -   [#4](https://github.com/Chaos487/RidingBike/issues/4) `NodePanel`/`MenuPanel`/`PausePanel` 背景的真实屏幕模糊一直没有视觉效果——先后试过三版技术路线(手写 Renderer Feature 用错 API、Shader Graph 单 Pass 采样有天花板、Render Graph 新 API 多趟降采样/升采样),最新这版排查掉了黑屏/Render Graph 报错/Editor Scene 视图摄像机抢占共享贴图这几个问题之后依然没有模糊效果，原因待查，已搁置
+-   [#5](https://github.com/Chaos487/RidingBike/issues/5) Trick System 圈数判定基本可用，但仍偶尔不稳定——2026-09-22 连续修了三个 bug（惯性旋转没算进去、前后轮谁先触地导致漏记旋转、腾空途中蹭地被误判成落地），用户复测后表示主要问题已解决但仍偶发不稳定，具体触发条件待继续排查
 
 ------------------------------------------------------------------------
 

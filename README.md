@@ -9,7 +9,7 @@
 ## 核心玩法
 
 骑车向右无限前进,地形持续生成、有上下坡和障碍物。玩家需要在高速前进的同时控制姿态、
-跳跃、空翻,追求"贴身擦过障碍物"和"高质量落地"带来的连击和分数,姿态彻底失控会摔车。
+跳跃、空翻,追求"贴身擦过障碍物"和"高质量落地"带来的分数,姿态彻底失控会摔车。
 
 **操作**:
 - `A` / `D`(或方向键左右):加速 / 减速倒车
@@ -39,20 +39,22 @@
 **障碍物**(`ObstacleSpawner.cs`,3.3 节)
 沿地形按概率放置,上坡不放(留作救车缓冲区);碰撞体带圆角避免高速冲量异常。
 
-**落地质量 / 特技 / 连击 / 贴身险**(`LandingDetector.cs` / `TrickSystem.cs` /
-`ComboSystem.cs` / `NearMissDetector.cs`,4.1 / 5 / 6 / 7 节)
-落地瞬间按角度偏差、角速度、垂直速度分出 Perfect / Good / Bad;空中转出的角度按
-档位换算特技分;贴身擦过障碍物、或 Perfect/Good 落地会累计连击,超时或摔车清零。
-这四个系统的分数目前互相独立展示,**还没有一个统一的 ScoreSystem 把它们乘到一起**。
+**落地质量 / 特技 / 贴身险**(`LandingDetector.cs` / `TrickSystem.cs` /
+`NearMissDetector.cs`,4.1 / 5 / 7 节)
+落地瞬间只看前后轮有效接地的时间差(Δt)分出 Perfect / Good / Not Bad,不读车身角度/
+坡度/角速度/垂直速度;空中转出的完整圈数按查表给 Trick Score(按圈数,不是精确角度
+档位),Trick Score 会累计显示在右上角的 Score;这几块分数目前互相独立,**还没有一个
+统一的 ScoreSystem 把 Distance/Trick 揉到一起**。Combo 连击系统已经整体移除(实现过
+一版纯计数器,没有真正接入分数,评估后觉得太复杂,直接砍掉,不在当前设计范围内)。
 
 **摔车判定 / 生命值**(`CrashDetector.cs` + `BikeDamageSystem.cs`,3.4 / 3.8 节)
 车身触地且倾角超过阈值、持续一小段时间才判定一次"失控";失控不直接结束一局,而是
 扣一条 HP 血条(默认能扛 2 次、第 3 次才真的摔车结算),期间给无敌时间和贴图闪烁提示。
 
 **局内 UI / 结算**(`RunManager.cs`,3.5 节)
-距离、时速、氮气就绪状态、连击数、HP 血条实时显示;特技/摔车/贴身险弹字提示;
-摔车后显示结算信息,`R` 重开。**结算画面目前只有距离,没有分数/最佳记录**,也没有任何
-跨局存档。
+距离、时速、氮气就绪状态、HP 血条、Score(Trick Score 累计值)实时显示;落地质量/特技/
+摔车/贴身险弹字提示,落地质量和特技各用独立的 Text 纵向堆叠显示,互不打断。摔车后
+显示结算信息,`R` 重开。**结算画面目前只有距离,没有分数/最佳记录**。
 
 **开始画面 / 主菜单**(`RunManager.cs` 的开始 gate + `MainMenuController.cs`)
 开始前是"tap to start"——屏幕背后能看到骑行场景(地形/车,只是暂停了),没有单独一个
@@ -171,7 +173,7 @@ Scene 视图摄像机抢占共享贴图这几个问题之后,视觉上依然没�
 
 只列要点,完整清单、优先级排序(P0→P3)、每一项的具体欠账见设计文档第 0 / 23 节:
 
-- 没有统一 ScoreSystem,Combo 不真正影响分数,摔车结算画面信息不全
+- 没有统一 ScoreSystem(Distance/Trick 分数没有揉到一起),摔车结算画面信息不全
 - [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)、
   [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2) 两个已知 bug,状态见设计文档第 0 节;
   [GitHub #4](https://github.com/Chaos487/RidingBike/issues/4) 弹窗背景真实模糊做不出效果,已搁置

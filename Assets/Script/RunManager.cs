@@ -23,13 +23,11 @@ public class RunManager : MonoBehaviour
     BikeDamageSystem damageSystem;
     BikeController bikeController;
     TrickSystem trickSystem;
-    ComboSystem comboSystem;
     ObstacleSpawner obstacleSpawner;
 
     Text distanceText;
     Text speedText;
     Text boostText;
-    Text comboText;
     Text toastText;
     Text trickToastText;
     Text statusText;
@@ -216,7 +214,6 @@ public class RunManager : MonoBehaviour
         if (distanceText != null) distanceText.gameObject.SetActive(visible);
         if (speedText != null) speedText.gameObject.SetActive(visible);
         if (boostText != null) boostText.gameObject.SetActive(visible);
-        if (comboText != null) comboText.gameObject.SetActive(visible);
         if (hpLabelText != null) hpLabelText.gameObject.SetActive(visible);
         if (hpBarRoot != null) hpBarRoot.SetActive(visible);
         if (boostButton != null) boostButton.gameObject.SetActive(visible);
@@ -225,19 +222,17 @@ public class RunManager : MonoBehaviour
         if (scoreText != null) scoreText.gameObject.SetActive(visible);
     }
 
-    /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
-    /// EndlessRunBootstrap 里这两个系统要在 RunManager 之后才创建(它们依赖 LandingDetector)。
+    /// <summary>接上特技反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
+    /// EndlessRunBootstrap 里这个系统要在 RunManager 之后才创建(它依赖 LandingDetector)。
     /// Landing Quality 和 Trick 各自用独立的 Text/Tween(ToastText / TrickToastText，纵向堆叠在
     /// 屏幕上方)，互不打断——不像 NearMiss/Crash/Station 提示那样抢同一个 ToastText。</summary>
-    public void InitializeFeedback(TrickSystem trick, ComboSystem combo, ObstacleSpawner obstacles, LandingDetector landing)
+    public void InitializeFeedback(TrickSystem trick, ObstacleSpawner obstacles, LandingDetector landing)
     {
         trickSystem = trick;
-        comboSystem = combo;
         obstacleSpawner = obstacles;
 
         landing.OnLanded += HandleLanded;
         trickSystem.OnTrickScored += HandleTrickScored;
-        comboSystem.OnComboChanged += HandleComboChanged;
         obstacleSpawner.OnNearMiss += HandleNearMiss;
     }
 
@@ -405,11 +400,6 @@ public class RunManager : MonoBehaviour
             .DOPunchScale(Vector3.one * hpPunchStrength, hpPunchDuration, hpPunchVibrato, hpPunchElasticity);
     }
 
-    void HandleComboChanged(int comboCount)
-    {
-        comboText.text = comboCount > 0 ? $"Combo x{comboCount}" : string.Empty;
-    }
-
     // Landing Quality(ToastText)和 Trick(TrickToastText)各自有独立的 Text + Tween，
     // 互相独立地弹出/淡出，不会因为共用同一个组件而互相打断/覆盖对方正在显示的内容。
     void ShowToast(string message) => ShowToastOn(toastText, ref toastTweener, message);
@@ -466,7 +456,6 @@ public class RunManager : MonoBehaviour
         distanceText = FindText("DistanceText");
         speedText = FindText("SpeedText");
         boostText = FindText("BoostText");
-        comboText = FindText("ComboText");
         toastText = FindText("ToastText");
         trickToastText = FindText("TrickToastText");
         statusText = FindText("StatusText");
