@@ -117,6 +117,18 @@ public class LandingDetector : MonoBehaviour
             return;
         }
 
+        // 触发 Pending 的那只轮子自己先弹开了(腾空途中蹭了一下地面/小坡坎，没有真正落地)，
+        // 另一只轮子也没跟上——这次不算数，取消判定，回到 Airborne 重新等下一次两只轮子都
+        // 实打实触地。不这样处理的话，蹭一下地面就会卡在 Pending 里干等 landingTimeout，
+        // 到时间就拿蹭地那一刻的旧数据强行结算一次，把明明还在继续的同一次转体腰斩成两段
+        // (症状：同一次滞空里连续出现两次"进入滞空"、中间夹着一次不该有的"落地结算")。
+        bool firstStillGrounded = firstContactWheel == Wheel.Front ? frontGrounded : backGrounded;
+        if (!firstStillGrounded)
+        {
+            state = State.Airborne;
+            return;
+        }
+
         if (Time.time - firstContactTime >= landingTimeout)
         {
             ResolveTimeout();

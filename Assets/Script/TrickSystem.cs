@@ -25,7 +25,7 @@ public class TrickSystem : MonoBehaviour
         bike = bikeController;
         landingDetector = detector;
         landingDetector.OnLanded += HandleLanded;
-        wasGrounded = bike.IsWheelGrounded;
+        wasGrounded = bike.IsConfirmedGrounded;
     }
 
     public void ApplySettings(TrickSystemSettings settings)
@@ -36,12 +36,14 @@ public class TrickSystem : MonoBehaviour
 
     // 临时调试日志，排查"转了一圈但没判定"这类问题用——实时打出腾空开始/每转满一圈/落地结算
     // 三种时机，方便对照实际按键手感跟 SpinAccumulatedDegrees 记录的度数是不是一致。
-    // 确认稳定之后可以整段删掉，不影响任何逻辑。
+    // 读 IsConfirmedGrounded(带 landingConfirmTime 防抖)而不是 IsWheelGrounded，这样日志里的
+    // "开始判定"时机才跟 BikeController 实际用来重置旋转基准的时机保持一致，不会因为腾空途中
+    // 蹭一下地面的单帧假触地凭空多打一轮日志。确认稳定之后可以整段删掉，不影响任何逻辑。
     void Update()
     {
         if (bike == null) return;
 
-        bool grounded = bike.IsWheelGrounded;
+        bool grounded = bike.IsConfirmedGrounded;
 
         if (!wasGrounded && !grounded)
         {

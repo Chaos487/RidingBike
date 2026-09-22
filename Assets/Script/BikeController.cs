@@ -103,6 +103,9 @@ public class BikeController : MonoBehaviour
     public float spinHoldThreshold = 0.15f;
     [Tooltip("旋转时的角速度 (deg/s)，越大转得越快。")]
     public float spinAngularSpeed = 720f;
+    [Tooltip("轮子触地要持续这么久(秒)才算\"真正落地\"，用来过滤腾空途中蹭一下地面/小坡坎的单帧假触地——" +
+             "不然会把同一次连续转体腰斩成两段，旋转计数、跳跃/旋转再次可用的解锁时机都会被误判。")]
+    public float landingConfirmTime = 0.05f;
 
     [Header("Invulnerability Flash")]
     [Tooltip("摔车扣血后的无敌期间，车身贴图一亮一灭切换一次的间隔(秒)，越小闪得越快。")]
@@ -124,6 +127,7 @@ public class BikeController : MonoBehaviour
     bool hasJumpedThisAirtime;
     float spinDirection;
     float spinAccumulatedDeg;
+    float groundedHoldTime;
     float airborneStartRotation;
     bool wasGroundedForSpin = true;
 
@@ -162,6 +166,12 @@ public class BikeController : MonoBehaviour
     public bool IsWheelGrounded =>
         (FrontWheelContact != null && FrontWheelContact.IsGrounded) ||
         (BackWheelContact != null && BackWheelContact.IsGrounded);
+
+    /// <summary>跟 IsWheelGrounded 的区别：这个做了 landingConfirmTime 防抖，腾空途中蹭一下地面的
+    /// 单帧假触地不会让它变 true。旋转计数(SpinAccumulatedDegrees)、跳跃/旋转再次可用的判定都用
+    /// 的是这份"确认过的触地"；外部系统想知道跟这些判定同步的"是否真的已经落地"，应该读这个，
+    /// 不要直接读 IsWheelGrounded。</summary>
+    public bool IsConfirmedGrounded { get; private set; }
 
     /// <summary>车架本身(不是轮子)有没有真的物理接触到东西。供 CrashDetector 判断车身是不是
     /// 已经倒地/打滑——车翻倒的时候轮子经常翘空、凑不齐"两轮都触地"，但车架会真的贴到地面。</summary>
@@ -371,7 +381,15 @@ public class BikeController : MonoBehaviour
         bool groundedForJump = IsGrounded();
         // 旋转/滞空状态机改用真实轮胎接触：这里误判方向必须是"以为还在空中"才安全——
         // 用射线的话，滞空高度不够大时会在真正腾空/落地前就先报"触地"，把旋转提前打断。
-        bool groundedForAirtime = IsWheelGrounded;
+        bool wheelGrounded = IsWheelGrounded;
+
+        // 触地要持续 landingConfirmTime 才算数，单帧的假触地(腾空途中蹭一下地面/小坡坎，
+        // 下一帧立刻又离地)不算——不然会把同一次连续转体腰斩成两段：跳跃/旋转的"再次可用"
+        // 提前解锁，旋转基准(airborneStartRotation)也被提前重置，实际转了两圈的动作可能被
+        // 拆成两个都不到一圈的片段。
+        groundedHoldTime = wheelGrounded ? groundedHoldTime + Time.deltaTime : 0f;
+        bool groundedForAirtime = groundedHoldTime >= landingConfirmTime;
+        IsConfirmedGrounded = groundedForAirtime;
 
         if (groundedForAirtime)
         {
