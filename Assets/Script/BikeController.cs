@@ -124,6 +124,7 @@ public class BikeController : MonoBehaviour
     bool hasJumpedThisAirtime;
     float spinDirection;
     float spinAccumulatedDeg;
+    float airborneStartRotation;
     bool wasGroundedForSpin = true;
 
     float frontWheelRadius;
@@ -166,7 +167,9 @@ public class BikeController : MonoBehaviour
     /// 已经倒地/打滑——车翻倒的时候轮子经常翘空、凑不齐"两轮都触地"，但车架会真的贴到地面。</summary>
     public WheelContactSensor BodyContact { get; private set; }
 
-    /// <summary>本次滞空期间已经累计转了多少度(持续按空格会一直累加，松手或落地才停)。外部系统(比如特技计分)据此判定转出了哪一档。</summary>
+    /// <summary>本次滞空期间车身真实物理转过的角度(从离地那一刻的角度算起，持续到落地那一刻，
+    /// 不只是按着空格主动转的那一段——松手之后惯性/自动回正带着车身继续转的部分也算在内，
+    /// 这样才跟玩家视觉上看到的旋转量一致)。外部系统(比如特技计分)据此判定转出了哪一档。</summary>
     public float SpinAccumulatedDegrees => spinAccumulatedDeg;
 
     void Reset()
@@ -376,11 +379,24 @@ public class BikeController : MonoBehaviour
             hasSpunThisAirtime = false;
             hasJumpedThisAirtime = false;
             spaceHoldTime = 0f;
+            // spinAccumulatedDeg 不在这里清零——落地这一刻正是 LandingDetector/TrickSystem
+            // 读它结算这次滞空转了多少度的时候，要保留到下一次真正腾空才重置。
         }
-        else if (wasGroundedForSpin)
+        else
         {
-            // 刚离地，开始新一次滞空——清零上次的旋转计数，避免特技系统读到上一次滞空的残留角度。
-            spinAccumulatedDeg = 0f;
+            if (wasGroundedForSpin)
+            {
+                // 刚离地，开始新一次滞空——记录这一刻的车身角度作为这次滞空的旋转基准。
+                airborneStartRotation = bikeRigidbody.rotation;
+            }
+
+            // 按车身真实物理转过的角度算分，不是"按住空格的时长 × 固定转速"——旧版按松手就停止
+            // 计时，但松手那一刻车身还带着角速度会再转一截(惯性)，等自动回正接管才慢慢转回去，
+            // 玩家视觉上看到的是转完了一整圈，计分却提前停了，感觉判定"不准"。现在持续读
+            // bikeRigidbody.rotation 相对离地那一刻的差值，惯性转的这一截也算进去，跟玩家看到的
+            // 旋转量保持一致。Rigidbody2D.rotation 是不会按 360 折返的连续值，这里可以直接相减，
+            // 不需要 DeltaAngle 那种做"最短夹角"的处理。
+            spinAccumulatedDeg = bikeRigidbody.rotation - airborneStartRotation;
         }
         wasGroundedForSpin = groundedForAirtime;
 
@@ -465,11 +481,12 @@ public class BikeController : MonoBehaviour
     {
         if (!isSpinning) return;
 
+        // 只负责"让车身转起来"这个物理动作本身——转了多少度现在由 HandleJumpAndSpin() 里
+        // 持续读 bikeRigidbody.rotation 的真实变化量来算，这里不再重复累计。
         bikeRigidbody.angularVelocity = spinDirection * spinAngularSpeed;
-        spinAccumulatedDeg += spinAngularSpeed * Time.fixedDeltaTime;
 
-        // 持续按住(空格或触屏)就一直转，可以转出 540°/720° 这种高风险档位；松手就停在当前角度，
-        // 剩下交给自动回正/玩家手感去调整落地姿态。
+        // 持续按住(空格或触屏)就一直转，可以转出 540°/720° 这种高风险档位；松手就停在当前角速度，
+        // 剩下交给自动回正/玩家手感去调整落地姿态——但那段惯性转动现在也会被计入 SpinAccumulatedDegrees。
         if (!actionHeld)
         {
             isSpinning = false;
