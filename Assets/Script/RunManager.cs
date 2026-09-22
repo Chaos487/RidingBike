@@ -31,6 +31,7 @@ public class RunManager : MonoBehaviour
     Text boostText;
     Text comboText;
     Text toastText;
+    Text trickToastText;
     Text statusText;
     Text hpLabelText;
     Text bestDistanceText;
@@ -82,6 +83,7 @@ public class RunManager : MonoBehaviour
     public Color boostNotReadyColor = new Color(0.5f, 0.5f, 0.5f, 0.4f);
 
     Sequence toastTweener;
+    Sequence trickToastTweener;
     Tweener hpPunchTweener;
     Tweener hpBlinkTweener;
     bool hpBlinking;
@@ -225,9 +227,8 @@ public class RunManager : MonoBehaviour
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
     /// EndlessRunBootstrap 里这两个系统要在 RunManager 之后才创建(它们依赖 LandingDetector)。
-    /// 这里比 TrickSystem 更早订阅 landingDetector.OnLanded(调用方保证的顺序)——转出特技的落地,
-    /// TrickSystem 随后弹出的更具体的提示("Backflip x圈数")会拼在落地质量下面显示两行；
-    /// 没转特技的普通落地则只有质量这一行。</summary>
+    /// Landing Quality 和 Trick 各自用独立的 Text/Tween(ToastText / TrickToastText，纵向堆叠在
+    /// 屏幕上方)，互不打断——不像 NearMiss/Crash/Station 提示那样抢同一个 ToastText。</summary>
     public void InitializeFeedback(TrickSystem trick, ComboSystem combo, ObstacleSpawner obstacles, LandingDetector landing)
     {
         trickSystem = trick;
@@ -240,15 +241,9 @@ public class RunManager : MonoBehaviour
         obstacleSpawner.OnNearMiss += HandleNearMiss;
     }
 
-    // 落地事件必然比同一次落地的 Trick 结算先触发(RunManager 比 TrickSystem 更早订阅
-    // landingDetector.OnLanded，见 InitializeFeedback 的注释)，这里存一份给 HandleTrickScored
-    // 拼到第二行用，两者共用同一个 Toast 组件、换行垂直排列显示。
-    string lastLandingQualityLabel = string.Empty;
-
     void HandleLanded(LandingDetector.Quality quality, LandingDetector.ContactOrder order)
     {
-        lastLandingQualityLabel = LandingQualityLabel(quality);
-        ShowToast(lastLandingQualityLabel);
+        ShowToast(LandingQualityLabel(quality));
     }
 
     static string LandingQualityLabel(LandingDetector.Quality quality) => quality switch
@@ -309,11 +304,11 @@ public class RunManager : MonoBehaviour
 
     void HandleTrickScored(int trickScore, int laps)
     {
-        ShowToast($"{lastLandingQualityLabel}\nBackflip x{laps}");
+        ShowTrickToast($"Backflip x{laps}");
 
         // 参考 Alto's Odyssey:弹字先单独出现，等它淡出之后这次的分数才真正计入右上角的总分。
-        // 单独起一个延时调用，不挂在共享的 toastTweener 上——toastTweener 会被后面新弹出的
-        // toast Kill 掉，挂在它上面的话分数可能因为被另一条 toast 打断而永远加不上。
+        // 单独起一个延时调用，不挂在 trickToastTweener 上——它会被下一次 Backflip 的新 toast
+        // Kill 掉，挂在它上面的话分数可能因为被另一条 toast 打断而永远加不上。
         // ignoreTimeScale 显式传 false，跟游戏里其它动画一样在 Time.timeScale = 0 时暂停计时。
         DOVirtual.DelayedCall(toastHoldSeconds + toastFadeSeconds, () => AddScore(trickScore), false);
     }
@@ -415,18 +410,26 @@ public class RunManager : MonoBehaviour
         comboText.text = comboCount > 0 ? $"Combo x{comboCount}" : string.Empty;
     }
 
-    void ShowToast(string message)
+    // Landing Quality(ToastText)和 Trick(TrickToastText)各自有独立的 Text + Tween，
+    // 互相独立地弹出/淡出，不会因为共用同一个组件而互相打断/覆盖对方正在显示的内容。
+    void ShowToast(string message) => ShowToastOn(toastText, ref toastTweener, message);
+
+    void ShowTrickToast(string message) => ShowToastOn(trickToastText, ref trickToastTweener, message);
+
+    void ShowToastOn(Text target, ref Sequence tweener, string message)
     {
-        toastTweener?.Kill();
+        if (target == null) return;
 
-        toastText.text = message;
-        Color c = toastText.color;
+        tweener?.Kill();
+
+        target.text = message;
+        Color c = target.color;
         c.a = 1f;
-        toastText.color = c;
+        target.color = c;
 
-        toastTweener = DOTween.Sequence()
+        tweener = DOTween.Sequence()
             .AppendInterval(toastHoldSeconds)
-            .Append(toastText.DOFade(0f, toastFadeSeconds));
+            .Append(target.DOFade(0f, toastFadeSeconds));
     }
 
     void HandleCrash()
@@ -465,6 +468,7 @@ public class RunManager : MonoBehaviour
         boostText = FindText("BoostText");
         comboText = FindText("ComboText");
         toastText = FindText("ToastText");
+        trickToastText = FindText("TrickToastText");
         statusText = FindText("StatusText");
         hpLabelText = FindText("HpLabelText");
         bestDistanceText = FindText("BestDistanceText");
@@ -479,6 +483,7 @@ public class RunManager : MonoBehaviour
         boostButtonImage = boostButton != null ? boostButton.GetComponent<Image>() : null;
 
         if (toastText != null) toastText.text = string.Empty;
+        if (trickToastText != null) trickToastText.text = string.Empty;
         if (statusText != null) statusText.gameObject.SetActive(false);
 
         bestDistance = PlayerPrefs.GetFloat(BestDistanceKey, 0f);
