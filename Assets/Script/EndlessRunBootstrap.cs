@@ -80,13 +80,17 @@ public static class EndlessRunBootstrap
 
         TrickSystem trickSystem = systems.AddComponent<TrickSystem>();
         trickSystem.ApplySettings(FindSettings<TrickSystemSettings>());
-        trickSystem.Initialize(bike, landingDetector);
 
         ComboSystem comboSystem = systems.AddComponent<ComboSystem>();
         comboSystem.ApplySettings(FindSettings<ComboSystemSettings>());
         comboSystem.Initialize(landingDetector, obstacleSpawner, crashDetector);
 
-        runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner);
+        // 先接 RunManager 的落地质量弹字，再接 TrickSystem——两者都订阅同一个 landingDetector.OnLanded，
+        // 事件按订阅顺序同步触发，这样有特技结算的落地会让 TrickSystem 的弹字(更具体)盖掉刚弹出的
+        // 质量弹字，没转特技的普通落地才会一直显示 PERFECT!/GOOD/NOT BAD。
+        runManager.InitializeFeedback(trickSystem, comboSystem, obstacleSpawner, landingDetector);
+
+        trickSystem.Initialize(bike, landingDetector);
 
         CameraDirector cameraDirector = SetupCamera(bike, damageSystem, landingDetector);
         if (cameraDirector != null)

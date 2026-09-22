@@ -218,18 +218,33 @@ public class RunManager : MonoBehaviour
     }
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
-    /// EndlessRunBootstrap 里这两个系统要在 RunManager 之后才创建(它们依赖 LandingDetector)。</summary>
-    public void InitializeFeedback(TrickSystem trick, ComboSystem combo, ObstacleSpawner obstacles)
+    /// EndlessRunBootstrap 里这两个系统要在 RunManager 之后才创建(它们依赖 LandingDetector)。
+    /// 这里比 TrickSystem 更早订阅 landingDetector.OnLanded(调用方保证的顺序)——转出特技的落地
+    /// 会被 TrickSystem 随后弹出的更具体的提示盖掉，没转特技的普通落地则会一直显示质量弹字。</summary>
+    public void InitializeFeedback(TrickSystem trick, ComboSystem combo, ObstacleSpawner obstacles, LandingDetector landing)
     {
         trickSystem = trick;
         comboSystem = combo;
         obstacleSpawner = obstacles;
 
+        landing.OnLanded += HandleLanded;
         trickSystem.OnTrickScored += HandleTrickScored;
         trickSystem.OnTrickFailed += HandleTrickFailed;
         comboSystem.OnComboChanged += HandleComboChanged;
         obstacleSpawner.OnNearMiss += HandleNearMiss;
     }
+
+    void HandleLanded(LandingDetector.Quality quality, LandingDetector.ContactOrder order)
+    {
+        ShowToast(LandingQualityLabel(quality));
+    }
+
+    static string LandingQualityLabel(LandingDetector.Quality quality) => quality switch
+    {
+        LandingDetector.Quality.Perfect => "PERFECT!",
+        LandingDetector.Quality.Good => "GOOD",
+        _ => "NOT BAD",
+    };
 
     void Update()
     {
