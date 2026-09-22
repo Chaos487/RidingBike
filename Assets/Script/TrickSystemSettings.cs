@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 /// <summary>
@@ -9,21 +8,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "TrickSystemSettings", menuName = "RidingBike/Trick System Settings")]
 public class TrickSystemSettings : ScriptableObject
 {
-    [Serializable]
-    public struct Tier
-    {
-        [Tooltip("本次滞空累计旋转角度达到这个值(度)才算这一档。")]
-        public float minDegrees;
-        public int score;
-    }
-
-    [Tooltip("按累计旋转角度分档给分，取满足条件里最高的一档；转的角度比最小一档还少就不计分。")]
-    public Tier[] tiers = new[]
-    {
-        new Tier { minDegrees = 90f, score = 50 },
-        new Tier { minDegrees = 180f, score = 100 },
-        new Tier { minDegrees = 360f, score = 250 },
-        new Tier { minDegrees = 540f, score = 500 },
-        new Tier { minDegrees = 720f, score = 1000 },
-    };
+    [Tooltip("按完整旋转圈数给分：Element 0 = 转满 1 圈的分数，Element 1 = 2 圈，以此类推。" +
+             "转的圈数超过这个列表长度时，直接沿用最后一档（最高分），不会越界。")]
+    public int[] scorePerLap = { 50, 150, 300, 500, 750 };
 }
