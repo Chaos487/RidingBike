@@ -192,9 +192,13 @@ public class CameraDirector : MonoBehaviour
 
         // 落地那一刻的回弹改成订阅 LandingDetector 抛出的事件，不再自己单独判一遍
         // "上一帧空中、这一帧触地"——避免两套系统各判一次、逻辑重复。
+        // 空中/触地状态改用 IsConfirmedGrounded(带 landingConfirmTime 防抖的真实轮胎接触)，
+        // 不再用 IsGrounded() 那条高容忍度的距离射线——那条射线专门为了"起跳判定不要太灵敏"
+        // 才故意设得宽松，用来判"这一帧算不算腾空"反而会在腾空的头尾一段时间里误判成触地，
+        // 导致空中拉远这个反馈在快速起跳/落地时该出现却没出现。
         if (!punchInProgress)
         {
-            UpdateZoom(bike.IsGrounded());
+            UpdateZoom(bike.IsConfirmedGrounded);
         }
         if (!introFramingActive) UpdateLookahead();
     }
