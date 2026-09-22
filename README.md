@@ -118,8 +118,10 @@ Odyssey 的沙丘剪影)。不用 `BackgroundScroller` 的摄像机视差公式(
 
 **音频框架**(`AudioManager.cs`,3.10 节)
 挂在场景里的一个独立物体上,六个可配置槽位(BGM/环境音/骑行中/落地/加速/摔车),
-每个槽位支持多音频随机或顺序播放、延迟触发、是否循环。**目前只是空的架子,场景里
-还没有挂任何实际音频文件,运行是静音的。**
+每个槽位支持多音频随机或顺序播放、延迟触发、是否循环。**`bgm`/`ambient` 这两个槽位
+已经接了真实音频文件(`Assets/Audio/bgm_main01.mp3`/`sfx_env_main01.mp3`),运行起来
+背景音乐/环境音是有声音的;`ride`/`landing`/`boost`/`crash` 这四个槽位还是空的,骑行/
+落地/加速/摔车目前依然没有对应音效。**
 
 **自动装配**(`EndlessRunBootstrap.cs`,3.7 节)
 场景加载(含重开)时自动找到 Bike、停用场景里的静态地面、实例化并接好上述所有系统,
@@ -169,8 +171,16 @@ Scene 视图摄像机抢占共享贴图这几个问题之后,视觉上依然没�
 
 只列要点,完整清单、优先级排序(P0→P3)、每一项的具体欠账见设计文档第 0 / 23 节:
 
-- 没有统一 ScoreSystem,Combo 不真正影响分数,摔车结算画面信息不全,没有跨局存档
+- 没有统一 ScoreSystem,Combo 不真正影响分数,摔车结算画面信息不全
 - [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)、
-  [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2) 两个已知 bug,状态见设计文档第 0 节
-- Event/Landmark 地形、Speed Risk、难度曲线、Roguelike 三选一/Build 构筑、局外 Meta 进度:均未开始
-- 正式美术(地形/障碍物仍是纯色网格和色块)、音频内容(架子已搭,没有素材)、移动端输入:均未完成
+  [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2) 两个已知 bug,状态见设计文档第 0 节;
+  [GitHub #4](https://github.com/Chaos487/RidingBike/issues/4) 弹窗背景真实模糊做不出效果,已搁置
+- Event/Landmark 地形、Speed Risk、难度曲线:均未开始。**Roguelike Station 三选一已经实现**
+  (见上面"Roguelike Station 三选一"一节),但"把选项归类成 Speed/Trick/Control 这种 Build
+  流派"这层、自行车部件构筑、局外 Meta 进度(花齿轮/永久解锁)都还没做
+- 正式美术:背景(craftpix 像素美术)、车身(真实线稿图)已经不是占位了,**地形/障碍物依然是
+  纯色网格和色块**。音频:`bgm`/`ambient` 两个槽位已经接了真实音频文件,`ride`/`landing`/
+  `boost`/`crash` 四个还是空的。移动端输入均未完成(核心操作仍是键盘,只有加速/暂停两个
+  按钮做了触屏兼容)
+- 跨局持久化目前只有"最远距离"(`RunManager`)和"齿轮数量"(`GearManager`)用 `PlayerPrefs`
+  存了,没有更复杂的存档/解锁状态需要存(因为还没有能花的东西)

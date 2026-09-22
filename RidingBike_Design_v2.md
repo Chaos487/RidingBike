@@ -63,6 +63,8 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 -   **尾气/扬尘粒子效果**（`BikeExhaust.cs`/`BikeExhaustSettings.cs`）：代码已接入 `EndlessRunBootstrap`，见 3.16 节。**`Assets/Resources/ExhaustTrail.prefab` 这份粒子预制体还没有人做**，找不到就跳过、只打一条 Warning，等美术把预制体放上去就能直接看到效果，不用再改代码
 -   **弹窗背景真实模糊**（`ScreenBlurFeature.cs`/`ScreenBlur.shader`/`BlurredPanelBackground.shader`）：**没做成，已搁置**，详细排查记录见 [GitHub #4](https://github.com/Chaos487/RidingBike/issues/4)。`NodePanel`/`MenuPanel`/`PausePanel` 背景现在挂的是 `BlurredPanelBackground.mat`，理论上接的是这套 Render Graph 多趟降采样/升采样算出来的模糊贴图，但视觉上看不出模糊效果，原因还没定位——下一个 session 要么继续查（建议先用 Frame Debugger 逐帧核实每一趟 Pass 的实际输出），要么换路线
 
+**2026-09-22 订正**：第 24 节"目前尚未完成"清单里好几条已经过时——**Roguelike Station 三选一（`NodeManager.cs`）其实早就做完了**，清单上一直写着"未完成"没人去掉，导致新开一个 session 只看这份文档、没去核对代码库，直接把这条当成事实转述给了用户。顺带查的时候发现"正式美术"（背景/车身已经是真实美术，只有地形/障碍物还是占位）、"音效/音乐"（`bgm`/`ambient` 两个槽位已经接了真实音频文件，见 3.10 节这次一起订正）、"存档/进度持久化"（最远距离、齿轮数量早就用 `PlayerPrefs` 存了）这三条也都写得比实际情况悲观。24 节已经改成准确状态。**教训**：这种"尚未完成"清单是会跟实际进度分叉的，不能只看它判断某个功能做没做，做完/做一半都要随手回来划掉或者订正，不要攒着等下次大审计。
+
 ------------------------------------------------------------------------
 
 # 1. 核心玩法
@@ -257,7 +259,12 @@ P0 四个系统本身都已经闭环（`EndlessRunBootstrap` 已接好、`RunMan
 
 ## 3.10 音频框架 `AudioManager.cs`
 
-> 只是结构，不是内容——见第 0 节的说明，目前场景里没有挂任何音频 clip。
+> **2026-09-22 更新**：`bgm`/`ambient` 两个槽位已经在场景里挂了真实音频文件
+> （`Assets/Audio/bgm_main01.mp3`/`sfx_env_main01.mp3`），运行起来背景音乐/环境音是
+> 有声音的；`ride`/`landing`/`boost`/`crash` 这四个槽位依然是空的（`Assets/Audio/` 下
+> 还有一个 `sfx_bike_land.mp3` 文件，但目前没挂到 `landing` 槽位上，属于素材已经在但
+> 还没接的状态）。这份改动是在这个项目另一个并行的 Editor session 里做的，不是这次
+> 改的，之前"目前场景里没有挂任何音频 clip"这句已经过时。
 
 -   直接挂在 `SampleScene` 里一个独立的空物体（`AudioManager`）上手动配置，不是
     `EndlessRunBootstrap` 运行时生成的——单例（`AudioManager.Instance`），因为
@@ -1283,14 +1290,24 @@ P0 范围内仍欠账（见 0 节展开）：
 
 -   Event / Landmark Terrain
 -   Speed Risk
--   Roguelike 三选一 Upgrade
--   Speed / Trick / Control Build
+-   ~~Roguelike 三选一 Upgrade~~ —— **已完成**（`NodeManager.cs` 调度，见 3.x 节，README
+    有详细说明），这条从"未完成"移出去了；这里错过一次没更新，导致 2026-09-22 有新开的
+    session 看着这份文档以为它还没做，教训是这种列表跟实现进度分叉了要随手改，不要攒着
+-   Speed / Trick / Control Build（把三选一的选项归类成"流派"、给流派搭配加成的那一层，
+    不是三选一本身——这层确实还没做）
 -   自行车部件构筑
--   局外 Meta Progression
--   正式美术
--   音效 / 音乐
--   移动端输入
--   存档 / 进度持久化
+-   局外 Meta Progression（花齿轮/永久解锁——`GearManager` 现在只有 `AddGear`，没有
+    `SpendGear`）
+-   正式美术（**部分完成**：背景`Background.prefab`已经是真实 craftpix 像素美术、车身
+    `Bike.prefab`已经是真实线稿图，地形`EndlessTerrainGenerator`/障碍物`ObstacleSpawner`
+    依然是纯色网格和色块）
+-   音效 / 音乐（**部分完成**：`AudioManager` 的 `bgm`/`ambient` 两个槽位已经接了真实音频
+    文件`Assets/Audio/bgm_main01.mp3`/`sfx_env_main01.mp3`，运行起来有背景音乐/环境音；
+    `ride`/`landing`/`boost`/`crash` 四个槽位还是空的）
+-   移动端输入（核心操作——A/D 加速、Space 跳跃/空翻——依然是键盘专属，只有 Boost/暂停
+    这两个按钮本来就是 UI 按钮，天然兼容触屏点击）
+-   存档 / 进度持久化（**部分完成**：`RunManager` 的最远距离、`GearManager` 的齿轮数量都
+    已经用 `PlayerPrefs` 存了，没有更复杂的存档/解锁状态需要存，因为还没有能花齿轮换的东西）
 
 已知问题（跟踪在 GitHub Issues）：
 
