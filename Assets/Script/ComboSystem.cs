@@ -53,7 +53,7 @@ public class ComboSystem : MonoBehaviour
 
     void HandleLanded(LandingDetector.Quality quality, LandingDetector.ContactOrder order)
     {
-        if (quality == LandingDetector.Quality.Bad) return;
+        if (quality == LandingDetector.Quality.NotBad) return;
         AddCombo();
     }
 

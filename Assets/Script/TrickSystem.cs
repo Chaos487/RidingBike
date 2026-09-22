@@ -44,7 +44,7 @@ public class TrickSystem : MonoBehaviour
         int score = ScoreForDegrees(degrees);
         if (score <= 0) return; // 没转够最低档，压根没触发过特技
 
-        if (quality == LandingDetector.Quality.Bad)
+        if (quality == LandingDetector.Quality.NotBad)
         {
             OnTrickFailed?.Invoke(degrees);
             return;

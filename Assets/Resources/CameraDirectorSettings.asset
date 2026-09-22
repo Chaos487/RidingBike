@@ -29,7 +29,7 @@ MonoBehaviour:
   landingPunchOutDuration: 0.22
   perfectLandingPunchScale: 0.2
   goodLandingPunchScale: 1
-  badLandingPunchScale: 1.8
+  notBadLandingPunchScale: 1.8
   maxLookaheadOffset: 1.6
   lookaheadDuration: 0.6
   lookaheadEase: 3

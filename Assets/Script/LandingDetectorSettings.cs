@@ -8,20 +8,15 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "LandingDetectorSettings", menuName = "RidingBike/Landing Detector Settings")]
 public class LandingDetectorSettings : ScriptableObject
 {
-    [Header("Perfect 判定(三项都不超过才算)")]
-    [Tooltip("车身角度和当地坡度的偏差上限(度)。")]
-    public float perfectMaxAngleError = 12f;
-    [Tooltip("落地瞬间车身角速度上限(deg/s)。")]
-    public float perfectMaxAngularSpeed = 90f;
-    [Tooltip("落地瞬间垂直速度上限(m/s)。")]
-    public float perfectMaxVerticalSpeed = 4f;
+    [Header("前后轮有效接地时间差 Δt 分档阈值(秒)")]
+    [Tooltip("Δt 不超过这个值判 Perfect。")]
+    public float perfectThreshold = 0.02f;
 
-    [Header("Good 判定(超过 Perfect、不超过这里算 Good，再往上算 Bad)")]
-    public float goodMaxAngleError = 30f;
-    public float goodMaxAngularSpeed = 200f;
-    public float goodMaxVerticalSpeed = 8f;
+    [Tooltip("Δt 超过 Perfect 阈值、但不超过这个值判 Good；再往上判 Not Bad。" +
+             "这个值同时也是 ContactOrder 判 Simultaneous 的边界。")]
+    public float goodThreshold = 0.05f;
 
-    [Header("前后轮接触顺序")]
-    [Tooltip("两轮触地时间差小于这个值(秒)视为同时着地。")]
-    public float simultaneousContactWindow = 0.05f;
+    [Header("等待第二只轮子触地的超时")]
+    [Tooltip("第一只轮子触地后，超过这么久第二只轮子还没触地，直接判 Not Bad，不再等待。")]
+    public float landingTimeout = 0.15f;
 }

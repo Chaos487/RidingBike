@@ -41,7 +41,7 @@ public class CameraDirector : MonoBehaviour
     float landingPunchOutDuration = 0.22f;
     float perfectLandingPunchScale = 0.2f;
     float goodLandingPunchScale = 1f;
-    float badLandingPunchScale = 1.8f;
+    float notBadLandingPunchScale = 1.8f;
 
     float maxLookaheadOffset = 1.6f;
     float lookaheadDuration = 0.6f;
@@ -142,7 +142,7 @@ public class CameraDirector : MonoBehaviour
         landingPunchOutDuration = settings.landingPunchOutDuration;
         perfectLandingPunchScale = settings.perfectLandingPunchScale;
         goodLandingPunchScale = settings.goodLandingPunchScale;
-        badLandingPunchScale = settings.badLandingPunchScale;
+        notBadLandingPunchScale = settings.notBadLandingPunchScale;
         maxLookaheadOffset = settings.maxLookaheadOffset;
         lookaheadDuration = settings.lookaheadDuration;
         lookaheadEase = settings.lookaheadEase;
@@ -279,7 +279,7 @@ public class CameraDirector : MonoBehaviour
         {
             LandingDetector.Quality.Perfect => perfectLandingPunchScale,
             LandingDetector.Quality.Good => goodLandingPunchScale,
-            _ => badLandingPunchScale,
+            _ => notBadLandingPunchScale,
         };
         PlayLandingPunch(landingPunchAmount * scale);
     }
