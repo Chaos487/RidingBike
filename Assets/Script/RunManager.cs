@@ -219,8 +219,9 @@ public class RunManager : MonoBehaviour
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
     /// EndlessRunBootstrap 里这两个系统要在 RunManager 之后才创建(它们依赖 LandingDetector)。
-    /// 这里比 TrickSystem 更早订阅 landingDetector.OnLanded(调用方保证的顺序)——转出特技的落地
-    /// 会被 TrickSystem 随后弹出的更具体的提示盖掉，没转特技的普通落地则会一直显示质量弹字。</summary>
+    /// 这里比 TrickSystem 更早订阅 landingDetector.OnLanded(调用方保证的顺序)——转出特技的落地,
+    /// TrickSystem 随后弹出的更具体的提示(分数/Trick Failed)会拼在落地质量下面显示两行；
+    /// 没转特技的普通落地则只有质量这一行。</summary>
     public void InitializeFeedback(TrickSystem trick, ComboSystem combo, ObstacleSpawner obstacles, LandingDetector landing)
     {
         trickSystem = trick;
@@ -234,9 +235,15 @@ public class RunManager : MonoBehaviour
         obstacleSpawner.OnNearMiss += HandleNearMiss;
     }
 
+    // 落地事件必然比同一次落地的 Trick 结算先触发(RunManager 比 TrickSystem 更早订阅
+    // landingDetector.OnLanded，见 InitializeFeedback 的注释)，这里存一份给 HandleTrickScored/
+    // HandleTrickFailed 拼到第二行用，两者共用同一个 Toast 组件、换行垂直排列显示。
+    string lastLandingQualityLabel = string.Empty;
+
     void HandleLanded(LandingDetector.Quality quality, LandingDetector.ContactOrder order)
     {
-        ShowToast(LandingQualityLabel(quality));
+        lastLandingQualityLabel = LandingQualityLabel(quality);
+        ShowToast(lastLandingQualityLabel);
     }
 
     static string LandingQualityLabel(LandingDetector.Quality quality) => quality switch
@@ -297,12 +304,12 @@ public class RunManager : MonoBehaviour
 
     void HandleTrickScored(int score, float degrees)
     {
-        ShowToast($"{degrees:0}°  +{score}");
+        ShowToast($"{lastLandingQualityLabel}\n{degrees:0}°  +{score}");
     }
 
     void HandleTrickFailed(float degrees)
     {
-        ShowToast($"Trick Failed ({degrees:0}°)");
+        ShowToast($"{lastLandingQualityLabel}\nTrick Failed ({degrees:0}°)");
     }
 
     void HandleNearMiss()
