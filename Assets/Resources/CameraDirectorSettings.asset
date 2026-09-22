@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7dd8e4faa9c05468d8b760c062dd3acd, type: 3}
   m_Name: CameraDirectorSettings
   m_EditorClassIdentifier: 
-  minOrthoSize: 7
-  maxOrthoSize: 9
+  minOrthoSize: 9
+  maxOrthoSize: 11
   crashOrthoSize: 6.5
-  airborneZoomOutBonus: 0.6
-  zoomInDuration: 1
+  airborneZoomOutBonus: 3
+  zoomInDuration: 0.5
   zoomInEase: 6
-  zoomOutDuration: 1
+  zoomOutDuration: 0.5
   zoomOutEase: 3
   crashZoomDuration: 1
   crashZoomEase: 27
@@ -34,3 +34,6 @@ MonoBehaviour:
   lookaheadDuration: 0.6
   lookaheadEase: 3
   retargetThreshold: 0.03
+  introOffsetX: 7
+  introRevealDuration: 1.1
+  introRevealEase: 3
