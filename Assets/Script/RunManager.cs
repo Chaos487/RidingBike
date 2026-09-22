@@ -6,18 +6,34 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// 管理单局 endless run 的状态:显示距离/时速/氮气就绪状态/连击数、弹出特技/贴身险提示、
-/// 监听摔车、结算并支持按 R 重开。
+/// 管理单局 endless run 的状态:显示距离/时速/氮气就绪状态、弹出摔车/Station 提示、
+/// 监听摔车、结算并支持按 R 重开;落地质量/特技/贴身险这几个"正反馈"事件走右侧的
+/// Feat 列表(见 SetupFeatList/AddFeatEntry)，不是走这里的 Toast。
 /// UI 视觉本身是 Assets/prefab/EndlessRunCanvas.prefab(手动在 Editor 里搭的,改颜色/字体/布局
 /// 直接在那份预制体上改,不用碰这个脚本)——这个脚本是在 EndlessRunBootstrap 里
 /// Instantiate 完预制体之后直接挂到它根节点上的,Awake() 按名字把预制体里的子物体找出来。
 /// 改预制体层级/改物体名字的话，下面 FindUIReferences() 里对应的路径也要跟着改。
+/// Feat 列表本身是运行时用代码搭的(见 SetupFeatList)，不在预制体里，不用去 Editor 里找。
 /// </summary>
 public class RunManager : MonoBehaviour
 {
-    [Header("Toast")]
+    [Header("Toast(Crash / Station 提示用)")]
     public float toastHoldSeconds = 1f;
     public float toastFadeSeconds = 0.4f;
+
+    [Header("右侧 Feat 列表(Landing Quality / Trick / Near Miss)")]
+    [Tooltip("每条 Feat 显示多久(秒)之后开始淡出。")]
+    public float featHoldSeconds = 2f;
+    [Tooltip("Feat 淡出的时长(秒)，淡出结束的那一刻分数才真正计入右上角的 Score。")]
+    public float featFadeSeconds = 0.4f;
+    [Tooltip("Perfect 落地计多少分。")]
+    public int perfectLandingScore = 20;
+    [Tooltip("Good 落地计多少分。")]
+    public int goodLandingScore = 10;
+    [Tooltip("Not Bad 落地计多少分——默认 0，纯粹垫个底不算失败，不专门奖励。")]
+    public int notBadLandingScore = 0;
+    [Tooltip("贴身擦过障碍物(Near Miss)计多少分。")]
+    public int nearMissScore = 15;
 
     Transform bikeTransform;
     BikeDamageSystem damageSystem;
@@ -29,12 +45,12 @@ public class RunManager : MonoBehaviour
     Text speedText;
     Text boostText;
     Text toastText;
-    Text trickToastText;
     Text statusText;
     Text hpLabelText;
     Text bestDistanceText;
     Text gearText;
     Text scoreText;
+    RectTransform featListRoot;
     GearManager gearManager;
     Image hpBarFill;
     TMP_Text hpValueText;
@@ -48,8 +64,8 @@ public class RunManager : MonoBehaviour
     const string BestDistanceKey = "RidingBike_BestDistance";
     float bestDistance;
 
-    // 当前这一局累计的 Trick Score，只在这一局内有效——跟 distance/speed 一样是纯运行时状态，
-    // 不落盘,重开(重新加载场景)自然归零,不需要额外的重置逻辑。
+    // 当前这一局累计的分数(Landing Quality + Trick + Near Miss)，只在这一局内有效——
+    // 跟 distance/speed 一样是纯运行时状态，不落盘,重开(重新加载场景)自然归零。
     int score;
 
     [Header("HP 扣血反馈")]
@@ -81,7 +97,6 @@ public class RunManager : MonoBehaviour
     public Color boostNotReadyColor = new Color(0.5f, 0.5f, 0.5f, 0.4f);
 
     Sequence toastTweener;
-    Sequence trickToastTweener;
     Tweener hpPunchTweener;
     Tweener hpBlinkTweener;
     bool hpBlinking;
@@ -220,12 +235,12 @@ public class RunManager : MonoBehaviour
         if (bestDistanceText != null) bestDistanceText.gameObject.SetActive(visible);
         if (gearText != null) gearText.gameObject.SetActive(visible);
         if (scoreText != null) scoreText.gameObject.SetActive(visible);
+        if (featListRoot != null) featListRoot.gameObject.SetActive(visible);
     }
 
-    /// <summary>接上特技反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
-    /// EndlessRunBootstrap 里这个系统要在 RunManager 之后才创建(它依赖 LandingDetector)。
-    /// Landing Quality 和 Trick 各自用独立的 Text/Tween(ToastText / TrickToastText，纵向堆叠在
-    /// 屏幕上方)，互不打断——不像 NearMiss/Crash/Station 提示那样抢同一个 ToastText。</summary>
+    /// <summary>接上特技反馈系统。跟 Initialize 分开是因为 EndlessRunBootstrap 里这个系统
+    /// 要在 RunManager 之后才创建(它依赖 LandingDetector)。Landing Quality/Trick/Near Miss
+    /// 三种事件都走右侧的 Feat 列表(AddFeatEntry)，不再各自弹 Toast。</summary>
     public void InitializeFeedback(TrickSystem trick, ObstacleSpawner obstacles, LandingDetector landing)
     {
         trickSystem = trick;
@@ -238,7 +253,7 @@ public class RunManager : MonoBehaviour
 
     void HandleLanded(LandingDetector.Quality quality, LandingDetector.ContactOrder order)
     {
-        ShowToast(LandingQualityLabel(quality));
+        AddFeatEntry(LandingQualityLabel(quality), LandingQualityScore(quality));
     }
 
     static string LandingQualityLabel(LandingDetector.Quality quality) => quality switch
@@ -246,6 +261,13 @@ public class RunManager : MonoBehaviour
         LandingDetector.Quality.Perfect => "PERFECT!",
         LandingDetector.Quality.Good => "GOOD",
         _ => "NOT BAD",
+    };
+
+    int LandingQualityScore(LandingDetector.Quality quality) => quality switch
+    {
+        LandingDetector.Quality.Perfect => perfectLandingScore,
+        LandingDetector.Quality.Good => goodLandingScore,
+        _ => notBadLandingScore,
     };
 
     void Update()
@@ -299,13 +321,46 @@ public class RunManager : MonoBehaviour
 
     void HandleTrickScored(int trickScore, int laps)
     {
-        ShowTrickToast($"Backflip x{laps}");
+        AddFeatEntry($"Backflip x{laps}", trickScore);
+    }
 
-        // 参考 Alto's Odyssey:弹字先单独出现，等它淡出之后这次的分数才真正计入右上角的总分。
-        // 单独起一个延时调用，不挂在 trickToastTweener 上——它会被下一次 Backflip 的新 toast
-        // Kill 掉，挂在它上面的话分数可能因为被另一条 toast 打断而永远加不上。
-        // ignoreTimeScale 显式传 false，跟游戏里其它动画一样在 Time.timeScale = 0 时暂停计时。
-        DOVirtual.DelayedCall(toastHoldSeconds + toastFadeSeconds, () => AddScore(trickScore), false);
+    void HandleNearMiss()
+    {
+        AddFeatEntry("NEAR MISS!", nearMissScore);
+    }
+
+    /// <summary>参考 Alto's Odyssey:Landing Quality/Trick/Near Miss 都在右侧列表弹出一条独立的
+    /// Feat,显示 featHoldSeconds 秒之后淡出,淡出结束那一刻这条的分数才真正计入右上角的 Score——
+    /// 每条都有自己的 GameObject/Tween,互相独立,不会因为共用一个组件而被后面新弹出的顶掉，
+    /// 玩家动作做得快的时候会自然堆叠出好几条同时显示,不用另外写"连击链"逻辑。</summary>
+    void AddFeatEntry(string label, int scoreValue)
+    {
+        if (featListRoot == null)
+        {
+            AddScore(scoreValue);
+            return;
+        }
+
+        GameObject entryObj = new GameObject("FeatEntry", typeof(RectTransform));
+        entryObj.transform.SetParent(featListRoot, false);
+
+        Text text = entryObj.AddComponent<Text>();
+        text.font = toastText != null ? toastText.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.fontSize = 24;
+        text.alignment = TextAnchor.UpperRight;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Truncate;
+        text.color = Color.white;
+        text.text = label;
+
+        DOTween.Sequence()
+            .AppendInterval(featHoldSeconds)
+            .Append(text.DOFade(0f, featFadeSeconds))
+            .OnComplete(() =>
+            {
+                AddScore(scoreValue);
+                if (entryObj != null) Destroy(entryObj);
+            });
     }
 
     void AddScore(int amount)
@@ -317,11 +372,6 @@ public class RunManager : MonoBehaviour
         scoreText.transform.DOKill();
         scoreText.transform.localScale = Vector3.one;
         scoreText.transform.DOPunchScale(Vector3.one * 0.15f, 0.3f, 6, 0.5f);
-    }
-
-    void HandleNearMiss()
-    {
-        ShowToast("NEAR MISS!");
     }
 
     /// <summary>NodeManager 进入 Approaching 状态时调用——车速开始平滑下降接近 Station 之前,
@@ -400,26 +450,22 @@ public class RunManager : MonoBehaviour
             .DOPunchScale(Vector3.one * hpPunchStrength, hpPunchDuration, hpPunchVibrato, hpPunchElasticity);
     }
 
-    // Landing Quality(ToastText)和 Trick(TrickToastText)各自有独立的 Text + Tween，
-    // 互相独立地弹出/淡出，不会因为共用同一个组件而互相打断/覆盖对方正在显示的内容。
-    void ShowToast(string message) => ShowToastOn(toastText, ref toastTweener, message);
-
-    void ShowTrickToast(string message) => ShowToastOn(trickToastText, ref trickToastTweener, message);
-
-    void ShowToastOn(Text target, ref Sequence tweener, string message)
+    // 现在只剩 Crash/Station 这两种提示走这个共用 Toast——Landing Quality/Trick/Near Miss
+    // 已经改成右侧的 Feat 列表(AddFeatEntry)，各自独立，不用再抢这一个组件。
+    void ShowToast(string message)
     {
-        if (target == null) return;
+        if (toastText == null) return;
 
-        tweener?.Kill();
+        toastTweener?.Kill();
 
-        target.text = message;
-        Color c = target.color;
+        toastText.text = message;
+        Color c = toastText.color;
         c.a = 1f;
-        target.color = c;
+        toastText.color = c;
 
-        tweener = DOTween.Sequence()
+        toastTweener = DOTween.Sequence()
             .AppendInterval(toastHoldSeconds)
-            .Append(target.DOFade(0f, toastFadeSeconds));
+            .Append(toastText.DOFade(0f, toastFadeSeconds));
     }
 
     void HandleCrash()
@@ -457,7 +503,6 @@ public class RunManager : MonoBehaviour
         speedText = FindText("SpeedText");
         boostText = FindText("BoostText");
         toastText = FindText("ToastText");
-        trickToastText = FindText("TrickToastText");
         statusText = FindText("StatusText");
         hpLabelText = FindText("HpLabelText");
         bestDistanceText = FindText("BestDistanceText");
@@ -472,8 +517,9 @@ public class RunManager : MonoBehaviour
         boostButtonImage = boostButton != null ? boostButton.GetComponent<Image>() : null;
 
         if (toastText != null) toastText.text = string.Empty;
-        if (trickToastText != null) trickToastText.text = string.Empty;
         if (statusText != null) statusText.gameObject.SetActive(false);
+
+        SetupFeatList();
 
         bestDistance = PlayerPrefs.GetFloat(BestDistanceKey, 0f);
         if (bestDistanceText != null) bestDistanceText.text = $"Best: {bestDistance:0} m";
@@ -498,6 +544,37 @@ public class RunManager : MonoBehaviour
             hpBarFill.type = Image.Type.Filled;
             hpBarFill.sprite = CreateSolidSprite();
         }
+    }
+
+    /// <summary>右侧 Feat 列表的容器,整个纯代码搭建(不在 EndlessRunCanvas.prefab 里)——
+    /// 里面的条目本来就要运行时动态生成/销毁,没必要为了一个容器去手改预制体。
+    /// 挂在右上角那串 HP/Best/Gears/Score 下面,VerticalLayoutGroup + ContentSizeFitter
+    /// 让新条目自动排到最后一个、旧条目淡出销毁后其它条目自动补上来，不用手动管位置。</summary>
+    void SetupFeatList()
+    {
+        GameObject root = new GameObject("FeatListRoot", typeof(RectTransform));
+        root.transform.SetParent(transform, false);
+
+        RectTransform rt = (RectTransform)root.transform;
+        rt.anchorMin = new Vector2(1f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(1f, 1f);
+        rt.anchoredPosition = new Vector2(-20f, -300f);
+        rt.sizeDelta = new Vector2(340f, 0f);
+
+        VerticalLayoutGroup layout = root.AddComponent<VerticalLayoutGroup>();
+        layout.childAlignment = TextAnchor.UpperRight;
+        layout.spacing = 6f;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        ContentSizeFitter fitter = root.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        featListRoot = rt;
     }
 
     Text FindText(string path)

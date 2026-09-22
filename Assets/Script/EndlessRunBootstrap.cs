@@ -81,9 +81,9 @@ public static class EndlessRunBootstrap
         TrickSystem trickSystem = systems.AddComponent<TrickSystem>();
         trickSystem.ApplySettings(FindSettings<TrickSystemSettings>());
 
-        // 先接 RunManager 的落地质量弹字，再接 TrickSystem——两者都订阅同一个 landingDetector.OnLanded，
-        // 事件按订阅顺序同步触发，这样有特技结算的落地会让 Trick 的弹字(独立的 TrickToastText)
-        // 跟落地质量弹字(ToastText)同时纵向显示，互不打断。
+        // RunManager 和 TrickSystem 都订阅同一个 landingDetector.OnLanded，但互不干扰——
+        // RunManager 把 Landing Quality/Trick/Near Miss 都丢进右侧独立的 Feat 列表
+        // (RunManager.AddFeatEntry)，不再共用同一个 Toast 组件，订阅顺序不影响显示结果。
         runManager.InitializeFeedback(trickSystem, obstacleSpawner, landingDetector);
 
         trickSystem.Initialize(bike, landingDetector);
