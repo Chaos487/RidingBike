@@ -288,9 +288,11 @@ PolygonCollider2D:
     m_Paths:
     - - {x: -0.02945299, y: 0.18032478}
       - {x: -0.15945299, y: 0.12032478}
-      - {x: -0.13878372, y: 0.068441056}
+      - {x: -0.25957733, y: 0.08270599}
       - {x: 0.13987774, y: 0.061913922}
-      - {x: 0.16598627, y: 0.06513615}
+      - {x: 0.35333794, y: 0.04884471}
+      - {x: 0.2678078, y: 0.07735475}
+      - {x: 0.14997534, y: 0.10073704}
       - {x: 0.150547, y: 0.18032478}
   m_UseDelaunayMesh: 0
 --- !u!1 &7885743151841378981
@@ -453,6 +455,7 @@ MonoBehaviour:
   maxDownhillAngleForBonus: 20
   spinHoldThreshold: 0.1
   spinAngularSpeed: 180
+  landingConfirmTime: 0.05
   invulnerabilityFlashInterval: 0.1
 --- !u!1 &8921212775599145840
 GameObject:
