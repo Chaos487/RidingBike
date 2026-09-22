@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7dd8e4faa9c05468d8b760c062dd3acd, type: 3}
   m_Name: CameraDirectorSettings
   m_EditorClassIdentifier: 
-  minOrthoSize: 9
-  maxOrthoSize: 11
+  minOrthoSize: 8
+  maxOrthoSize: 10
   crashOrthoSize: 6.5
-  airborneZoomOutBonus: 3
+  airborneZoomOutBonus: 2
   zoomInDuration: 0.5
   zoomInEase: 6
   zoomOutDuration: 0.5
