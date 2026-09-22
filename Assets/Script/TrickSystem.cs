@@ -14,8 +14,8 @@ public class TrickSystem : MonoBehaviour
     BikeController bike;
     LandingDetector landingDetector;
 
-    /// <summary>特技结算成功,score 是这次的得分,degrees 是实际转了多少度(仅供 UI 展示用，不参与计分)。</summary>
-    public event Action<int, float> OnTrickScored;
+    /// <summary>特技结算成功,score 是这次的得分,laps 是完整转了几圈(仅供 UI 展示用，比如 "Backflip x{laps}")。</summary>
+    public event Action<int, int> OnTrickScored;
 
     public void Initialize(BikeController bikeController, LandingDetector detector)
     {
@@ -36,7 +36,7 @@ public class TrickSystem : MonoBehaviour
         int laps = Mathf.FloorToInt(Mathf.Abs(degrees) / 360f);
         if (laps <= 0) return; // 没转满一圈，压根没触发过特技
 
-        OnTrickScored?.Invoke(ScoreForLaps(laps), degrees);
+        OnTrickScored?.Invoke(ScoreForLaps(laps), laps);
     }
 
     int ScoreForLaps(int laps)

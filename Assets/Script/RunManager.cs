@@ -35,6 +35,7 @@ public class RunManager : MonoBehaviour
     Text hpLabelText;
     Text bestDistanceText;
     Text gearText;
+    Text scoreText;
     GearManager gearManager;
     Image hpBarFill;
     TMP_Text hpValueText;
@@ -47,6 +48,10 @@ public class RunManager : MonoBehaviour
     // 不用另外写一套存档逻辑——这是这个项目第一次真正"跨局/跨启动"持久化的数据。
     const string BestDistanceKey = "RidingBike_BestDistance";
     float bestDistance;
+
+    // 当前这一局累计的 Trick Score，只在这一局内有效——跟 distance/speed 一样是纯运行时状态，
+    // 不落盘,重开(重新加载场景)自然归零,不需要额外的重置逻辑。
+    int score;
 
     [Header("HP 扣血反馈")]
     [Tooltip("扣血瞬间整个血条框(HpBarRoot)放大再回弹的幅度,0 = 关闭。")]
@@ -215,12 +220,13 @@ public class RunManager : MonoBehaviour
         if (boostButton != null) boostButton.gameObject.SetActive(visible);
         if (bestDistanceText != null) bestDistanceText.gameObject.SetActive(visible);
         if (gearText != null) gearText.gameObject.SetActive(visible);
+        if (scoreText != null) scoreText.gameObject.SetActive(visible);
     }
 
     /// <summary>接上特技/连击这两个反馈系统，弹出对应的 UI 提示。跟 Initialize 分开是因为
     /// EndlessRunBootstrap 里这两个系统要在 RunManager 之后才创建(它们依赖 LandingDetector)。
     /// 这里比 TrickSystem 更早订阅 landingDetector.OnLanded(调用方保证的顺序)——转出特技的落地,
-    /// TrickSystem 随后弹出的更具体的提示(分数)会拼在落地质量下面显示两行；
+    /// TrickSystem 随后弹出的更具体的提示("Backflip x圈数")会拼在落地质量下面显示两行；
     /// 没转特技的普通落地则只有质量这一行。</summary>
     public void InitializeFeedback(TrickSystem trick, ComboSystem combo, ObstacleSpawner obstacles, LandingDetector landing)
     {
@@ -301,9 +307,26 @@ public class RunManager : MonoBehaviour
         if (bikeController != null) bikeController.TryTriggerBoost();
     }
 
-    void HandleTrickScored(int score, float degrees)
+    void HandleTrickScored(int trickScore, int laps)
     {
-        ShowToast($"{lastLandingQualityLabel}\n{degrees:0}°  +{score}");
+        ShowToast($"{lastLandingQualityLabel}\nBackflip x{laps}");
+
+        // 参考 Alto's Odyssey:弹字先单独出现，等它淡出之后这次的分数才真正计入右上角的总分。
+        // 单独起一个延时调用，不挂在共享的 toastTweener 上——toastTweener 会被后面新弹出的
+        // toast Kill 掉，挂在它上面的话分数可能因为被另一条 toast 打断而永远加不上。
+        // ignoreTimeScale 显式传 false，跟游戏里其它动画一样在 Time.timeScale = 0 时暂停计时。
+        DOVirtual.DelayedCall(toastHoldSeconds + toastFadeSeconds, () => AddScore(trickScore), false);
+    }
+
+    void AddScore(int amount)
+    {
+        score += amount;
+        if (scoreText == null) return;
+
+        scoreText.text = $"Score: {score}";
+        scoreText.transform.DOKill();
+        scoreText.transform.localScale = Vector3.one;
+        scoreText.transform.DOPunchScale(Vector3.one * 0.15f, 0.3f, 6, 0.5f);
     }
 
     void HandleNearMiss()
@@ -446,6 +469,7 @@ public class RunManager : MonoBehaviour
         hpLabelText = FindText("HpLabelText");
         bestDistanceText = FindText("BestDistanceText");
         gearText = FindText("GearText");
+        scoreText = FindText("ScoreText");
         hpBarFill = FindImage("HpBarRoot/HpBarBackground/HpBarFill");
         hpValueText = FindTMPText("HpBarRoot/HpValueText");
         Transform hpBarRootTransform = transform.Find("HpBarRoot");
@@ -459,6 +483,7 @@ public class RunManager : MonoBehaviour
 
         bestDistance = PlayerPrefs.GetFloat(BestDistanceKey, 0f);
         if (bestDistanceText != null) bestDistanceText.text = $"Best: {bestDistance:0} m";
+        if (scoreText != null) scoreText.text = $"Score: {score}";
         if (startButton != null)
         {
             startButton.gameObject.SetActive(false); // EnterStartGate() 会在 Initialize() 里再打开，这里先关掉避免第一帧闪一下
