@@ -39,6 +39,7 @@ public class RunManager : MonoBehaviour
     BikeDamageSystem damageSystem;
     BikeController bikeController;
     TrickSystem trickSystem;
+    LandingDetector landingDetector;
     ObstacleSpawner obstacleSpawner;
 
     Text distanceText;
@@ -245,8 +246,9 @@ public class RunManager : MonoBehaviour
     {
         trickSystem = trick;
         obstacleSpawner = obstacles;
+        landingDetector = landing;
 
-        landing.OnLanded += HandleLanded;
+        landingDetector.OnLanded += HandleLanded;
         trickSystem.OnTrickScored += HandleTrickScored;
         obstacleSpawner.OnNearMiss += HandleNearMiss;
     }
@@ -485,6 +487,14 @@ public class RunManager : MonoBehaviour
             }
             bikeController.enabled = false;
         }
+
+        // 摔车之后车身还会继续物理下坠/在地上弹一下才彻底停稳，这段时间轮子还在触地/离地——
+        // 不停掉这两个系统的话，LandingDetector 会把这次物理settling误判成又一次正常落地，
+        // TrickSystem 也会跟着结算，摔车结算画面弹出来之后还能看到 Feat 列表继续冒新条目、
+        // Score 继续涨，很奇怪。停掉之后 LandingDetector 不会再触发 OnLanded，TrickSystem
+        // 自己的 Update()(圈数调试日志)也跟着停。
+        if (landingDetector != null) landingDetector.enabled = false;
+        if (trickSystem != null) trickSystem.enabled = false;
 
         float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
         statusText.text = $"Crashed! Distance {distance:0} m\nPress R / tap screen to restart";
