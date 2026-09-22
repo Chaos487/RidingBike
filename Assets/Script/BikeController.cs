@@ -379,25 +379,25 @@ public class BikeController : MonoBehaviour
             hasSpunThisAirtime = false;
             hasJumpedThisAirtime = false;
             spaceHoldTime = 0f;
-            // spinAccumulatedDeg 不在这里清零——落地这一刻正是 LandingDetector/TrickSystem
-            // 读它结算这次滞空转了多少度的时候，要保留到下一次真正腾空才重置。
         }
-        else
-        {
-            if (wasGroundedForSpin)
-            {
-                // 刚离地，开始新一次滞空——记录这一刻的车身角度作为这次滞空的旋转基准。
-                airborneStartRotation = bikeRigidbody.rotation;
-            }
 
-            // 按车身真实物理转过的角度算分，不是"按住空格的时长 × 固定转速"——旧版按松手就停止
-            // 计时，但松手那一刻车身还带着角速度会再转一截(惯性)，等自动回正接管才慢慢转回去，
-            // 玩家视觉上看到的是转完了一整圈，计分却提前停了，感觉判定"不准"。现在持续读
-            // bikeRigidbody.rotation 相对离地那一刻的差值，惯性转的这一截也算进去，跟玩家看到的
-            // 旋转量保持一致。Rigidbody2D.rotation 是不会按 360 折返的连续值，这里可以直接相减，
-            // 不需要 DeltaAngle 那种做"最短夹角"的处理。
-            spinAccumulatedDeg = bikeRigidbody.rotation - airborneStartRotation;
+        if (wasGroundedForSpin && !groundedForAirtime)
+        {
+            // 刚离地，开始新一次滞空——记录这一刻的车身角度作为这次滞空的旋转基准。
+            airborneStartRotation = bikeRigidbody.rotation;
         }
+
+        // 按车身真实物理转过的角度算分，不是"按住空格的时长 × 固定转速"，而且**不管现在有没有
+        // 轮子先触地都持续更新**——旧版一旦任意一只轮子触地(groundedForAirtime 变 true)就不再
+        // 更新这个值，但 LandingDetector 要等到两只轮子都触地(或等到 landingTimeout 超时)才真正
+        // 判定"这次落地结束"，TrickSystem 是在那一刻才读这个值。先触地的轮子撑住之后、另一只轮子
+        // 落地之前这段窗口车身往往还在继续转，之前这段旋转被漏记了——同样转了一整圈，会因为先
+        // 沾地的是前轮还是后轮而算出不同的圈数，这就是圈数判定看起来不稳定的根源。现在彻底不在
+        // 这里冻结，交给 TrickSystem 自己决定什么时候读，读到的永远是当下最新、最准的旋转量；
+        // Rigidbody2D.rotation 是不会按 360 折返的连续值，这里可以直接相减，不需要 DeltaAngle
+        // 那种做"最短夹角"的处理。
+        spinAccumulatedDeg = bikeRigidbody.rotation - airborneStartRotation;
+
         wasGroundedForSpin = groundedForAirtime;
 
         // hasJumpedThisAirtime 用真实轮胎接触(groundedForAirtime)才清零，不依赖上面那条容忍度很高的
