@@ -131,6 +131,21 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 -   #5 要不要跟着关掉，等这版实机验证过、确认"偶尔一弹一弹"和连带的判定异常消失之后再说，
     这次没有在文档里直接标记为已解决。
 
+**2026-09-24 补充（持久 Goals 系统上线）：**
+
+-   参考 Alto's Odyssey 的 Level 目标机制新做了一套持久 Goals 系统——固定 3 个目标一组，
+    跨很多局游戏持续追踪，**不是**网上常见的"roguelike 每局随机抽 3 个目标"那种设计
+    （最初参考一份 ChatGPT 给的方案是后者，讨论后明确改成前者，细节/取舍见 3.17 节）。
+    新增 `GoalManager.cs`/`GoalSettings.cs`/`GoalsTabUI.cs`/`GoalsRecapUI.cs`/
+    `GoalsUIUtil.cs` 五个文件，`NodeManager` 新增 `OnNodeReached` 事件，
+    `RunManager.BestDistanceKey`/`HighScoreKey` 从 private 改成 public 供复用
+-   摔车结算流程多了一步：摔车 → `GoalsRecapUI`(本局目标进度，点 Next)→ `RunSummaryUI`
+    (不变)。`RunSummaryUI` 不再自己订阅 `RunManager.OnRunSummaryReady`，改成被
+    `GoalsRecapUI` 调用——顺带发现并修了一个之前的疏漏：`RunSummaryUI` 的背景模糊一直
+    没有真正调用 `ScreenBlurState.BeginBlur()`，材质从来没有真的跑过渲染 Pass；这次
+    一起补上，并给 `ScreenBlurState` 加了 `Reset()` 防止这两个"打开就不会再关"的面板
+    让计数器一局比一局涨、回不到 0
+
 ------------------------------------------------------------------------
 
 # 1. 核心玩法
@@ -579,6 +594,58 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     因为 `FindPrefab` 的 Editor 内 `AssetDatabase` 搜索在真机构建里会被编译掉，只有
     `Resources.Load` 兜底分支在真机上生效——这个项目之前在 iOS 上因为资产没放
     Resources 下出过一次空白屏的坑（见第 0 节），这次直接按已经验证过的路子走
+
+------------------------------------------------------------------------
+
+## 3.17 持久 Goals 系统 `GoalManager.cs` + `GoalSettings.cs` + `GoalsTabUI.cs` + `GoalsRecapUI.cs` + `GoalsUIUtil.cs`
+
+> **已实现，2026-09-24**——参考 Alto's Odyssey 的 Level 目标（不是网上常见的"roguelike
+> 每局随机抽目标"那种设计，讨论方案时明确对齐过：固定 3 个目标一组，跨很多局游戏持续
+> 追踪，不是每局重开就清零重抽）。
+
+-   **数据**：`GoalSettings`（ScriptableObject，`Create > RidingBike > Goal Settings`）唯一
+    配置来源——`GoalDefinition`(id/title/category/requirementType/targetValue/gearReward)
+    列表 + `GoalLevel`(3 个 id 一组)列表，第一版刻意做得很小(6 条目标、2 个 Level)，
+    跟这个项目其它系统现在都还是最小可用版本的阶段一致，以后扩内容直接往两个列表里加，
+    不用改代码。Level 顺序是策划固定排好的，不是运行时随机生成——目标池本来就小，
+    硬写顺序比写"随机但不能同分类"这种生成器更简单可靠，也更符合 Alto 本身固定 Level
+    顺序的设计
+-   **两类判定口径**(`GoalRequirementType`)：
+    -   "单局最佳成绩"（Distance/Score）：直接读 `RunManager.BestDistanceKey`/`HighScoreKey`
+        这两个已经在维护的存档记录（两个 key 从 `private const` 改成了 `public const`），
+        `GoalManager` 自己不重复存一份
+    -   "跨局累计次数"（Trick/Perfect 落地/Near Miss/Node）：`GoalManager` 自己开
+        4 个新的 PlayerPrefs 计数器，`SubscribeGameplayEvents` 订阅
+        `LandingDetector.OnLanded`(只数 Perfect)/`TrickSystem.OnTrickCompleted`/
+        `ObstacleSpawner.OnNearMiss`/`NodeManager.OnNodeReached`(新增的事件，之前
+        `NodeManager` 只有 `NodeCount` 这个数值，没有事件)持续累加，不随单局重开清零——
+        跟 `ScoreSystem` 是同一个"只监听事件、不控制 gameplay"的套路
+-   **一读一写两个入口**：`GetDisplaySnapshot()` 纯只读、无副作用，给 `GoalsTabUI` 用；
+    `SettleCurrentLevel()` 有副作用(发 Gear、写盘、可能推进 Level)，只在摔车结算前的
+    `GoalsRecapUI` 弹出时调用一次。目标一旦发过奖励(`RidingBike_Goal_RewardedIds`，
+    逗号拼接存成一个字符串)就不会再发第二次，哪怕跨局计数器之后继续往上涨。3 个都完成
+    会把 Level 推进到下一组，但这次返回的快照仍然是"刚结算完的这个 Level"(全部打钩)，
+    下一次调用才会看到新 Level 的空目标——不然玩家会在还没看到自己刚打满的画面时就已经
+    被换掉
+-   **两处 UI，共用 `GoalsUIUtil` 的行/星星构件**（Unity 内置 `Text` 不支持删除线富文本
+    标签，完成的目标用一条叠加的纯色 Image 画假删除线，比为了这一个效果接 TextMeshPro
+    简单）：
+    -   `GoalsTabUI`：菜单/暂停面板里**现成的** `GoalsPanel` 占位节点(`MenuPanel/
+        ContentArea/GoalsPanel` 和 `PausePanel/TabArea/ContentArea/GoalsPanel`，两份
+        分开的 Tab 面板各自都有)，运行时把清单画进去，不改 `EndlessRunCanvas.prefab`。
+        Back 按钮是面板本来就有的共享按钮，不用管
+    -   `GoalsRecapUI`：摔车结算最先弹出的一屏（新面板，运行时代码搭建，做法跟
+        `RunSummaryUI` 一样），点 Next 才显示 `RunSummaryUI`——`RunManager.OnRunSummaryReady`
+        现在唯一的订阅方是它，`RunSummaryUI` 不再自己订阅，改成暴露一个公开的
+        `Show(data)` 方法由 `GoalsRecapUI` 在点 Next 时调用（两个面板轮流独占屏幕，
+        不能都直接订阅同一个事件同时弹出来）
+-   **顺带修的一个 bug**：接这个系统时发现 `RunSummaryUI` 的背景一直没有调用
+    `ScreenBlurState.BeginBlur()`，模糊材质实际上从来没有真的跑过渲染 Pass。这次一起
+    补上，并且给 `ScreenBlurState` 新增了 `Reset()`——`RunSummaryUI`/`GoalsRecapUI`
+    这两个面板打开之后不会再关(直接走向场景重载)，如果只 `BeginBlur()` 不配对
+    `EndBlur()`，这个 `static` 类的计数器会一局比一局涨、永远回不到 0；`ReloadScene()`
+    (`RunSummaryUI`/`PauseController` 两处)现在都会显式调 `Reset()` 兜底，不依赖
+    每个面板是否都乖乖配对调用过
 
 ------------------------------------------------------------------------
 

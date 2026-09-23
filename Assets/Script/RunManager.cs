@@ -52,7 +52,9 @@ public class RunManager : MonoBehaviour
 
     // PlayerPrefs 在 PC/iOS 上都是内置的、跨平台的本地持久化(Windows 存注册表，iOS 存 plist)，
     // 不用另外写一套存档逻辑——这是这个项目第一次真正"跨局/跨启动"持久化的数据。
-    const string BestDistanceKey = "RidingBike_BestDistance";
+    // public 是给 GoalManager 用的——"单局最远距离"/"单局最高分"这两个目标直接复用这两个
+    // 已经在追踪的存档记录，不用另开一套。
+    public const string BestDistanceKey = "RidingBike_BestDistance";
     float bestDistance;
 
     // bestDistance 这个字段在 Update() 里会随着当前跑动距离实时更新(见下面)，到结算那一刻
@@ -62,7 +64,7 @@ public class RunManager : MonoBehaviour
 
     // 结算页(Run Summary)的"历史最高 Total Score"记录——跟 BestDistance 是两码事,单独开一个
     // PlayerPrefs key。之前这个项目没有"Total Score 破紀錄"这个概念,是这次结算系统新加的。
-    const string HighScoreKey = "RidingBike_HighScore";
+    public const string HighScoreKey = "RidingBike_HighScore";
     int savedHighScore;
 
     // 结算时用"当前齿轮总数 - 这一局开局时的齿轮总数"算出"这一局捡了多少"——齿轮拾取

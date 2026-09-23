@@ -71,8 +71,22 @@ public static class EndlessRunBootstrap
         GearManager gearManager = systems.AddComponent<GearManager>();
         gearManager.Initialize();
 
-        RunManager runManager = SetupRunManagerUI();
+        // 持久 Goals 系统(参考 Alto's Odyssey 的 Level 目标)——跟 ScoreSystem 是同一个套路,
+        // 只监听已有系统的事件,不控制 gameplay。事件订阅要等 LandingDetector/TrickSystem/
+        // ObstacleSpawner/NodeManager 都创建好才能接,放在本方法最后;这里先创建实例、
+        // 读配置、从存档恢复跨局进度。
+        GoalManager goalManager = systems.AddComponent<GoalManager>();
+        goalManager.ApplySettings(FindSettings<GoalSettings>());
+        goalManager.Initialize(gearManager);
+
+        (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI) runUI = SetupRunManagerUI();
+        RunManager runManager = runUI.runManager;
         runManager.Initialize(bike.transform, damageSystem, bike, gearManager);
+
+        runUI.goalsTabUI.Initialize(goalManager);
+        // GoalsRecapUI 先弹、玩家点 Next 才显示 RunSummaryUI——两个面板轮流独占屏幕,见
+        // RunSummaryUI.Show / GoalsRecapUI 顶部注释。
+        runUI.goalsRecapUI.Initialize(runManager, goalManager, runUI.runSummaryUI);
 
         LandingDetector landingDetector = systems.AddComponent<LandingDetector>();
         landingDetector.ApplySettings(FindSettings<LandingDetectorSettings>());
@@ -118,6 +132,10 @@ public static class EndlessRunBootstrap
         // 同样的反向查询套路：结算时 ScoreSystem 要按"经过了几个 Node"算分，
         // 见 RunManager.getNodeCount / NodeManager.NodeCount 的注释。
         runManager.getNodeCount = () => nodeManager.NodeCount;
+
+        // Goals 系统的跨局累计计数器要等这几个系统都创建好才能订阅它们的事件，见
+        // GoalManager.SubscribeGameplayEvents 注释——跟 ScoreSystem.Initialize 是同一个套路。
+        goalManager.SubscribeGameplayEvents(landingDetector, trickSystem, obstacleSpawner, nodeManager);
     }
 
     // Roguelike Node 三选一系统(GitHub Issue #3 存档方案,现在以物理化 Station 呈现)——
@@ -191,13 +209,15 @@ public static class EndlessRunBootstrap
     // UI 现在是手动在 Editor 里搭的 Assets/prefab/EndlessRunCanvas.prefab，实例化出来之后
     // 直接把 RunManager 挂到它根节点上——RunManager.Awake() 会按名字把预制体里的子物体
     // (DistanceText/SpeedText/.../HpBarBackground/HpBarFill) 找出来，改预制体视觉不用碰这份代码。
-    static RunManager SetupRunManagerUI()
+    static (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI) SetupRunManagerUI()
     {
         GameObject canvasPrefab = FindPrefab("EndlessRunCanvas");
         if (canvasPrefab == null)
         {
             Debug.LogError("EndlessRunBootstrap: 找不到 Assets/prefab/EndlessRunCanvas.prefab，局内 UI 不会显示。");
-            return new GameObject("RunManager (missing UI prefab)").AddComponent<RunManager>();
+            GameObject fallback = new GameObject("RunManager (missing UI prefab)");
+            return (fallback.AddComponent<RunManager>(), fallback.AddComponent<RunSummaryUI>(),
+                fallback.AddComponent<GoalsTabUI>(), fallback.AddComponent<GoalsRecapUI>());
         }
 
         GameObject canvasInstance = Object.Instantiate(canvasPrefab);
@@ -237,14 +257,19 @@ public static class EndlessRunBootstrap
         PauseController pauseController = canvasInstance.AddComponent<PauseController>();
         pauseController.Initialize(runManager);
 
-        // 摔车结算面板(Run Complete)——整个 UI 都是运行时代码搭建的(见 RunSummaryUI 顶部
-        // 注释)，不是预制体里的节点，所以这里不用 FindUIReferences 那一套，直接 Initialize
-        // 接上 RunManager.OnRunSummaryReady 就行。放在最后 AddComponent，保证它的面板作为
-        // 最后一个子物体、渲染在其它所有 UI 之上。
-        RunSummaryUI runSummaryUI = canvasInstance.AddComponent<RunSummaryUI>();
-        runSummaryUI.Initialize(runManager);
+        // Goals Tab(菜单/暂停面板里现成的 GoalsPanel 节点，见 GoalsTabUI 顶部注释)——
+        // 只需要能 transform.Find 到 canvasInstance 下的 MenuPanel/PausePanel，跟 GoalManager
+        // 的接线放在主 Setup() 里做(这里只 AddComponent，Initialize 调用点在调用方)。
+        GoalsTabUI goalsTabUI = canvasInstance.AddComponent<GoalsTabUI>();
 
-        return runManager;
+        // 摔车结算：GoalsRecapUI 先弹(本局目标进度)，玩家点 Next 才显示 RunSummaryUI——
+        // 两个面板都是运行时代码搭建的(不是预制体节点)，跟 GoalManager/RunSummaryUI 的接线
+        // 同样放在主 Setup() 里做。RunSummaryUI 放在 GoalsRecapUI 之前 AddComponent，保证它
+        // 的面板是更早的子物体，GoalsRecapUI(会先显示的那个)盖在它上面。
+        RunSummaryUI runSummaryUI = canvasInstance.AddComponent<RunSummaryUI>();
+        GoalsRecapUI goalsRecapUI = canvasInstance.AddComponent<GoalsRecapUI>();
+
+        return (runManager, runSummaryUI, goalsTabUI, goalsRecapUI);
     }
 
     // 地形几何体是运行时按曲线生成的，没法预先摆好，但视觉(材质/贴图)可以在 Editor 里调——

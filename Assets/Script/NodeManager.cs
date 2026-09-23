@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
@@ -68,6 +69,10 @@ public class NodeManager : MonoBehaviour
     /// 用这个乘 ScoreSettings.scorePerNode 算分，RunManager 通过反向查询 Func 拿这个值，
     /// 跟 isPausedByOtherSystem 是同一个套路(RunManager 比 NodeManager 先创建，没法直接持有引用)。</summary>
     public int NodeCount => nodeCount;
+
+    /// <summary>每到达一个 Station(nodeCount++ 的那一刻)触发一次——GoalManager 用来累加
+    /// "累计到达过几个 Node"这个跨局目标，不用每帧轮询 NodeCount 去猜有没有变化。</summary>
+    public event Action OnNodeReached;
 
     public void ApplySettings(NodeSettings settings)
     {
@@ -194,6 +199,7 @@ public class NodeManager : MonoBehaviour
         bike.enabled = false;
 
         nodeCount++;
+        OnNodeReached?.Invoke();
         NodeTier stage = decisionCurve.GetStage(nodeCount);
         currentChoices = choicePool.GenerateChoices(stage, 3);
 

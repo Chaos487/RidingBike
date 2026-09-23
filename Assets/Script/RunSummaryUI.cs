@@ -5,9 +5,9 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// 结算面板(Run Complete):RunManager 摔车 runSummaryDelaySeconds 秒之后把这一局的
-/// RunSummaryData 打包好交过来(RunManager.OnRunSummaryReady)，这里只管显示和处理
-/// Home/Play Again 两个按钮——不读任何游戏系统、不自己算分、不自己判断破紀錄。
+/// 结算面板(Run Complete):不自己订阅 RunManager.OnRunSummaryReady——摔车之后会先弹
+/// GoalsRecapUI(本局目标进度)，玩家点 Next 才由它调这里公开的 Show(data)。这里只管
+/// 显示和处理 Home/Play Again 两个按钮——不读任何游戏系统、不自己算分、不自己判断破紀錄。
 ///
 /// 整个面板(背景/统计行/按钮)完全用代码在运行时搭建，不在 EndlessRunCanvas.prefab 里
 /// 手动摆(参考 RunManager.SetupFeatList 的做法)：内容是数据驱动的可变结构(New High
@@ -28,8 +28,6 @@ using UnityEngine.UI;
 /// </summary>
 public class RunSummaryUI : MonoBehaviour
 {
-    RunManager runManager;
-
     GameObject panelRoot;
 
     Text distanceValueText;
@@ -55,23 +53,12 @@ public class RunSummaryUI : MonoBehaviour
     CanvasGroup totalRowGroup;
     CanvasGroup highScoreRowGroup;
 
-    public void Initialize(RunManager manager)
-    {
-        runManager = manager;
-        runManager.OnRunSummaryReady += Show;
-    }
-
     void Awake()
     {
         BuildUI();
     }
 
-    void OnDestroy()
-    {
-        if (runManager != null) runManager.OnRunSummaryReady -= Show;
-    }
-
-    void Show(RunSummaryData data)
+    public void Show(RunSummaryData data)
     {
         distanceValueText.text = $"{data.distanceScore:N0}";
         gearsValueText.text = $"{data.gearScore:N0}";
@@ -98,6 +85,12 @@ public class RunSummaryUI : MonoBehaviour
         SetRowLabel(gearsValueText, "⚙", $"Gears Collected ({data.gearsCollected:N0})");
         SetRowLabel(nodeValueText, "◆", $"Nodes Passed ({data.nodeCount:N0})");
         SetRowLabel(maxHpValueText, "♥", $"Max HP ({data.finalMaxHp:0})");
+
+        // 背景模糊材质要等 ScreenBlurFeature 真的跑了这趟渲染 Pass 才有内容可采样——
+        // 之前这里漏调了这一句，面板背景实际上一直没有真的模糊过。这个面板打开之后不会再关
+        // (Home/Play Again 直接重载场景)，不需要对应的 EndBlur()，ReloadScene() 里会用
+        // ScreenBlurState.Reset() 统一清零，不依赖这里配对调用。
+        ScreenBlurState.BeginBlur();
 
         panelRoot.SetActive(true);
         PlayRevealAnimation();
@@ -155,6 +148,9 @@ public class RunSummaryUI : MonoBehaviour
     void ReloadScene()
     {
         Time.timeScale = 1f;
+        // ScreenBlurState 是 static,不会跟着场景重开自动清零——这个面板打开的时候调过
+        // BeginBlur() 却不会走到配对的 EndBlur(),这里统一清一次，见 ScreenBlurState.Reset() 注释。
+        ScreenBlurState.Reset();
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 

@@ -98,8 +98,11 @@ public class PauseController : MonoBehaviour
     {
         // Time.timeScale 是全局静态值，LoadScene 不会自动重置它——暂停中(0)时点 Restart/Home
         // 不手动改回 1 的话，新场景加载出来会直接卡在 0(虽然 EnterStartGate 后面也会设一次，
-        // 这里显式复位更保险，不依赖谁先谁后)。
+        // 这里显式复位更保险，不依赖谁先谁后)。ScreenBlurState 同理也是 static，一起清零
+        // (见该类 Reset() 注释)——正常暂停面板 Open/Close 本来是配对的，加这行是为了兜底
+        // Run Summary/GoalsRecapUI 那种"打开就不会再关"的面板不小心漏加计数的情况。
         Time.timeScale = 1f;
+        ScreenBlurState.Reset();
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 

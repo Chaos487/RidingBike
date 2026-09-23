@@ -212,4 +212,14 @@ public static class ScreenBlurState
     {
         activeCount = Mathf.Max(0, activeCount - 1);
     }
+
+    /// <summary>清零重来——这个类是 static,不会跟着场景重开自动重置。摔车结算(Run Summary/
+    /// GoalsRecapUI)那两个面板打开之后就不会再关(要么点 Home/Play Again 直接重载场景),
+    /// 不会自然走到配对的 EndBlur()，如果每次结算面板打开都 BeginBlur() 一次、又从来没有
+    /// EndBlur()，activeCount 会一局比一局涨、永远回不到 0——ReloadScene() 里显式调这个方法
+    /// 清零，保证每一局重开都是干净状态，不依赖之前每个面板是否都乖乖配对调用过 EndBlur()。</summary>
+    public static void Reset()
+    {
+        activeCount = 0;
+    }
 }
