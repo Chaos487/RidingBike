@@ -15,7 +15,7 @@
 - `A` / `D`(或方向键左右):加速 / 减速倒车
 - `Shift`(左右皆可):加速键,按住时用更大扭矩更快提速,最高速度不变,按行驶距离充能
 - `Space`:触地时短按跳跃;空中长按触发 360° 空翻
-- `R`:摔车结算后重开(重新加载场景)
+- 摔车结算后点结算面板上的 Home / Play Again 重开(不再是按 `R`,见下面"局内 UI / 结算")
 
 ## 已实现的系统
 
@@ -45,18 +45,24 @@ Alto's Odyssey 那种"一直往下滑"的手感),阶段间 SmoothStep 过渡不�
 `NearMissDetector.cs`,4.1 / 5 / 7 节)
 落地瞬间只看前后轮有效接地的时间差(Δt)分出 Perfect / Good / Not Bad,不读车身角度/
 坡度/角速度/垂直速度;空中转出的完整圈数按查表给 Trick Score(按圈数,不是精确角度
-档位),Trick Score 会累计显示在右上角的 Score;这几块分数目前互相独立,**还没有一个
-统一的 ScoreSystem 把 Distance/Trick 揉到一起**。Combo 连击系统已经整体移除(实现过
-一版纯计数器,没有真正接入分数,评估后觉得太复杂,直接砍掉,不在当前设计范围内)。
+档位)。三者都走右侧的 Feat 列表(参考 Alto's Odyssey:完成一项弹出一条独立条目,显示
+2 秒后淡出,淡出结束才计入右上角的 Score),互相独立,`Score` 是这三者的统一累计值,
+结算面板的 Total 直接读这个值(但 Distance/Gears 没有换算成分数,不计入 Total,细节
+见下面"局内 UI / 结算")。Combo 连击系统已经整体移除(实现过一版纯计数器,没有真正
+接入分数,评估后觉得太复杂,直接砍掉,不在当前设计范围内)。
 
 **摔车判定 / 生命值**(`CrashDetector.cs` + `BikeDamageSystem.cs`,3.4 / 3.8 节)
 车身触地且倾角超过阈值、持续一小段时间才判定一次"失控";失控不直接结束一局,而是
 扣一条 HP 血条(默认能扛 2 次、第 3 次才真的摔车结算),期间给无敌时间和贴图闪烁提示。
 
-**局内 UI / 结算**(`RunManager.cs`,3.5 节)
-距离、时速、氮气就绪状态、HP 血条、Score(Trick Score 累计值)实时显示;落地质量/特技/
-摔车/贴身险弹字提示,落地质量和特技各用独立的 Text 纵向堆叠显示,互不打断。摔车后
-显示结算信息,`R` 重开。**结算画面目前只有距离,没有分数/最佳记录**。
+**局内 UI / 结算**(`RunManager.cs` + `RunSummaryUI.cs`,3.5 节)
+距离、时速、氮气就绪状态、HP 血条、Score 实时显示;落地质量/特技/贴身险走右侧独立的
+Feat 列表,不再是顶部弹字堆叠。摔车 0.8 秒后(留时间给车身物理沉降)冻结画面、弹出
+Run Summary 结算面板(参考 Alto's Odyssey 截图,不是照抄 UI):Distance / Trick Score /
+Gears Collected 三行 + Total + 破紀錄时才显示的 New High Score,底部 Home / Gears
+Earned / Play Again。面板背景复用现成的全屏模糊(`ScreenBlurState` +
+`BlurredPanelBackground.mat`),整个面板运行时代码搭建,图标是 Unicode 符号占位
+(项目里没有对应美术资源)。
 
 **开始画面 / 主菜单**(`RunManager.cs` 的开始 gate + `MainMenuController.cs`)
 开始前是"tap to start"——屏幕背后能看到骑行场景(地形/车,只是暂停了),没有单独一个
@@ -175,7 +181,9 @@ Scene 视图摄像机抢占共享贴图这几个问题之后,视觉上依然没�
 
 只列要点,完整清单、优先级排序(P0→P3)、每一项的具体欠账见设计文档第 0 / 23 节:
 
-- 没有统一 ScoreSystem(Distance/Trick 分数没有揉到一起),摔车结算画面信息不全
+- 结算画面信息不全的问题已解决(见"局内 UI / 结算"一节的 Run Summary 面板),但仍然没有
+  真正把 Distance/Trick/Gears 揉到一起的统一 ScoreSystem——Total 目前就是 Landing
+  Quality+Trick+Near Miss 的累计值,Distance/Gears 只是展示,不计分
 - [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)、
   [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2) 两个已知 bug,状态见设计文档第 0 节;
   [GitHub #4](https://github.com/Chaos487/RidingBike/issues/4) 弹窗背景真实模糊做不出效果,已搁置
@@ -186,5 +194,5 @@ Scene 视图摄像机抢占共享贴图这几个问题之后,视觉上依然没�
   纯色网格和色块**。音频:`bgm`/`ambient` 两个槽位已经接了真实音频文件,`ride`/`landing`/
   `boost`/`crash` 四个还是空的。移动端输入均未完成(核心操作仍是键盘,只有加速/暂停两个
   按钮做了触屏兼容)
-- 跨局持久化目前只有"最远距离"(`RunManager`)和"齿轮数量"(`GearManager`)用 `PlayerPrefs`
-  存了,没有更复杂的存档/解锁状态需要存(因为还没有能花的东西)
+- 跨局持久化目前有"最远距离"、"Total Score 历史最高分"(`RunManager`)和"齿轮数量"
+  (`GearManager`)用 `PlayerPrefs` 存了,没有更复杂的存档/解锁状态需要存(因为还没有能花的东西)

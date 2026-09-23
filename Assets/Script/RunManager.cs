@@ -2,13 +2,12 @@ using System;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
 /// 管理单局 endless run 的状态:显示距离/时速/氮气就绪状态、弹出摔车/Station 提示、
-/// 监听摔车、结算并支持按 R 重开;落地质量/特技/贴身险这几个"正反馈"事件走右侧的
-/// Feat 列表(见 SetupFeatList/AddFeatEntry)，不是走这里的 Toast。
+/// 监听摔车、结算成 RunSummaryData 交给 RunSummaryUI 显示结算面板;落地质量/特技/贴身险
+/// 这几个"正反馈"事件走右侧的 Feat 列表(见 SetupFeatList/AddFeatEntry)，不是走这里的 Toast。
 /// UI 视觉本身是 Assets/prefab/EndlessRunCanvas.prefab(手动在 Editor 里搭的,改颜色/字体/布局
 /// 直接在那份预制体上改,不用碰这个脚本)——这个脚本是在 EndlessRunBootstrap 里
 /// Instantiate 完预制体之后直接挂到它根节点上的,Awake() 按名字把预制体里的子物体找出来。
@@ -46,7 +45,6 @@ public class RunManager : MonoBehaviour
     Text speedText;
     Text boostText;
     Text toastText;
-    Text statusText;
     Text hpLabelText;
     Text bestDistanceText;
     Text gearText;
@@ -65,9 +63,32 @@ public class RunManager : MonoBehaviour
     const string BestDistanceKey = "RidingBike_BestDistance";
     float bestDistance;
 
+    // 结算页(Run Summary)的"历史最高 Total Score"记录——跟 BestDistance 是两码事,单独开一个
+    // PlayerPrefs key。之前这个项目没有"Total Score 破紀錄"这个概念,是这次结算系统新加的。
+    const string HighScoreKey = "RidingBike_HighScore";
+    int savedHighScore;
+
     // 当前这一局累计的分数(Landing Quality + Trick + Near Miss)，只在这一局内有效——
     // 跟 distance/speed 一样是纯运行时状态，不落盘,重开(重新加载场景)自然归零。
+    // 这个字段就是七、里说的"统一 Score System 入口"——Run Summary 的 Total 直接读它,
+    // 不会另外发明一套计分逻辑。
     int score;
+
+    // Trick Score 在结算页要单独显示"本局累计"和"单次最高"，但 TrickSystem 自己只广播
+    // 每次的得分(不攒总数,也不知道"最高的一次"是多少)——这两个字段专门为结算页攒的，
+    // 不影响 TrickSystem/Landing Quality 之间的解耦。
+    int trickTotalScore;
+    int bestTrickScore;
+
+    // 结算时用"当前齿轮总数 - 这一局开局时的齿轮总数"算出"这一局捡了多少"——齿轮拾取
+    // 那一刻就已经实时加钱+存盘了(见 GearPickup/GearManager)，这里只是纯展示用的差值,
+    // 不会、也不能再调一次 AddGear（不然会重复发钱）。
+    int gearCountAtRunStart;
+
+    [Header("Run Summary")]
+    [Tooltip("摔车之后等待多久(秒)才真正冻结画面、弹出结算面板——留一点时间给车身物理" +
+             "沉降/摄像机震动播完，不要一摔车整个画面就硬生生定格在半空的姿态。")]
+    public float runSummaryDelaySeconds = 0.8f;
 
     [Header("HP 扣血反馈")]
     [Tooltip("扣血瞬间整个血条框(HpBarRoot)放大再回弹的幅度,0 = 关闭。")]
@@ -120,6 +141,10 @@ public class RunManager : MonoBehaviour
     /// 分别维护一份"是否暂停"。</summary>
     public event Action<bool> OnPauseStateChanged;
 
+    /// <summary>摔车 runSummaryDelaySeconds 秒之后、真正进入结算状态那一刻触发一次,参数是
+    /// 打包好的这一局数据——RunSummaryUI 订阅这个来显示结算面板,不读任何游戏系统。</summary>
+    public event Action<RunSummaryData> OnRunSummaryReady;
+
     public bool IsPaused => paused;
 
     /// <summary>只有正常骑行中(不在开始前/不在结算画面)才允许暂停。Station 三选一期间也算
@@ -156,6 +181,7 @@ public class RunManager : MonoBehaviour
         // RunManager 还没订阅、接不到——这里直接读它当前的值先显示一次，之后靠事件保持实时更新。
         if (gearManager != null)
         {
+            gearCountAtRunStart = gearManager.CurrentGearCount;
             HandleGearCountChanged(gearManager.CurrentGearCount);
             gearManager.OnGearCountChanged += HandleGearCountChanged;
         }
@@ -277,16 +303,8 @@ public class RunManager : MonoBehaviour
         if (waitingForStart) return; // 按钮点击走 HandleStartClicked，这里不用轮询任何输入
         if (paused) return; // Time.timeScale = 0 挡不住 Update() 本身还在跑，这里顺便短路掉
 
-        if (runEnded)
-        {
-            // 手机端没有 R 键：摔车结算画面这时候没有别的可点的 UI 跟它抢，屏幕任意位置点一下
-            // 就重开，不用像 BikeController 里判断跳跃输入那样去排除点在 UI 上的情况。
-            if (Input.GetKeyDown(KeyCode.R) || Input.GetMouseButtonDown(0))
-            {
-                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-            }
-            return;
-        }
+        // 重开交给结算面板(RunSummaryUI)的 Home/Play Again 按钮，这里不用再轮询任何输入。
+        if (runEnded) return;
 
         float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
         distanceText.text = $"Distance: {distance:0} m";
@@ -323,6 +341,8 @@ public class RunManager : MonoBehaviour
 
     void HandleTrickScored(int trickScore, int laps)
     {
+        trickTotalScore += trickScore;
+        if (trickScore > bestTrickScore) bestTrickScore = trickScore;
         AddFeatEntry($"Backflip x{laps}", trickScore);
     }
 
@@ -496,15 +516,46 @@ public class RunManager : MonoBehaviour
         if (landingDetector != null) landingDetector.enabled = false;
         if (trickSystem != null) trickSystem.enabled = false;
 
-        float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
-        statusText.text = $"Crashed! Distance {distance:0} m\nPress R / tap screen to restart";
-        statusText.gameObject.SetActive(true);
-
         // 摔车结算是个自然的存盘点——真正落盘一次，防止手机端切后台/被系统杀掉的时候丢掉这一局刚破的纪录
         // (Update() 里 SetFloat 只更新内存缓存，不保证真的写到磁盘)。
         PlayerPrefs.Save();
 
         OnRunEnded?.Invoke();
+
+        // 车身这时候往往还在物理沉降/弹跳，画面立刻冻结会显得硬生生卡在半空——
+        // 延后 runSummaryDelaySeconds 秒，让这段安顿下来之后再真正进入结算状态。
+        DOVirtual.DelayedCall(runSummaryDelaySeconds, EnterRunSummary);
+    }
+
+    /// <summary>真正的"结算状态"从这里开始:冻结时间，把这一局的统计打包成 RunSummaryData
+    /// 交给 RunSummaryUI——这里只负责收集数据/判断破紀錄，不管具体怎么显示(六、七、九节
+    /// 的要求:Trick Score 不重新计算、Total 复用现有 score、UI 不自己判断破紀錄)。</summary>
+    void EnterRunSummary()
+    {
+        Time.timeScale = 0f;
+
+        float distance = Mathf.Max(0f, bikeTransform.position.x - startX);
+        int gearsCollected = gearManager != null
+            ? Mathf.Max(0, gearManager.CurrentGearCount - gearCountAtRunStart)
+            : 0;
+
+        bool isNewHighScore = score > savedHighScore;
+        if (isNewHighScore)
+        {
+            savedHighScore = score;
+            PlayerPrefs.SetInt(HighScoreKey, savedHighScore);
+            PlayerPrefs.Save();
+        }
+
+        OnRunSummaryReady?.Invoke(new RunSummaryData
+        {
+            distance = distance,
+            trickScore = trickTotalScore,
+            bestTrickScore = bestTrickScore,
+            gearsCollected = gearsCollected,
+            totalScore = score,
+            isNewHighScore = isNewHighScore,
+        });
     }
 
     void FindUIReferences()
@@ -513,7 +564,6 @@ public class RunManager : MonoBehaviour
         speedText = FindText("SpeedText");
         boostText = FindText("BoostText");
         toastText = FindText("ToastText");
-        statusText = FindText("StatusText");
         hpLabelText = FindText("HpLabelText");
         bestDistanceText = FindText("BestDistanceText");
         gearText = FindText("GearText");
@@ -527,11 +577,11 @@ public class RunManager : MonoBehaviour
         boostButtonImage = boostButton != null ? boostButton.GetComponent<Image>() : null;
 
         if (toastText != null) toastText.text = string.Empty;
-        if (statusText != null) statusText.gameObject.SetActive(false);
 
         SetupFeatList();
 
         bestDistance = PlayerPrefs.GetFloat(BestDistanceKey, 0f);
+        savedHighScore = PlayerPrefs.GetInt(HighScoreKey, 0);
         if (bestDistanceText != null) bestDistanceText.text = $"Best: {bestDistance:0} m";
         if (scoreText != null) scoreText.text = $"Score: {score}";
         if (startButton != null)

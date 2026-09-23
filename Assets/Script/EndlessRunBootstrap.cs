@@ -226,6 +226,13 @@ public static class EndlessRunBootstrap
         PauseController pauseController = canvasInstance.AddComponent<PauseController>();
         pauseController.Initialize(runManager);
 
+        // 摔车结算面板(Run Complete)——整个 UI 都是运行时代码搭建的(见 RunSummaryUI 顶部
+        // 注释)，不是预制体里的节点，所以这里不用 FindUIReferences 那一套，直接 Initialize
+        // 接上 RunManager.OnRunSummaryReady 就行。放在最后 AddComponent，保证它的面板作为
+        // 最后一个子物体、渲染在其它所有 UI 之上。
+        RunSummaryUI runSummaryUI = canvasInstance.AddComponent<RunSummaryUI>();
+        runSummaryUI.Initialize(runManager);
+
         return runManager;
     }
 

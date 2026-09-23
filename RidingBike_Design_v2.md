@@ -23,7 +23,7 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 
 -   没有统一的 `ScoreSystem`——Distance、Trick 分数各自独立显示；Trick Score 已经累计成一个右上角实时显示的 Score（`RunManager.score`），但这只是 Trick 自己的累计值，不是真正把 Distance/Trick 揉到一起的统一分数系统
 -   **已补上**"PERFECT!"落地专属弹字——2026-09-22 给 `RunManager` 接了 `LandingDetector.OnLanded`，落地会弹 `PERFECT!`/`GOOD`/`NOT BAD`（独立的 `ToastText`），转出特技的话下面还会纵向堆叠一行 `Backflip x{圈数}`（独立的 `TrickToastText`），两者互不打断；仍然欠账的是**音效**分级——`AudioManager` 的 `landing` 槽位现在对三档质量播的还是同一个音效
--   摔车结算画面信息不全——`RunManager.HandleCrash()` 目前只拼 `距离 {distance} m`，Score / Best Distance / Best Trick 都还没有（Combo 已移除，不需要再要 Highest Combo 了）；也完全没有任何跨局的最佳记录持久化（`bestDistance` 除外，那个已经用 `PlayerPrefs` 存了）
+-   ~~摔车结算画面信息不全~~ —— **已实现**（2026-09-23，`RunSummaryUI.cs`，见 3.5 节末尾）：Distance / Trick Score（含本局单次最高分）/ Gears Collected / Total / New High Score 都有了，新增了 `RidingBike_HighScore` 这条独立的跨局持久化记录
 -   已知 bug，仍然 OPEN，本次没有实机验证条件、只做了代码核对：
     -   [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)（跳跃偶发不生效）：代码里 `groundCheckDistance` 确实已经是修复后的 `1.2`（issue 描述的修复已经落进当前代码），但 issue 本身写明"还没有实机验证过、用户要求先搁置"，本次没有条件复测，状态维持 OPEN，不要当成已解决
     -   [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2)（空中无法触发旋转 / A、D 无法控制空中姿态）：**这个 issue 的后半段已经不是 bug 了，是设计变了**——`BikeController.ApplyBalance()` 现在的注释明确写着"空中不再响应方向键……方向键在空中彻底不影响车身角度"，也就是说"空中用 A/D 压头抬头"这个预期行为本身被主动拿掉了，改成完全交给自动回正 + 空格旋转两条路径，不是还没修好。前半段"长按空格触发不了空中旋转"本次没有条件实机验证，`HandleJumpAndSpin()`/`StartSpin()` 代码逻辑读起来是完整的，但读代码不能代替实机测试，issue 继续保持 OPEN
@@ -72,6 +72,24 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 -   **`BikeController.SpinAccumulatedDegrees` 改成读真实物理旋转**：不再是"按住空格的时长 × 固定角速度"，改成持续追踪 `bikeRigidbody.rotation` 相对离地那一刻的差值——松手后惯性/自动回正带着车身继续转的那一截也算进去，不然玩家视觉上转完了一圈，计分却在松手那一刻提前停了。过程中还修了两个更隐蔽的 bug：① 圈数计算之前在任意一只轮子先触地时就冻结，但 `LandingDetector` 要等两只轮子都触地才真正判定落地，中间那段窗口的旋转被漏记，导致前后轮谁先落地会读出不同圈数；② 腾空途中蹭一下地面（单帧假触地）会被当成"真的落地"，把同一次连续转体腰斩成两段——`BikeController` 新增 `landingConfirmTime`（默认 0.05s）触地防抖 + `IsConfirmedGrounded`，`LandingDetector` 的 Pending 状态也改成"先触地那只轮子自己又弹开、另一只轮子没跟上"就取消判定、不再傻等超时。**这三个问题修完之后 Trick 判定仍然偶尔感觉不够稳定**，已经建了 [GitHub #5](https://github.com/Chaos487/RidingBike/issues/5) 留到后面继续查，`TrickSystem.cs` 里还留着一段调试用的 `Debug.Log`（打腾空开始/每圈完成/落地结算），方便下次继续用同样的方法定位。
 -   **UI**：落地质量和 Trick 结果不再抢同一个 Toast，`EndlessRunCanvas.prefab` 里新增了独立的 `TrickToastText`（纵向堆叠在原来的 `ToastText` 下面），Trick 弹字从"xxx° +分数"改成"Backflip x{圈数}"；新增右上角常驻 `ScoreText`，累计显示 Trick Score，弹字淡出之后分数才真正计入（参考 Alto's Odyssey 的反馈节奏）。
 -   **Combo 连击系统整体移除**：`ComboSystem.cs`/`ComboSystemSettings.cs` 已删除，`EndlessRunCanvas.prefab` 里的 `ComboText` 节点也删了。移除原因是评估后认为这个系统太复杂、且一直没有真正接入分数（纯计数器，不影响 Trick Score/金币），跟"先把 P0 三个核心系统做扎实"的优先级冲突。**第 6 节的 Combo 设计文字还留着**，作为历史设计记录保留，但已经不在当前实现范围内——如果以后要重新考虑连击机制，建议先重新讨论要不要做、怎么接入分数，不要直接照抄第 6 节。第 12/13/16/21/25/26 节里提到 Combo 的地方（Roguelike Build、UI 设计方向、最终设计原则等）暂时没有跟着改，这些是更偏"长期设计愿景"的段落，要不要一并调整没有在这次改动范围内拍板。
+
+**2026-09-23 补充（Run Summary 结算面板 + 右侧 Feat 列表 + 地形去掉上坡，这三条实际上
+都是同一次长会话里陆续做的，本节之前没有一起补记，这次一并订正）：**
+
+-   **右侧 Feat 列表**：落地质量/Trick/Near Miss 弹字从"顶部纵向堆叠的两个独立 Toast"
+    改成参考 Alto's Odyssey 的右侧列表——每完成一项，右侧弹出一条独立的条目，显示 2 秒
+    后淡出，淡出结束那一刻分数才真正计入右上角 Score，条目之间完全独立、不设上限、会
+    自然堆叠。**完全取代**（不是新增）了旧版的 `ToastText`/`TrickToastText` 弹字方式，
+    细节见 3.5 节
+-   **地形去掉上坡**：`EndlessTerrainGenerator` 从"平地→上坡→下坡→平地"循环改成
+    "平地→下坡→平地"循环，地形整体持续下降，呼应 Alto's Odyssey"一直往下滑"的手感；
+    `EndlessRunSettings`/`EndlessTerrainGenerator` 里的 `minUphillLength`/`maxUphillLength`
+    两个字段已删除，细节见 3.2 节
+-   **Run Summary 结算面板**：摔车结算从"只拼一行文字 + R 重开"换成完整的结算面板
+    （参考 Alto's Odyssey 截图重新设计核心结构，不是照抄 UI），运行时代码搭建
+    （`RunSummaryUI.cs`），Home/Play Again 按钮取代了 `R` 键重开。详细设计/取舍（Total
+    不是三行数值真正加总、图标是 Unicode 占位符、New High Score 是新开的独立持久化记录）
+    见 3.5 节末尾。这是这次改动的主体，也是本条补充存在的直接原因
 
 ------------------------------------------------------------------------
 
@@ -178,18 +196,41 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 
 ## 3.5 局内 UI / 结算 `RunManager.cs`
 
+> **2026-09-23 已更新**：这一节原来写的"顶部弹字堆叠"和"R 重开"都是旧版实现，已经
+> 分别被下面的 Feat 列表和 Run Summary 结算面板取代，本节内容已同步成当前实际状态。
+
 -   左上角实时显示：
     -   距离
     -   时速
     -   氮气(Boost)是否就绪，没就绪时显示还差多少米回满
--   右上角实时显示：HP、Best Distance、齿轮数量、Score（Trick Score 累计值）
--   顶部弹字提示：落地质量（`ToastText`：PERFECT!/GOOD/NOT BAD）和 Trick 结果（独立的
-    `TrickToastText`：Backflip x{圈数}）纵向堆叠、各自独立淡出，互不打断；Near Miss、
-    摔车扣血剩余血量、Station 接近提示走的是跟落地质量共用的 `ToastText`（同一个 Toast，
+-   右上角实时显示：HP、Best Distance、齿轮数量、Score（`RunManager.score`，即 Landing
+    Quality + Trick + Near Miss 的统一累计值，见下面 Feat 列表）
+-   右侧 Feat 列表（参考 Alto's Odyssey，运行时代码搭建，不在预制体里）：Landing Quality
+    （PERFECT!/GOOD/NOT BAD）、Trick（Backflip x{圈数}）、Near Miss 各自独立弹出一条，
+    显示 2 秒后淡出，淡出结束那一刻分数才真正计入右上角 Score；每条都有自己的
+    GameObject/Tween，互不打断，动作做得快会自然堆叠出好几条同时显示，不用额外写"连击"
+    逻辑。这套列表**完全取代**了旧版的 `ToastText`/`TrickToastText` 纵向堆叠弹字
+-   `ToastText` 现在只剩 Crash 扣血剩余血量、Station 接近提示两种用途（同一个 Toast，
     新的会打断上一个）
 -   HP 血条（`HpBarBackground/HpBarFill`），跟着 `BikeDamageSystem.OnHpChanged` 实时更新
--   摔车结算后显示结算信息（目前只有距离，见第 0 节的欠账记录）
--   `R` 重开（重新加载当前场景）
+-   **摔车结算（`RunSummaryUI.cs`，Run Summary 面板）**：`CrashDetector` 判定摔车之后，
+    `RunManager.HandleCrash()` 先锁输入、停掉 `LandingDetector`/`TrickSystem`（不然结算面板
+    弹出来之后车身物理沉降还会被误判成新的落地/特技），延迟 `runSummaryDelaySeconds`
+    （默认 0.8 秒，给车身沉降/镜头震动留时间，不要一摔车就硬生生定格在半空）之后才真正
+    `Time.timeScale = 0` 冻结画面，把这一局的数据打包成 `RunSummaryData`（distance /
+    trickScore / bestTrickScore / gearsCollected / totalScore / isNewHighScore）广播给
+    `RunSummaryUI`。面板背景复用 `NodePanel`/`MenuPanel`/`PausePanel` 同一套
+    `BlurredPanelBackground.mat` + `ScreenBlurState`；内容分三行（Distance Travelled /
+    Trick Score，副标题显示本局单次最高分 / Gears Collected）+ 底部 Total（直接读
+    `RunManager.score`，**不是**三行数值真正加总——Distance/Gears 目前没有换算成分数，
+    只是展示用，这点跟 Alto 截图"每行加总等于 Total"不一样，是讨论方案时跟用户确认过的
+    取舍）+ 只在破紀錄时才显示的 New High Score；破紀錄的判定是新开的
+    `RidingBike_HighScore`（PlayerPrefs）跟 `BestDistance` 是两条独立记录。成绩逐行淡入、
+    Total 最后、New High Score 最后，总时长约 1 秒。底部 Home / ⚙ Gears Earned / Play Again
+    ——Home 和 Play Again 目前是同一个行为（重新加载当前场景，项目没有单独主菜单场景），
+    Gears Earned 只是展示"这一局捡了多少个"，齿轮早在拾取那一刻就实时加钱/存盘了
+    （`GearPickup`→`GearManager.AddGear`），这里**不会**重复发钱。图标是 Unicode 符号占位
+    （▲/✎/⚙/★），项目里没有对应的美术资源，也没有生图工具能画
 
 **Combo（连击）已移除**——原来这里显示"当前连击数"，2026-09-22 评估后认为系统太复杂、
 没有真正接入分数，整体砍掉了（见第 0 节 2026-09-22 补充），不再有这项显示。
