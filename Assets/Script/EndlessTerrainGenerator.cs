@@ -409,6 +409,12 @@ public class EndlessTerrainGenerator : MonoBehaviour
     void RebuildCollider()
     {
         edgeCollider.points = points.ToArray();
+
+        // 临时调试日志，排查"偶尔一弹一弹"导致的 landing/trick 误判用——每前进约 sampleSpacing
+        // 就会重建一次这个 EdgeCollider2D，重建瞬间有可能短暂打断正在接触的碰撞流形。
+        // 拿这个时间戳去对 WheelContactSensor 的触地/离地翻转日志，看两者是不是对得上。
+        // 排查完可以整段删掉，不影响任何逻辑。
+        Debug.Log($"[EndlessTerrainGenerator] 重建地面 Collider，frontX={frontX:0.00} @ t={Time.time:0.0000}");
     }
 
     // 渐变过渡段(地表 -> gradientDepth)内部再细分成几段，每段用 SmoothStep 算颜色，

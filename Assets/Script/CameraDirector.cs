@@ -285,6 +285,14 @@ public class CameraDirector : MonoBehaviour
             LandingDetector.Quality.Good => goodLandingPunchScale,
             _ => notBadLandingPunchScale,
         };
+
+        // 临时调试日志，排查"偶尔一弹一弹"导致的 landing/trick 误判用——NotBad 档的回弹倍数
+        // (notBadLandingPunchScale)比 Perfect 大得多，如果是 LandingDetector 那边的假判定，
+        // 大概率就落在这一档，一个本来几乎看不见的物理小毛刺会被这里放大成明显的镜头一震。
+        // 拿这个时间戳去对 LandingDetector 的判定日志，看是不是同一次假判定触发的。
+        // 排查完可以整段删掉，不影响任何逻辑。
+        Debug.Log($"[CameraDirector] 落地回弹 Quality={quality} Scale={scale} @ t={Time.time:0.0000}");
+
         PlayLandingPunch(landingPunchAmount * scale);
     }
 

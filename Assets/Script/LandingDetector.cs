@@ -86,7 +86,14 @@ public class LandingDetector : MonoBehaviour
 
             case State.Grounded:
                 // 只有两轮都离地才重新武装,车身还有任意一轮贴着地面时不会重新开始一次新的落地判定。
-                if (!frontGrounded && !backGrounded) state = State.Airborne;
+                if (!frontGrounded && !backGrounded)
+                {
+                    // 临时调试日志，排查"偶尔一弹一弹"导致的 landing/trick 误判用——重新武装这一刻
+                    // 如果没有对应的玩家跳跃输入，很可能就是检测侧的假腾空(见 WheelContactSensor
+                    // 里的同一轮排查日志)，不是真的跳了一下。排查完可以整段删掉，不影响任何逻辑。
+                    Debug.Log($"[LandingDetector] 重新武装(两轮同时离地) @ t={Time.time:0.0000}");
+                    state = State.Airborne;
+                }
                 break;
         }
     }
@@ -103,6 +110,8 @@ public class LandingDetector : MonoBehaviour
         firstContactWheel = frontGrounded ? Wheel.Front : Wheel.Back;
         firstContactTime = firstContactWheel == Wheel.Front ? bike.FrontWheelContact.LastGroundedTime : bike.BackWheelContact.LastGroundedTime;
         state = State.Pending;
+
+        Debug.Log($"[LandingDetector] 进入 Pending，先触地={firstContactWheel} @ t={firstContactTime:0.0000}");
     }
 
     void UpdatePending(bool frontGrounded, bool backGrounded)
@@ -163,6 +172,13 @@ public class LandingDetector : MonoBehaviour
     {
         state = State.Grounded;
         LastLanding = new LandingResult(quality, order, deltaTime, firstWheel);
+
+        // 临时调试日志，排查"偶尔一弹一弹"导致的 landing/trick 误判用——重点看 deltaTime 是不是
+        // 小得离谱(几毫秒级)、又没有对应的玩家跳跃输入，那基本可以确认是检测侧的假判定，
+        // 不是真的有过一次腾空。排查完可以整段删掉，不影响任何逻辑。
+        Debug.Log($"[LandingDetector] 判定完成 Quality={quality} Order={order} " +
+                  $"DeltaTime={deltaTime:0.0000} FirstWheel={firstWheel} @ t={Time.time:0.0000}");
+
         OnLanded?.Invoke(quality, order);
     }
 

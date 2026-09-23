@@ -43,6 +43,17 @@ public class WheelContactSensor : MonoBehaviour
     void FixedUpdate()
     {
         if (groundedThisStep && !groundedLastStep) LastGroundedTime = Time.time;
+
+        // 临时调试日志，排查"偶尔一弹一弹"导致的 landing/trick 误判用——只打状态真正翻转的
+        // 那一步，不是每步都打。重点看：①翻转是不是只维持了 1~2 个物理步就恢复；
+        // ②Front/Back(甚至 Body)是不是同一个物理步一起翻转，还是错开的；③翻转时机
+        // 跟 EndlessTerrainGenerator 的地形重建日志、LandingDetector 的判定日志对不对得上。
+        // 排查完可以整段删掉，不影响任何逻辑。
+        if (groundedThisStep != groundedLastStep)
+        {
+            Debug.Log($"[WheelContactSensor:{gameObject.name}] {(groundedThisStep ? "触地" : "离地")} @ t={Time.time:0.0000}");
+        }
+
         groundedLastStep = groundedThisStep;
         groundedThisStep = false; // 每步重新判定,下面的碰撞回调会在本步物理模拟后立刻把它设回 true
     }
