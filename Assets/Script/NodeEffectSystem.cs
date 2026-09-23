@@ -33,6 +33,9 @@ public static class NodeEffectSystem
             case EffectType.MaxSpeedPercent:
                 bike.maxSpeedKmh *= 1f + effect.value / 100f;
                 break;
+            case EffectType.BaselineSpeedPercent:
+                bike.baselineSpeedKmh *= 1f + effect.value / 100f;
+                break;
             case EffectType.JumpForceFlat:
                 bike.jumpForce += effect.value;
                 break;

@@ -32,12 +32,12 @@ MonoBehaviour:
     - type: 1
       value: 5
   - title: "\u5F3A\u5316\u5F15\u64CE"
-    description: "\u8F66\u901F\u4E0A\u9650 +8%"
+    description: "\u4FDD\u5E95\u8F66\u901F +8%"
     minStage: 0
     riskLevel: 0
     weight: 10
     effects:
-    - type: 0
+    - type: 5
       value: 8
   - title: "\u5FEB\u901F\u8865\u7ED9"
     description: "\u6C2E\u6C14\u56DE\u80FD\u8DDD\u79BB -20%"

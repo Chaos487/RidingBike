@@ -23,6 +23,12 @@ public enum EffectType
     /// <summary>氮气充能所需距离 (BikeController.boostRechargeDistance),按百分比缩短/拉长
     /// (正值=缩短=回能更快,负值=拉长=回能更慢)。</summary>
     BoostRechargePercent,
+    /// <summary>保底前进速度 (BikeController.baselineSpeedKmh),按百分比加成/减益——车速永远
+    /// 不会低于这个值,跟"车速上限"是两码事(那个只是不会超过,不保证达到)。故意加在枚举
+    /// 最后面,不要插到中间——这些枚举值会按整数序号(不是按名字)序列化进
+    /// Assets/Resources/NodeSettings.asset,插到中间会把已经手调好的那份资产里所有排在
+    /// 后面的 EffectType 全部错位。</summary>
+    BaselineSpeedPercent,
 }
 
 [System.Serializable]
@@ -110,11 +116,11 @@ public class NodeSettings : ScriptableObject
             new ChoicePreset
             {
                 title = "Engine Boost",
-                description = "Max Speed +8%",
+                description = "Baseline Speed +8%",
                 minStage = NodeTier.Early,
                 riskLevel = RiskLevel.Safe,
                 weight = 10f,
-                effects = { new EffectEntry { type = EffectType.MaxSpeedPercent, value = 8f } },
+                effects = { new EffectEntry { type = EffectType.BaselineSpeedPercent, value = 8f } },
             },
             new ChoicePreset
             {
