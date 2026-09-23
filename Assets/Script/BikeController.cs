@@ -466,11 +466,31 @@ public class BikeController : MonoBehaviour
     // 手机端没有 Space 键：点一下屏幕等价于按一下 Space(触地起跳)，按住屏幕等价于按住
     // Space(空中长按触发旋转)，跟键盘输入是"或"的关系，不是替换——PC 端的空格键继续有效。
     // Input.GetMouseButton* 在触屏设备上会直接读到主触点，不需要额外用 Input.touches。
-    // 要排除点在 UI(Start/Confirm 按钮这些)上的那次点击，不然点 UI 会被同时读成一次跳跃/旋转输入。
+    // 要排除点在 UI(Start/Confirm/Boost 按钮这些)上的那次点击，不然点 UI 会被同时读成一次跳跃/旋转输入。
     static bool ActionPressed() => Input.GetKeyDown(KeyCode.Space) || (Input.GetMouseButtonDown(0) && !IsPointerOverUI());
     static bool ActionHeld() => Input.GetKey(KeyCode.Space) || (Input.GetMouseButton(0) && !IsPointerOverUI());
 
-    static bool IsPointerOverUI() => EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+    // EventSystem.IsPointerOverGameObject() 不带参数时查的是"鼠标指针"(pointer id -1)——
+    // 在真机触屏上，手指点击是走 touch(pointer id = 那根手指的 fingerId)，鼠标指针根本没有
+    // 跟着移动过去，这个无参重载永远查不到"手指正按在 Boost 按钮上"，导致 Editor/PC 鼠标点击
+    // 测试时排除 UI 完全正常，一到真机上点 Boost 按钮就会被同时判定成一次跳跃(手机点击加速
+    // 按钮却同时跳跃/旋转的 bug 根源)。触屏设备要按每根手指各自的 fingerId 查，跟 Input.touches
+    // 一一对应；没有触点时(PC/Editor 鼠标)才退回查鼠标指针。
+    static bool IsPointerOverUI()
+    {
+        if (EventSystem.current == null) return false;
+
+        if (Input.touchCount > 0)
+        {
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                if (EventSystem.current.IsPointerOverGameObject(Input.GetTouch(i).fingerId)) return true;
+            }
+            return false;
+        }
+
+        return EventSystem.current.IsPointerOverGameObject();
+    }
 
     void Jump()
     {
