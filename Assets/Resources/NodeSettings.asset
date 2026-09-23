@@ -23,32 +23,34 @@ MonoBehaviour:
   midTierStartIndex: 3
   lateTierStartIndex: 6
   choices:
-  - title: "Light Load"
-    description: "Jump Force +5"
+  - title: Light Load
+    description: Jump Force +10
     minStage: 0
     riskLevel: 0
     weight: 10
     effects:
     - type: 1
-      value: 5
-  - title: "Engine Boost"
-    description: "Baseline Speed +8%"
+      value: 10
+  - title: Engine Boost
+    description: Baseline Speed +10%
     minStage: 0
     riskLevel: 0
     weight: 10
     effects:
     - type: 5
-      value: 8
-  - title: "Fast Refuel"
-    description: "Boost Recharge -20%"
+      value: 10
+  - title: Fast Refuel
+    description: Boost Recharge -20%
     minStage: 0
     riskLevel: 0
     weight: 10
     effects:
     - type: 4
       value: 20
-  - title: "Off-Road Kit"
-    description: "Jump Force +10\nMax Speed -5%"
+  - title: Off-Road Kit
+    description: 'Jump Force +10
+
+      Max Speed -5%'
     minStage: 1
     riskLevel: 1
     weight: 8
@@ -57,8 +59,10 @@ MonoBehaviour:
       value: 10
     - type: 0
       value: -5
-  - title: "Extreme Tuning"
-    description: "Max Speed +15%\nMax HP -15"
+  - title: Extreme Tuning
+    description: 'Max Speed +15%
+
+      Max HP -15'
     minStage: 1
     riskLevel: 2
     weight: 7
@@ -67,8 +71,10 @@ MonoBehaviour:
       value: 15
     - type: 2
       value: -15
-  - title: "Lightweight Frame"
-    description: "Acceleration +20%\nMax HP -10"
+  - title: Lightweight Frame
+    description: 'Acceleration +20%
+
+      Max HP -10'
     minStage: 1
     riskLevel: 2
     weight: 7
@@ -77,8 +83,10 @@ MonoBehaviour:
       value: 20
     - type: 2
       value: -10
-  - title: "Nitro Overdrive"
-    description: "Boost Recharge -50%\nMax Speed -10%"
+  - title: Nitro Overdrive
+    description: 'Boost Recharge -50%
+
+      Max Speed -10%'
     minStage: 2
     riskLevel: 2
     weight: 6
@@ -87,23 +95,27 @@ MonoBehaviour:
       value: 50
     - type: 0
       value: -10
-  - title: "Turbo Charger"
-    description: "Max Speed +30%\nMax HP -30"
+  - title: Turbo Charger
+    description: 'Baseline Speed +30%
+
+      Max HP -30'
     minStage: 2
     riskLevel: 3
     weight: 5
     effects:
-    - type: 0
+    - type: 5
       value: 30
     - type: 2
       value: -30
-  - title: "All or Nothing"
-    description: "Jump Force +25\nMax HP -40"
+  - title: All or Nothing
+    description: 'Jump Force +25
+
+      Max HP -40'
     minStage: 2
     riskLevel: 3
     weight: 4
     effects:
     - type: 1
-      value: 15
+      value: 25
     - type: 2
       value: -40
