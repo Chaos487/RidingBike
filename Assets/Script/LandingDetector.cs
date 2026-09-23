@@ -6,8 +6,10 @@ using UnityEngine;
 /// 坡度、角速度、垂直速度。一次腾空只产生一次判定:两轮都离地时(Airborne)任一轮首次
 /// 触地记录 FirstContactWheel/FirstContactTime,进入 LandingPending;另一轮触地就算 Δt
 /// 分档,或者等超过 landingTimeout 另一轮还没触地就直接判 NotBad;判定完立即广播,
-/// 回到 Grounded 状态,直到两轮都离地才重新武装(Airborne),避免车身仍贴着地面时
-/// 被误判成"又落地了一次"。
+/// 回到 Grounded 状态,直到 bike.IsConfirmedGrounded 变 false(经过
+/// BikeController.airborneConfirmTime 双向防抖确认过的"真的腾空了")才重新武装
+/// (Airborne),避免车身仍贴着地面、或者只是被地形 Collider 重建/悬挂噪声/boost
+/// 瞬间顶了一下这类几毫秒的假离地，被误判成"又落地了一次"。
 /// </summary>
 public class LandingDetector : MonoBehaviour
 {
@@ -85,13 +87,15 @@ public class LandingDetector : MonoBehaviour
                 break;
 
             case State.Grounded:
-                // 只有两轮都离地才重新武装,车身还有任意一轮贴着地面时不会重新开始一次新的落地判定。
-                if (!frontGrounded && !backGrounded)
+                // 重新武装的条件改成读 bike.IsConfirmedGrounded(双向防抖过的接地状态)，不再是
+                // 原始的"两轮都离地"——地形 Collider 重建/悬挂噪声/boost 瞬间顶一下这类几毫秒的
+                // 假离地，现在会被 BikeController.airborneConfirmTime 直接挡掉，不会走到这里，
+                // 从源头上减少凭空触发一次新落地判定的次数(而不是靠事后加锁/加冷却掩盖)。
+                if (!bike.IsConfirmedGrounded)
                 {
-                    // 临时调试日志，排查"偶尔一弹一弹"导致的 landing/trick 误判用——重新武装这一刻
-                    // 如果没有对应的玩家跳跃输入，很可能就是检测侧的假腾空(见 WheelContactSensor
-                    // 里的同一轮排查日志)，不是真的跳了一下。排查完可以整段删掉，不影响任何逻辑。
-                    Debug.Log($"[LandingDetector] 重新武装(两轮同时离地) @ t={Time.time:0.0000}");
+                    // 临时调试日志，排查"偶尔一弹一弹"导致的 landing/trick 误判用——加了双向防抖
+                    // 之后这条应该只在真的腾空时才打印。排查完可以整段删掉，不影响任何逻辑。
+                    Debug.Log($"[LandingDetector] 重新武装(确认腾空) @ t={Time.time:0.0000}");
                     state = State.Airborne;
                 }
                 break;

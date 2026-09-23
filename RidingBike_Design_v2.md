@@ -102,6 +102,35 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     统一列表(细节同样在 3.5 节)，这是"跟三行对不上"这个问题最终真正被解决的一次——不是靠
     调整分组，是给每一项都发明了对应的分数
 
+**2026-09-23 补充（同一天最后一条：`IsConfirmedGrounded` 补上双向防抖，很可能是
+[GitHub #5](https://github.com/Chaos487/RidingBike/issues/5) 的真正病根）：**
+
+-   用户实机反馈"骑着骑着偶尔一弹一弹"，还伴随 Landing Quality/Trick 判定异常(右侧
+    Feat 列表短时间内堆出好几条 PERFECT!/NOT BAD)。加 debug log(`WheelContactSensor`/
+    `LandingDetector`/`EndlessTerrainGenerator`/`CameraDirector` 四处)+ 用户提供的实机
+    录屏交叉核对后，先定位到一个直接诱因并修掉了：`EndlessTerrainGenerator.Update()`
+    以前只要 `ExtendFront`(长出新地形)或 `TrimBehind`(删掉车身后方旧点)任一个发生就
+    重建物理用的 `EdgeCollider2D`，纯 Trim 触发的重建（不影响轮子所在区域的几何坐标，
+    纯粹是内存清理）现在砍掉了，只在真的长出新地形时才重建——减少了轮子正好压在
+    重建瞬间、被 Unity 整体销毁重建 fixture 短暂打断接触的次数。
+-   但这只是减少诱因的**频率**，真正的**病根**在防抖本身：`BikeController.landingConfirmTime`
+    /`IsConfirmedGrounded` 一直只做了"触地要维持够久才确认落地"这一半防抖，"离地要维持
+    够久才确认腾空"完全没做——`wheelGrounded` 一旦变 false，`groundedHoldTime` 当场清零，
+    `IsConfirmedGrounded` 同一帧就翻转成 false，没有任何缓冲。这意味着不管是地形 Collider
+    重建、悬挂噪声，还是 boost 瞬间顶一下前轮，只要有几毫秒的假离地，就会被 `LandingDetector`
+    当成一次真的腾空，凭空触发一整套 Landing Quality 判定；而 `TrickSystem` 的滞空开始
+    时机、`airborneStartRotation` 旋转基准重置也是靠同一个 `IsConfirmedGrounded` 驱动的——
+    **这很可能就是 #5 里"Trick 判定偶尔不稳定"一直没能根治的真正原因，而不是三次以前
+    修的那三个问题本身还有遗漏**。新增 `airborneConfirmTime`（默认 0.05s，跟
+    `landingConfirmTime` 对称），做成双向防抖(迟滞开关)：触地要维持够久才确认落地，
+    离地也要维持够久才确认腾空，中间过渡态保持上一次确认过的状态不变。`LandingDetector`
+    的重新武装条件也从原始的"两轮都离地"改成直接读这个防抖过的 `bike.IsConfirmedGrounded`。
+-   讨论方案时明确问过用户"boost 瞬间前轮真的翻起来(持续几十毫秒，不是假离地)要不要也
+    归入 Landing Quality 判定"，用户选择**照常判定**——这次的防抖只过滤几毫秒级的假离地，
+    不会把真的(哪怕很短的)腾空滤掉，这是有意的取舍，不是遗漏。
+-   #5 要不要跟着关掉，等这版实机验证过、确认"偶尔一弹一弹"和连带的判定异常消失之后再说，
+    这次没有在文档里直接标记为已解决。
+
 ------------------------------------------------------------------------
 
 # 1. 核心玩法
@@ -580,6 +609,12 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 > **还没做的**：`AudioManager` 的 `landing` 音效槽位（3.10 节）现在对三档播的还是同一个
 > 音效，没有分级；三档阈值是估的第一版数字，还没有经过大量实机测试微调手感。
 > **Combo 加成已经不需要了**——Combo 系统本身已经整体移除，见第 0 节 2026-09-22 补充。
+>
+> **2026-09-23 补充**：这个状态机重新武装(Grounded → Airborne)的触发条件从原始的"两轮
+> 都离地"改成读 `bike.IsConfirmedGrounded`(`BikeController` 新增了对称的
+> `airborneConfirmTime` 防抖)，过滤掉地形 Collider 重建/悬挂噪声/boost 瞬间顶一下这类
+> 几毫秒的假离地——之前这类假离地会被立刻当成一次新腾空，凭空触发一次多余的判定。
+> 细节、跟 GitHub #5 的关联见第 0 节同一天最后一条补充。
 
 这是目前最重要的玩法增强。
 

@@ -106,6 +106,11 @@ public class BikeController : MonoBehaviour
     [Tooltip("轮子触地要持续这么久(秒)才算\"真正落地\"，用来过滤腾空途中蹭一下地面/小坡坎的单帧假触地——" +
              "不然会把同一次连续转体腰斩成两段，旋转计数、跳跃/旋转再次可用的解锁时机都会被误判。")]
     public float landingConfirmTime = 0.05f;
+    [Tooltip("轮子离地要持续这么久(秒)才算\"真正腾空\"——跟 landingConfirmTime 是同一套防抖的" +
+             "镜像版本，过滤地形 Collider 重建/悬挂噪声/boost 瞬间顶一下这类几毫秒的假离地，" +
+             "不然会被立刻当成一次新的腾空，触发多余的 Landing Quality 判定、打断正在进行的" +
+             "旋转基准(见 IsConfirmedGrounded 注释)。")]
+    public float airborneConfirmTime = 0.05f;
 
     [Header("Invulnerability Flash")]
     [Tooltip("摔车扣血后的无敌期间，车身贴图一亮一灭切换一次的间隔(秒)，越小闪得越快。")]
@@ -128,6 +133,7 @@ public class BikeController : MonoBehaviour
     float spinDirection;
     float spinAccumulatedDeg;
     float groundedHoldTime;
+    float ungroundedHoldTime;
     float airborneStartRotation;
     bool wasGroundedForSpin = true;
 
@@ -167,10 +173,12 @@ public class BikeController : MonoBehaviour
         (FrontWheelContact != null && FrontWheelContact.IsGrounded) ||
         (BackWheelContact != null && BackWheelContact.IsGrounded);
 
-    /// <summary>跟 IsWheelGrounded 的区别：这个做了 landingConfirmTime 防抖，腾空途中蹭一下地面的
-    /// 单帧假触地不会让它变 true。旋转计数(SpinAccumulatedDegrees)、跳跃/旋转再次可用的判定都用
-    /// 的是这份"确认过的触地"；外部系统想知道跟这些判定同步的"是否真的已经落地"，应该读这个，
-    /// 不要直接读 IsWheelGrounded。</summary>
+    /// <summary>跟 IsWheelGrounded 的区别：这个做了双向防抖(landingConfirmTime/
+    /// airborneConfirmTime)，腾空途中蹭一下地面的单帧假触地不会让它变 true，反过来地形 Collider
+    /// 重建/悬挂噪声/boost 瞬间顶一下这类几毫秒的假离地也不会让它变 false——中间过渡态保持
+    /// 上一次确认过的状态。旋转计数(SpinAccumulatedDegrees)、跳跃/旋转再次可用的判定、
+    /// LandingDetector 的落地判定都用的是这份"确认过的接地状态"；外部系统想知道跟这些判定
+    /// 同步的"是否真的已经落地/腾空"，应该读这个，不要直接读 IsWheelGrounded。</summary>
     public bool IsConfirmedGrounded { get; private set; }
 
     /// <summary>车架本身(不是轮子)有没有真的物理接触到东西。供 CrashDetector 判断车身是不是
@@ -389,13 +397,19 @@ public class BikeController : MonoBehaviour
         // 用射线的话，滞空高度不够大时会在真正腾空/落地前就先报"触地"，把旋转提前打断。
         bool wheelGrounded = IsWheelGrounded;
 
-        // 触地要持续 landingConfirmTime 才算数，单帧的假触地(腾空途中蹭一下地面/小坡坎，
-        // 下一帧立刻又离地)不算——不然会把同一次连续转体腰斩成两段：跳跃/旋转的"再次可用"
-        // 提前解锁，旋转基准(airborneStartRotation)也被提前重置，实际转了两圈的动作可能被
-        // 拆成两个都不到一圈的片段。
+        // 双向防抖(迟滞开关，跟 landingConfirmTime/airborneConfirmTime 两个字段对应)：
+        // 触地要持续 landingConfirmTime 才确认落地，离地也要持续 airborneConfirmTime 才确认
+        // 腾空——中间"刚变化、还没到阈值"的过渡态保持上一次确认过的状态不变，不会跟着
+        // WheelContactSensor 的原始信号一帧一抖。只做触地这一半防抖的话(旧版就是这样)，
+        // 地形 Collider 重建/悬挂噪声/boost 瞬间顶一下这类几毫秒的假离地会被立刻当成一次
+        // 新的腾空：同一次连续转体被腰斩成两段，跳跃/旋转的"再次可用"提前解锁，旋转基准
+        // (airborneStartRotation)被提前重置，LandingDetector 也会跟着凭空触发一次多余的
+        // 落地判定。
         groundedHoldTime = wheelGrounded ? groundedHoldTime + Time.deltaTime : 0f;
-        bool groundedForAirtime = groundedHoldTime >= landingConfirmTime;
-        IsConfirmedGrounded = groundedForAirtime;
+        ungroundedHoldTime = wheelGrounded ? 0f : ungroundedHoldTime + Time.deltaTime;
+        if (groundedHoldTime >= landingConfirmTime) IsConfirmedGrounded = true;
+        else if (ungroundedHoldTime >= airborneConfirmTime) IsConfirmedGrounded = false;
+        bool groundedForAirtime = IsConfirmedGrounded;
 
         if (groundedForAirtime)
         {
