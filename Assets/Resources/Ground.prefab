@@ -145,25 +145,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   trackTarget: {fileID: 0}
   generateAheadDistance: 50
-  despawnBehindDistance: 40
+  despawnBehindDistance: 25
   sampleSpacing: 0.4
-  startFlatLength: 50
+  startFlatLength: 70
   groundThickness: 100
-  minFlatLength: 4
-  maxFlatLength: 12
-  minUphillLength: 15
-  maxUphillLength: 35
-  minDownhillLength: 15
-  maxDownhillLength: 35
-  minHillHeight: 2
-  maxHillHeight: 5
-  gapChance: 0.15
-  minGapSpan: 3
-  maxGapSpan: 6
+  minFlatLength: 5
+  maxFlatLength: 20
+  minDownhillLength: 75
+  maxDownhillLength: 200
+  minHillHeight: 10
+  maxHillHeight: 50
+  gapChance: 0.5
+  minGapSpan: 7
+  maxGapSpan: 15
   gapDepth: 25
   gapEdgeLength: 1.5
-  obstacleCheckIntervalMin: 6
-  obstacleCheckIntervalMax: 12
+  obstacleCheckIntervalMin: 30
+  obstacleCheckIntervalMax: 50
   flatAngleThreshold: 5
   edgeRadius: 0.1
   groundColor: {r: 0.8301887, g: 0.7865104, b: 0.71662515, a: 1}
