@@ -218,14 +218,14 @@ public class EndlessTerrainGenerator : MonoBehaviour
     {
         if (trackTarget == null || points.Count == 0) return;
 
-        bool changed = false;
+        bool frontChanged = false;
         int safetyIterations = 0;
         const int maxIterationsPerUpdate = 2000; // 200m 的余量，正常情况下远用不到——只用来防止目标位置异常跳变时死循环卡死
 
         while (frontX - trackTarget.position.x < generateAheadDistance)
         {
             ExtendFront();
-            changed = true;
+            frontChanged = true;
 
             safetyIterations++;
             if (safetyIterations >= maxIterationsPerUpdate)
@@ -235,12 +235,25 @@ public class EndlessTerrainGenerator : MonoBehaviour
             }
         }
 
-        changed |= TrimBehind(trackTarget.position.x - despawnBehindDistance);
+        bool trimmed = TrimBehind(trackTarget.position.x - despawnBehindDistance);
         gaps.RemoveAll(g => g.endX < trackTarget.position.x - despawnBehindDistance);
 
-        if (changed)
+        // 物理用的 Collider 只在真的长出新地形(frontChanged)时才重建——单纯因为 TrimBehind
+        // 删掉了车身后方 despawnBehindDistance 之外的旧点而触发的重建，不会改变轮子当前所在
+        // 区域的几何坐标(那些点离玩家太远，删不删对轮子附近的形状没有影响)，但 Unity 每次
+        // 整体重新赋值 EdgeCollider2D.points 都要整个销毁重建一次物理 fixture——用 debug 日志
+        // 实测验证过，正压在地面上的轮子会在这个重建瞬间偶尔短暂丢失接触(前轮"离地"几乎全部
+        // 发生在某次重建后的 1~3 个物理步内)，这是"骑着骑着偶尔弹一下"的直接成因。纯 Trim
+        // 触发的重建砍掉之后，Collider 会暂时保留几个已经从 points 列表里删掉的旧点(留在车身
+        // 后方一截，无害)，等下一次真的有新地形生成时自然一起同步掉，不用额外处理。
+        // Mesh 纯视觉、不参与物理，Trim 也要重建(不然车身后方已经清理掉的地形还会残留在画面上)。
+        if (frontChanged)
         {
             RebuildCollider();
+        }
+
+        if (frontChanged || trimmed)
+        {
             RebuildMesh();
         }
     }
