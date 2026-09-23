@@ -44,28 +44,31 @@ Alto's Odyssey 那种"一直往下滑"的手感),阶段间 SmoothStep 过渡不�
 **落地质量 / 特技 / 贴身险**(`LandingDetector.cs` / `TrickSystem.cs` /
 `NearMissDetector.cs`,4.1 / 5 / 7 节)
 落地瞬间只看前后轮有效接地的时间差(Δt)分出 Perfect / Good / Not Bad,不读车身角度/
-坡度/角速度/垂直速度;空中转出的完整圈数按查表给 Trick Score(按圈数,不是精确角度
-档位)。三者都走右侧的 Feat 列表(参考 Alto's Odyssey:完成一项弹出一条独立条目,显示
-2 秒后淡出,淡出结束才计入右上角的 Score),互相独立,`Score` 是这三者的统一累计值,
-结算面板的 Total 直接读这个值,面板上 Landing Quality/Trick/Near Miss 三行紧挨着 Total
-摆在一起、加总正好等于 Total(Distance/Gears 没有换算成分数,单独分在展示用的一组,不
-计入 Total,细节见下面"局内 UI / 结算")。Combo 连击系统已经整体移除(实现过一版纯计
-数器,没有真正接入分数,评估后觉得太复杂,直接砍掉,不在当前设计范围内)。
+坡度/角速度/垂直速度;空中转出的完整圈数换算成"转满了几圈"(`TrickSystem` 本身不计分,
+只广播圈数)。三者都走右侧的 Feat 列表(参考 Alto's Odyssey:完成一项弹出一条独立条目,
+显示 2 秒后淡出,淡出结束才计入右上角的 Score)。"这次该给多少分"统一由 `ScoreSystem.cs`
+查 `ScoreSettings` 这份可配置资产决定,不再散在各个脚本的 Inspector 字段里,细节见下面
+"局内 UI / 结算"。Combo 连击系统已经整体移除(实现过一版纯计数器,没有真正接入分数,
+评估后觉得太复杂,直接砍掉,不在当前设计范围内)。
 
 **摔车判定 / 生命值**(`CrashDetector.cs` + `BikeDamageSystem.cs`,3.4 / 3.8 节)
 车身触地且倾角超过阈值、持续一小段时间才判定一次"失控";失控不直接结束一局,而是
 扣一条 HP 血条(默认能扛 2 次、第 3 次才真的摔车结算),期间给无敌时间和贴图闪烁提示。
 
-**局内 UI / 结算**(`RunManager.cs` + `RunSummaryUI.cs`,3.5 节)
+**局内 UI / 结算**(`RunManager.cs` + `ScoreSystem.cs` + `ScoreSettings.cs` +
+`RunSummaryUI.cs`,3.5 节)
 距离、时速、氮气就绪状态、HP 血条、Score 实时显示;落地质量/特技/贴身险走右侧独立的
-Feat 列表,不再是顶部弹字堆叠。摔车 0.8 秒后(留时间给车身物理沉降)冻结画面、弹出
-Run Summary 结算面板(参考 Alto's Odyssey 截图,不是照抄 UI):上半段是展示用的 Distance
-Travelled / Gears Collected(不计分),下半段紧挨着 Total 的是 Landing Quality / Trick
-Score / Near Miss 三行,加总正好等于 Total(这个分组是上线后根据"Total 数字跟三行对不上"
-的实机反馈调整过一版,细节见设计文档 3.5 节),破紀錄时额外显示 New High Score,底部
-Home / Gears Earned / Play Again。面板背景复用现成的全屏模糊(`ScreenBlurState` +
-`BlurredPanelBackground.mat`),整个面板运行时代码搭建,图标是 Unicode 符号占位
-(项目里没有对应美术资源)。
+Feat 列表,不再是顶部弹字堆叠。`ScoreSystem` 是唯一持有 Total 分数的地方(从
+`RunManager` 拆出来的独立组件),`ScoreSettings` 是唯一的计分配置——Landing
+Quality/Trick/Near Miss 这三个"跑动中的离散事件"该给多少分,加上 Distance/Gears/
+Node(经过的 Station 数)/Max HP(结算时的血量上限,不是剩余血量)这四项"结算时才算的
+连续数值"该怎么换算成分,以及破最远距离纪录的额外加分,全部收在这一份资产里。摔车
+0.8 秒后(留时间给车身物理沉降)冻结画面、弹出 Run Summary 结算面板(参考 Alto's
+Odyssey 截图,不是照抄 UI):**一张统一列表**,每行右侧都是这一项的分数,全部加起来
+正好等于 Total(原始数值折进标签文字里显示,比如"Distance Travelled (793m)"),破紀錄时
+额外显示 New Distance Record / New High Score(两套独立记录),底部 Home / Gears Earned /
+Play Again。面板背景复用现成的全屏模糊(`ScreenBlurState` + `BlurredPanelBackground.mat`),
+整个面板运行时代码搭建,图标是 Unicode 符号占位(项目里没有对应美术资源)。
 
 **开始画面 / 主菜单**(`RunManager.cs` 的开始 gate + `MainMenuController.cs`)
 开始前是"tap to start"——屏幕背后能看到骑行场景(地形/车,只是暂停了),没有单独一个
@@ -184,9 +187,8 @@ Scene 视图摄像机抢占共享贴图这几个问题之后,视觉上依然没�
 
 只列要点,完整清单、优先级排序(P0→P3)、每一项的具体欠账见设计文档第 0 / 23 节:
 
-- 结算画面信息不全的问题已解决(见"局内 UI / 结算"一节的 Run Summary 面板),但仍然没有
-  真正把 Distance/Trick/Gears 揉到一起的统一 ScoreSystem——Total 目前就是 Landing
-  Quality+Trick+Near Miss 的累计值,Distance/Gears 只是展示,不计分
+- 结算画面信息不全、没有统一 ScoreSystem 这两条都已解决(见"局内 UI / 结算"一节的
+  `ScoreSystem.cs`/`ScoreSettings.cs`/Run Summary 面板)
 - [GitHub #1](https://github.com/Chaos487/RidingBike/issues/1)、
   [GitHub #2](https://github.com/Chaos487/RidingBike/issues/2) 两个已知 bug,状态见设计文档第 0 节;
   [GitHub #4](https://github.com/Chaos487/RidingBike/issues/4) 弹窗背景真实模糊做不出效果,已搁置

@@ -25,21 +25,13 @@ public class RunManager : MonoBehaviour
     public float featHoldSeconds = 2f;
     [Tooltip("Feat 淡出的时长(秒)，淡出结束的那一刻分数才真正计入右上角的 Score。")]
     public float featFadeSeconds = 0.4f;
-    [Tooltip("Perfect 落地计多少分。")]
-    public int perfectLandingScore = 20;
-    [Tooltip("Good 落地计多少分。")]
-    public int goodLandingScore = 10;
-    [Tooltip("Not Bad 落地计多少分——默认 0，纯粹垫个底不算失败，不专门奖励。")]
-    public int notBadLandingScore = 0;
-    [Tooltip("贴身擦过障碍物(Near Miss)计多少分。")]
-    public int nearMissScore = 15;
 
     Transform bikeTransform;
     BikeDamageSystem damageSystem;
     BikeController bikeController;
     TrickSystem trickSystem;
     LandingDetector landingDetector;
-    ObstacleSpawner obstacleSpawner;
+    ScoreSystem scoreSystem;
 
     Text distanceText;
     Text speedText;
@@ -63,33 +55,24 @@ public class RunManager : MonoBehaviour
     const string BestDistanceKey = "RidingBike_BestDistance";
     float bestDistance;
 
+    // bestDistance 这个字段在 Update() 里会随着当前跑动距离实时更新(见下面)，到结算那一刻
+    // 已经不代表"这局开始前的纪录"了——单独存一份开局时读到的值，专门给"这局是否破了距离
+    // 纪录"这个判断用，不会被实时更新污染。
+    float startingBestDistance;
+
     // 结算页(Run Summary)的"历史最高 Total Score"记录——跟 BestDistance 是两码事,单独开一个
     // PlayerPrefs key。之前这个项目没有"Total Score 破紀錄"这个概念,是这次结算系统新加的。
     const string HighScoreKey = "RidingBike_HighScore";
     int savedHighScore;
 
-    // 当前这一局累计的分数(Landing Quality + Trick + Near Miss)，只在这一局内有效——
-    // 跟 distance/speed 一样是纯运行时状态，不落盘,重开(重新加载场景)自然归零。
-    // 这个字段就是七、里说的"统一 Score System 入口"——Run Summary 的 Total 直接读它,
-    // 不会另外发明一套计分逻辑。
-    int score;
-
-    // Trick Score 在结算页要单独显示"本局累计"和"单次最高"，但 TrickSystem 自己只广播
-    // 每次的得分(不攒总数,也不知道"最高的一次"是多少)——这两个字段专门为结算页攒的，
-    // 不影响 TrickSystem/Landing Quality 之间的解耦。
-    int trickTotalScore;
-    int bestTrickScore;
-
-    // 结算页把 Landing Quality/Near Miss 也各自列成单独一行(不只是折进 Total 里看不见)，
-    // 这样"Total 到底是哪几行加出来的"是可以从面板上直接看出来的——这两个字段专门为此攒，
-    // AddFeatEntry/AddScore 那条统一计分路径完全没变。
-    int landingQualityTotalScore;
-    int nearMissTotalScore;
-
     // 结算时用"当前齿轮总数 - 这一局开局时的齿轮总数"算出"这一局捡了多少"——齿轮拾取
     // 那一刻就已经实时加钱+存盘了(见 GearPickup/GearManager)，这里只是纯展示用的差值,
     // 不会、也不能再调一次 AddGear（不然会重复发钱）。
     int gearCountAtRunStart;
+
+    /// <summary>反向查询:本局一共经过了几个 Roguelike Station——RunManager 比 NodeManager
+    /// 先创建,没法直接持有引用,跟 isPausedByOtherSystem 是同一个套路。为空时视为 0。</summary>
+    public Func<int> getNodeCount;
 
     [Header("Run Summary")]
     [Tooltip("摔车之后等待多久(秒)才真正冻结画面、弹出结算面板——留一点时间给车身物理" +
@@ -273,38 +256,23 @@ public class RunManager : MonoBehaviour
 
     /// <summary>接上特技反馈系统。跟 Initialize 分开是因为 EndlessRunBootstrap 里这个系统
     /// 要在 RunManager 之后才创建(它依赖 LandingDetector)。Landing Quality/Trick/Near Miss
-    /// 三种事件都走右侧的 Feat 列表(AddFeatEntry)，不再各自弹 Toast。</summary>
-    public void InitializeFeedback(TrickSystem trick, ObstacleSpawner obstacles, LandingDetector landing)
+    /// "这次值多少分"已经不归 RunManager 管了——订阅的是 ScoreSystem 广播出来的、已经算好分
+    /// 的事件,这里只负责把它们丢进右侧的 Feat 列表(AddFeatEntry)，不再各自弹 Toast。
+    /// `trick`/`landing` 这两个引用留着是因为 HandleCrash 要在摔车时把它们禁用掉,不是因为
+    /// 还要直接订阅它们的原始事件。</summary>
+    public void InitializeFeedback(TrickSystem trick, LandingDetector landing, ScoreSystem score)
     {
         trickSystem = trick;
-        obstacleSpawner = obstacles;
         landingDetector = landing;
+        scoreSystem = score;
 
-        landingDetector.OnLanded += HandleLanded;
-        trickSystem.OnTrickScored += HandleTrickScored;
-        obstacleSpawner.OnNearMiss += HandleNearMiss;
+        scoreSystem.OnScoreChanged += HandleScoreChanged;
+        scoreSystem.OnLandingScored += HandleLandingScored;
+        scoreSystem.OnTrickScored += HandleTrickScored;
+        scoreSystem.OnNearMissScored += HandleNearMissScored;
     }
 
-    void HandleLanded(LandingDetector.Quality quality, LandingDetector.ContactOrder order)
-    {
-        int points = LandingQualityScore(quality);
-        landingQualityTotalScore += points;
-        AddFeatEntry(LandingQualityLabel(quality), points);
-    }
-
-    static string LandingQualityLabel(LandingDetector.Quality quality) => quality switch
-    {
-        LandingDetector.Quality.Perfect => "PERFECT!",
-        LandingDetector.Quality.Good => "GOOD",
-        _ => "NOT BAD",
-    };
-
-    int LandingQualityScore(LandingDetector.Quality quality) => quality switch
-    {
-        LandingDetector.Quality.Perfect => perfectLandingScore,
-        LandingDetector.Quality.Good => goodLandingScore,
-        _ => notBadLandingScore,
-    };
+    void HandleLandingScored(string label, int points) => AddFeatEntry(label, points);
 
     void Update()
     {
@@ -347,18 +315,9 @@ public class RunManager : MonoBehaviour
         if (bikeController != null) bikeController.TryTriggerBoost();
     }
 
-    void HandleTrickScored(int trickScore, int laps)
-    {
-        trickTotalScore += trickScore;
-        if (trickScore > bestTrickScore) bestTrickScore = trickScore;
-        AddFeatEntry($"Backflip x{laps}", trickScore);
-    }
+    void HandleTrickScored(int points, int laps) => AddFeatEntry($"Backflip x{laps}", points);
 
-    void HandleNearMiss()
-    {
-        nearMissTotalScore += nearMissScore;
-        AddFeatEntry("NEAR MISS!", nearMissScore);
-    }
+    void HandleNearMissScored(int points) => AddFeatEntry("NEAR MISS!", points);
 
     /// <summary>参考 Alto's Odyssey:Landing Quality/Trick/Near Miss 都在右侧列表弹出一条独立的
     /// Feat,显示 featHoldSeconds 秒之后淡出,淡出结束那一刻这条的分数才真正计入右上角的 Score——
@@ -368,7 +327,7 @@ public class RunManager : MonoBehaviour
     {
         if (featListRoot == null)
         {
-            AddScore(scoreValue);
+            scoreSystem?.CommitScore(scoreValue);
             return;
         }
 
@@ -389,17 +348,16 @@ public class RunManager : MonoBehaviour
             .Append(text.DOFade(0f, featFadeSeconds))
             .OnComplete(() =>
             {
-                AddScore(scoreValue);
+                scoreSystem?.CommitScore(scoreValue);
                 if (entryObj != null) Destroy(entryObj);
             });
     }
 
-    void AddScore(int amount)
+    void HandleScoreChanged(int newScore)
     {
-        score += amount;
         if (scoreText == null) return;
 
-        scoreText.text = $"Score: {score}";
+        scoreText.text = $"Score: {newScore}";
         scoreText.transform.DOKill();
         scoreText.transform.localScale = Vector3.one;
         scoreText.transform.DOPunchScale(Vector3.one * 0.15f, 0.3f, 6, 0.5f);
@@ -536,9 +494,11 @@ public class RunManager : MonoBehaviour
         DOVirtual.DelayedCall(runSummaryDelaySeconds, EnterRunSummary);
     }
 
-    /// <summary>真正的"结算状态"从这里开始:冻结时间，把这一局的统计打包成 RunSummaryData
-    /// 交给 RunSummaryUI——这里只负责收集数据/判断破紀錄，不管具体怎么显示(六、七、九节
-    /// 的要求:Trick Score 不重新计算、Total 复用现有 score、UI 不自己判断破紀錄)。</summary>
+    /// <summary>真正的"结算状态"从这里开始:冻结时间，收集这一局的原始数据(距离/齿轮/Node
+    /// 数/结算时的血量上限/是否破了距离纪录)交给 ScoreSystem.BuildSummary() 换算成分数、
+    /// 打包成 RunSummaryData——RunManager 自己只负责"这局是否破了 Total Score 历史最高分"
+    /// (这个要等 BuildSummary 把所有分数都加完才知道最终 Total 是多少，所以放在拿到返回值
+    /// 之后再判断),不重新计算任何一项分数,也不管结算面板具体怎么显示。</summary>
     void EnterRunSummary()
     {
         Time.timeScale = 0f;
@@ -547,26 +507,23 @@ public class RunManager : MonoBehaviour
         int gearsCollected = gearManager != null
             ? Mathf.Max(0, gearManager.CurrentGearCount - gearCountAtRunStart)
             : 0;
+        int nodeCount = getNodeCount != null ? getNodeCount() : 0;
+        float finalMaxHp = damageSystem != null ? damageSystem.maxHp : 0f;
+        bool isNewDistanceRecord = distance > startingBestDistance;
 
-        bool isNewHighScore = score > savedHighScore;
-        if (isNewHighScore)
+        RunSummaryData data = scoreSystem != null
+            ? scoreSystem.BuildSummary(distance, gearsCollected, nodeCount, finalMaxHp, isNewDistanceRecord)
+            : new RunSummaryData { distance = distance, gearsCollected = gearsCollected, nodeCount = nodeCount, finalMaxHp = finalMaxHp, isNewDistanceRecord = isNewDistanceRecord };
+
+        data.isNewHighScore = data.totalScore > savedHighScore;
+        if (data.isNewHighScore)
         {
-            savedHighScore = score;
+            savedHighScore = data.totalScore;
             PlayerPrefs.SetInt(HighScoreKey, savedHighScore);
             PlayerPrefs.Save();
         }
 
-        OnRunSummaryReady?.Invoke(new RunSummaryData
-        {
-            distance = distance,
-            trickScore = trickTotalScore,
-            bestTrickScore = bestTrickScore,
-            landingQualityScore = landingQualityTotalScore,
-            nearMissScore = nearMissTotalScore,
-            gearsCollected = gearsCollected,
-            totalScore = score,
-            isNewHighScore = isNewHighScore,
-        });
+        OnRunSummaryReady?.Invoke(data);
     }
 
     void FindUIReferences()
@@ -592,9 +549,10 @@ public class RunManager : MonoBehaviour
         SetupFeatList();
 
         bestDistance = PlayerPrefs.GetFloat(BestDistanceKey, 0f);
+        startingBestDistance = bestDistance;
         savedHighScore = PlayerPrefs.GetInt(HighScoreKey, 0);
         if (bestDistanceText != null) bestDistanceText.text = $"Best: {bestDistance:0} m";
-        if (scoreText != null) scoreText.text = $"Score: {score}";
+        if (scoreText != null) scoreText.text = "Score: 0";
         if (startButton != null)
         {
             startButton.gameObject.SetActive(false); // EnterStartGate() 会在 Initialize() 里再打开，这里先关掉避免第一帧闪一下

@@ -64,6 +64,11 @@ public class NodeManager : MonoBehaviour
     /// 见 RunManager.TogglePause 的注释。</summary>
     public bool IsStationPaused => flowState == StationFlowState.Paused;
 
+    /// <summary>本局一共到达过几个 Station(不管玩家最后选了哪个选项)——ScoreSystem 结算时
+    /// 用这个乘 ScoreSettings.scorePerNode 算分，RunManager 通过反向查询 Func 拿这个值，
+    /// 跟 isPausedByOtherSystem 是同一个套路(RunManager 比 NodeManager 先创建，没法直接持有引用)。</summary>
+    public int NodeCount => nodeCount;
+
     public void ApplySettings(NodeSettings settings)
     {
         if (settings == null)

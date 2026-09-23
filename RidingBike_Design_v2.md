@@ -73,8 +73,8 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 -   **UI**：落地质量和 Trick 结果不再抢同一个 Toast，`EndlessRunCanvas.prefab` 里新增了独立的 `TrickToastText`（纵向堆叠在原来的 `ToastText` 下面），Trick 弹字从"xxx° +分数"改成"Backflip x{圈数}"；新增右上角常驻 `ScoreText`，累计显示 Trick Score，弹字淡出之后分数才真正计入（参考 Alto's Odyssey 的反馈节奏）。
 -   **Combo 连击系统整体移除**：`ComboSystem.cs`/`ComboSystemSettings.cs` 已删除，`EndlessRunCanvas.prefab` 里的 `ComboText` 节点也删了。移除原因是评估后认为这个系统太复杂、且一直没有真正接入分数（纯计数器，不影响 Trick Score/金币），跟"先把 P0 三个核心系统做扎实"的优先级冲突。**第 6 节的 Combo 设计文字还留着**，作为历史设计记录保留，但已经不在当前实现范围内——如果以后要重新考虑连击机制，建议先重新讨论要不要做、怎么接入分数，不要直接照抄第 6 节。第 12/13/16/21/25/26 节里提到 Combo 的地方（Roguelike Build、UI 设计方向、最终设计原则等）暂时没有跟着改，这些是更偏"长期设计愿景"的段落，要不要一并调整没有在这次改动范围内拍板。
 
-**2026-09-23 补充（Run Summary 结算面板 + 右侧 Feat 列表 + 地形去掉上坡，这三条实际上
-都是同一次长会话里陆续做的，本节之前没有一起补记，这次一并订正）：**
+**2026-09-23 补充（Run Summary 结算面板 + 右侧 Feat 列表 + 地形去掉上坡 + 统一计分系统，
+这四条实际上都是同一次长会话里陆续做的，本节之前没有一起补记，这次一并订正）：**
 
 -   **右侧 Feat 列表**：落地质量/Trick/Near Miss 弹字从"顶部纵向堆叠的两个独立 Toast"
     改成参考 Alto's Odyssey 的右侧列表——每完成一项，右侧弹出一条独立的条目，显示 2 秒
@@ -93,6 +93,14 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     能直接从紧邻的三行看出来是怎么加出来的；详细设计/取舍（图标是 Unicode 占位符、New
     High Score 是新开的独立持久化记录）见 3.5 节末尾。这是这次改动的主体，也是本条补充
     存在的直接原因
+-   **统一计分系统（`ScoreSystem.cs`/`ScoreSettings.cs`）**：同一天再晚一点，把"玩家每完成
+    一件事该给多少分"整个收拢成一份可配置资产，还新增了 Distance/Gears/Node/Max HP 四个
+    连续数值换算出来的分数，以及"破最远距离纪录额外加分"——细节、取舍（为什么按"离散事件"
+    和"结算时一次性算完的连续数值"分两类处理、为什么 Max HP 算的是结算时的上限不是剩余
+    血量）见 3.5 节。原来分散在 `RunManager` 的 4 个 Inspector 字段和 `TrickSystemSettings`
+    (已删除)里的计分值全部并了过去；`RunSummaryUI` 的结算面板也跟着从"两组行"收回成一张
+    统一列表(细节同样在 3.5 节)，这是"跟三行对不上"这个问题最终真正被解决的一次——不是靠
+    调整分组，是给每一项都发明了对应的分数
 
 ------------------------------------------------------------------------
 
@@ -197,17 +205,45 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 
 ------------------------------------------------------------------------
 
-## 3.5 局内 UI / 结算 `RunManager.cs`
+## 3.5 局内 UI / 结算 `RunManager.cs` + `ScoreSystem.cs` + `ScoreSettings.cs`
 
 > **2026-09-23 已更新**：这一节原来写的"顶部弹字堆叠"和"R 重开"都是旧版实现，已经
-> 分别被下面的 Feat 列表和 Run Summary 结算面板取代，本节内容已同步成当前实际状态。
+> 分别被下面的 Feat 列表和 Run Summary 结算面板取代；同一天晚些时候又接入了统一计分系统
+> (`ScoreSystem`/`ScoreSettings`)，本节内容已同步成当前实际状态。
 
 -   左上角实时显示：
     -   距离
     -   时速
     -   氮气(Boost)是否就绪，没就绪时显示还差多少米回满
--   右上角实时显示：HP、Best Distance、齿轮数量、Score（`RunManager.score`，即 Landing
-    Quality + Trick + Near Miss 的统一累计值，见下面 Feat 列表）
+-   右上角实时显示：HP、Best Distance、齿轮数量、Score（`ScoreSystem.CurrentScore`，见下面）
+-   **统一计分系统（`ScoreSystem.cs` + `ScoreSettings.cs`）**：从 `RunManager` 拆出来的
+    独立组件，唯一持有 Total 分数和每个分类的累计值——原因是 `RunManager` 已经身兼
+    HUD/开始 gate/暂停/摔车结算好几摊事，继续把计分堆在它上面会更难看懂。玩家每完成一件
+    事该给多少分，全部收在 `ScoreSettings` 这一份可配置资产里（`Create > RidingBike >
+    Score Settings`），不再散在 `RunManager` 的 Inspector 字段和已删除的
+    `TrickSystemSettings` 两个地方：
+    -   Landing Quality：`perfectLandingScore`(20)/`goodLandingScore`(10)/`notBadLandingScore`(0)
+    -   Trick：`scorePerLap`(50/150/300/500/750，原来在 `TrickSystemSettings` 里，现在挪过来了——
+        `TrickSystem` 本身不再计分，只广播"转满了几圈"，`OnTrickCompleted(int laps)`)
+    -   Near Miss：`nearMissScore`(15)
+    -   Distance：`scorePerMeter`(1) × 本局距离，四舍五入成整数分
+    -   Gears：`scorePerGear`(5) × 本局捡到的齿轮数
+    -   Node：`scorePerNode`(50) × 本局经过的 Station 数(`NodeManager.NodeCount`，新增的
+        public getter，`RunManager.getNodeCount` 反向查询拿到，跟 `isPausedByOtherSystem`
+        同一个套路)
+    -   Max HP：`scorePerMaxHpPoint`(2) × **结算那一刻的 maxHp 上限**（不是剩余血量——
+        摔车判定本身就是血量归零那一刻触发的，剩余血量永远是 0，没法拿来加分；maxHp 会被
+        Node 选项加成/削弱，相当于奖励这局 Build 往生命值方向堆得多深）
+    -   Distance Record Bonus：`newDistanceRecordBonus`(500)，本局距离超过之前的最远距离
+        纪录时额外给这么多分——跟"Total Score 历史最高分"(New High Score)是两套独立的
+        记录，可能同时触发，也可能只触发一个
+    -   Landing/Trick/Near Miss 是跑动过程中的离散事件，发生瞬间 `ScoreSystem` 只广播
+        "这次值多少分"（`OnLandingScored`/`OnTrickScored`/`OnNearMissScored`），不立刻
+        计入 Total——真正落进 Total 的时机还是交给下面的 Feat 列表（气泡淡出那一刻才调
+        `ScoreSystem.CommitScore`），这个"淡出才计分"的反馈节奏完全没变，只是"这次该给
+        多少分"这个判断从 `RunManager` 挪到了 `ScoreSystem`。Distance/Gears/Node/Max HP
+        没有对应的 Feat 弹幕，是结算那一刻（`ScoreSystem.BuildSummary`）一次性算完直接
+        计入 Total 的
 -   右侧 Feat 列表（参考 Alto's Odyssey，运行时代码搭建，不在预制体里）：Landing Quality
     （PERFECT!/GOOD/NOT BAD）、Trick（Backflip x{圈数}）、Near Miss 各自独立弹出一条，
     显示 2 秒后淡出，淡出结束那一刻分数才真正计入右上角 Score；每条都有自己的
@@ -220,26 +256,31 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     `RunManager.HandleCrash()` 先锁输入、停掉 `LandingDetector`/`TrickSystem`（不然结算面板
     弹出来之后车身物理沉降还会被误判成新的落地/特技），延迟 `runSummaryDelaySeconds`
     （默认 0.8 秒，给车身沉降/镜头震动留时间，不要一摔车就硬生生定格在半空）之后才真正
-    `Time.timeScale = 0` 冻结画面，把这一局的数据打包成 `RunSummaryData`（distance /
-    trickScore / bestTrickScore / landingQualityScore / nearMissScore / gearsCollected /
-    totalScore / isNewHighScore）广播给 `RunSummaryUI`。面板背景复用
-    `NodePanel`/`MenuPanel`/`PausePanel` 同一套 `BlurredPanelBackground.mat` +
-    `ScreenBlurState`；内容分两组——上半段是纯展示的 Distance Travelled / Gears
-    Collected（不计分，Distance/Gears 目前没有换算成分数）；下半段紧挨着 Total 的是真正
-    累加进 Total 的三项：Landing Quality / Trick Score（副标题显示本局单次最高分）/
-    Near Miss，底部 Total 就是这三项加总（`RunManager.score`）。**这个"两组行"的分法是
-    2026-09-23 实机反馈之后改的**——最初版本 Total 只读 `score`、但面板上只显示 Distance/
-    Trick/Gears 三行，玩家会下意识拿这三行去对 Total、对不上（比如 Distance 793m + Trick
-    250 + Gears 103 怎么都凑不出 Total 370），改成把 Landing Quality/Near Miss 也列成单独
-    一行、跟 Distance/Gears 分组隔开，这样"Total 是哪几行加出来的"从面板上就能直接看出来，
-    不用去猜；还是没有给 Distance/Gears 发明换算分数（那属于新计分规则，仍然不在这次改动
-    范围内）。只在破紀錄时才显示 New High Score；破紀錄的判定是新开的
-    `RidingBike_HighScore`（PlayerPrefs）跟 `BestDistance` 是两条独立记录。成绩逐行淡入、
-    Total 最后、New High Score 最后，总时长约 1 秒。底部 Home / ⚙ Gears Earned / Play Again
-    ——Home 和 Play Again 目前是同一个行为（重新加载当前场景，项目没有单独主菜单场景），
-    Gears Earned 只是展示"这一局捡了多少个"，齿轮早在拾取那一刻就实时加钱/存盘了
-    （`GearPickup`→`GearManager.AddGear`），这里**不会**重复发钱。图标是 Unicode 符号占位
-    （▲/✎/⚙/✓/!/★），项目里没有对应的美术资源，也没有生图工具能画
+    `Time.timeScale = 0` 冻结画面，收集距离/齿轮/Node 数/结算时的血量上限/是否破了距离
+    纪录这几项原始数据交给 `ScoreSystem.BuildSummary()` 换算成分数、打包成完整的
+    `RunSummaryData` 广播给 `RunSummaryUI`。面板背景复用 `NodePanel`/`MenuPanel`/`PausePanel`
+    同一套 `BlurredPanelBackground.mat` + `ScreenBlurState`。
+    **内容是一张统一列表，不再分组**——每一行右侧显示的都是这一项算出来的分数（不是原始
+    数值），全部加起来正好等于 Total；原始数值（793m、103 个齿轮…）折进行标签文字里显示：
+    Distance Travelled / Gears Collected / Nodes Passed / Max HP（这四行的标签带括号里的
+    原始数值）、Landing Quality / Trick Score（副标题显示本局单次最高分）/ Near Miss，
+    然后是只在破紀錄时才显示的 New Distance Record（带 `+分数` 的具体数字），底部 Total，
+    最后是只在破紀錄时才显示的 New High Score（纯提示，不重复显示分数，已经算在 Total
+    里了）。**这张"统一列表"是 2026-09-23 经过两轮调整才定下来的**：最初版本 Total 只读
+    `RunManager.score`、但面板上只显示 Distance/Trick/Gears 三行，玩家会下意识拿这三行去
+    对 Total、对不上（比如 Distance 793m + Trick 250 + Gears 103 怎么都凑不出 Total 370）；
+    第一轮改成把 Landing Quality/Near Miss 也列成单独一行、跟 Distance/Gears 分成"展示组/
+    计分组"两组；这次接入 `ScoreSystem`、给 Distance/Gears/Node/Max HP 也发明了换算分数
+    之后，两组的区分已经没有意义了（因为现在每一项都真的在计分），于是收回成一张单一列表。
+    破紀錄的判定是新开的 `RidingBike_HighScore`（PlayerPrefs）跟 `BestDistance` 是两条独立
+    记录；`RunManager` 另外单独存了一份 `startingBestDistance`（开局时读到的纪录值，不受
+    `Update()` 里实时更新 `bestDistance` 的影响）专门用来判断"这局是否破了距离纪录"。
+    成绩逐行淡入、Total 最后、New High Score 最后，总时长约 1 秒（行数比最初设计多了不少，
+    stagger 间隔跟着缩短）。底部 Home / ⚙ Gears Earned / Play Again——Home 和 Play Again
+    目前是同一个行为（重新加载当前场景，项目没有单独主菜单场景），Gears Earned 只是展示
+    "这一局捡了多少个"，齿轮早在拾取那一刻就实时加钱/存盘了（`GearPickup`→
+    `GearManager.AddGear`），这里**不会**重复发钱。图标是 Unicode 符号占位
+    （▲/⚙/◆/♥/✓/✎/!/★），项目里没有对应的美术资源，也没有生图工具能画
 
 **Combo（连击）已移除**——原来这里显示"当前连击数"，2026-09-22 评估后认为系统太复杂、
 没有真正接入分数，整体砍掉了（见第 0 节 2026-09-22 补充），不再有这项显示。

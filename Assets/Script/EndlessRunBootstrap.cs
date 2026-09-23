@@ -79,12 +79,19 @@ public static class EndlessRunBootstrap
         landingDetector.Initialize(bike);
 
         TrickSystem trickSystem = systems.AddComponent<TrickSystem>();
-        trickSystem.ApplySettings(FindSettings<TrickSystemSettings>());
 
-        // RunManager 和 TrickSystem 都订阅同一个 landingDetector.OnLanded，但互不干扰——
-        // RunManager 把 Landing Quality/Trick/Near Miss 都丢进右侧独立的 Feat 列表
-        // (RunManager.AddFeatEntry)，不再共用同一个 Toast 组件，订阅顺序不影响显示结果。
-        runManager.InitializeFeedback(trickSystem, obstacleSpawner, landingDetector);
+        // ScoreSystem 是唯一持有 Total 分数的地方(从 RunManager 拆出来的，见该类顶部注释)——
+        // 订阅 LandingDetector/TrickSystem/ObstacleSpawner 这三个"离散事件"源，自己按
+        // ScoreSettings 换算成分数再转发给 RunManager 的 Feat 列表显示。
+        ScoreSystem scoreSystem = systems.AddComponent<ScoreSystem>();
+        scoreSystem.ApplySettings(FindSettings<ScoreSettings>());
+        scoreSystem.Initialize(landingDetector, trickSystem, obstacleSpawner);
+
+        // RunManager 和 TrickSystem 都(间接)跟 landingDetector.OnLanded 有关，但互不干扰——
+        // RunManager 现在订阅的是 ScoreSystem 转发出来的、已经算好分的事件，把 Landing
+        // Quality/Trick/Near Miss 都丢进右侧独立的 Feat 列表(RunManager.AddFeatEntry)，
+        // 不再共用同一个 Toast 组件，订阅顺序不影响显示结果。
+        runManager.InitializeFeedback(trickSystem, landingDetector, scoreSystem);
 
         trickSystem.Initialize(bike, landingDetector);
 
@@ -107,6 +114,10 @@ public static class EndlessRunBootstrap
         // 这里补一刀接线，让 RunManager.TogglePause() 能反向查询"游戏是不是已经因为三选一被
         // 冻结了"，见 RunManager.isPausedByOtherSystem / NodeManager.IsStationPaused 的注释。
         runManager.isPausedByOtherSystem = () => nodeManager.IsStationPaused;
+
+        // 同样的反向查询套路：结算时 ScoreSystem 要按"经过了几个 Node"算分，
+        // 见 RunManager.getNodeCount / NodeManager.NodeCount 的注释。
+        runManager.getNodeCount = () => nodeManager.NodeCount;
     }
 
     // Roguelike Node 三选一系统(GitHub Issue #3 存档方案,现在以物理化 Station 呈现)——
