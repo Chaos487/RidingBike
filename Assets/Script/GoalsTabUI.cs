@@ -54,10 +54,11 @@ public class GoalsTabUI : MonoBehaviour
 
     void BuildInto(Transform panel)
     {
-        // 占位文字节点本身(GoalsPanel 上直接挂的那个 Text，内容原来是"Goals")保留不动，
-        // 换成大写小标题；真正的清单内容挂一个新的子物体 "Rows"，运行时动态填充。
+        // 占位文字节点本身(GoalsPanel 上直接挂的那个 Text，内容原来是"Goals")清空——
+        // Tab 按钮本身已经写着"Goals"，面板里没必要再重复一次标题，只留下面真正测试用的
+        // 目标清单内容。真正的清单内容挂一个新的子物体 "Rows"，运行时动态填充。
         Text placeholderText = panel.GetComponent<Text>();
-        if (placeholderText != null) placeholderText.text = "GOALS";
+        if (placeholderText != null) placeholderText.text = string.Empty;
 
         GameObject rows = new GameObject("Rows", typeof(RectTransform));
         rows.transform.SetParent(panel, false);
