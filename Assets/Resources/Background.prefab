@@ -236,7 +236,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d66ed997c314503bb2128dd204e13bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  backgroundSprite: {fileID: 21300000, guid: 492e14ed773c2ee4a9bfe43e7e25eb10, type: 3}
+  backgroundSprite: {fileID: 21300000, guid: 8bef64ad2f75ae444b7c261a2b64f092, type: 3}
   trackTarget: {fileID: 0}
   parallaxFactor: 0.4
   scale: 1.4
@@ -287,7 +287,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d66ed997c314503bb2128dd204e13bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  backgroundSprite: {fileID: 0}
+  backgroundSprite: {fileID: 21300000, guid: 36a1902bf0adebe4faf46c54b077b5be, type: 3}
   trackTarget: {fileID: 0}
   parallaxFactor: 0.6
   scale: 1.4
@@ -338,7 +338,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d66ed997c314503bb2128dd204e13bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  backgroundSprite: {fileID: 21300000, guid: 2788c637728d35348b205e2af8cb4ee0, type: 3}
+  backgroundSprite: {fileID: 21300000, guid: 07225b615cda9ed46bb4a7ef0195c648, type: 3}
   trackTarget: {fileID: 0}
   parallaxFactor: 0.5
   scale: 1.4
@@ -440,7 +440,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d66ed997c314503bb2128dd204e13bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  backgroundSprite: {fileID: 21300000, guid: 9bfeffb7939685b4ca33e8d37809ba39, type: 3}
+  backgroundSprite: {fileID: 21300000, guid: 5d78e34e9c538c348af6df0d8329abc1, type: 3}
   trackTarget: {fileID: 0}
   parallaxFactor: 0.8
   scale: 1.4
