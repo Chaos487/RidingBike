@@ -87,9 +87,12 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     两个字段已删除，细节见 3.2 节
 -   **Run Summary 结算面板**：摔车结算从"只拼一行文字 + R 重开"换成完整的结算面板
     （参考 Alto's Odyssey 截图重新设计核心结构，不是照抄 UI），运行时代码搭建
-    （`RunSummaryUI.cs`），Home/Play Again 按钮取代了 `R` 键重开。详细设计/取舍（Total
-    不是三行数值真正加总、图标是 Unicode 占位符、New High Score 是新开的独立持久化记录）
-    见 3.5 节末尾。这是这次改动的主体，也是本条补充存在的直接原因
+    （`RunSummaryUI.cs`），Home/Play Again 按钮取代了 `R` 键重开。面板上线后实机反馈发现
+    Total 数字跟显示的三行对不上（Distance/Trick/Gears 三行凑不出 Total），**同一天晚些
+    时候加了 Landing Quality/Near Miss 两行、按"展示用数据"和"计分的三项"分组**，让 Total
+    能直接从紧邻的三行看出来是怎么加出来的；详细设计/取舍（图标是 Unicode 占位符、New
+    High Score 是新开的独立持久化记录）见 3.5 节末尾。这是这次改动的主体，也是本条补充
+    存在的直接原因
 
 ------------------------------------------------------------------------
 
@@ -218,19 +221,25 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     弹出来之后车身物理沉降还会被误判成新的落地/特技），延迟 `runSummaryDelaySeconds`
     （默认 0.8 秒，给车身沉降/镜头震动留时间，不要一摔车就硬生生定格在半空）之后才真正
     `Time.timeScale = 0` 冻结画面，把这一局的数据打包成 `RunSummaryData`（distance /
-    trickScore / bestTrickScore / gearsCollected / totalScore / isNewHighScore）广播给
-    `RunSummaryUI`。面板背景复用 `NodePanel`/`MenuPanel`/`PausePanel` 同一套
-    `BlurredPanelBackground.mat` + `ScreenBlurState`；内容分三行（Distance Travelled /
-    Trick Score，副标题显示本局单次最高分 / Gears Collected）+ 底部 Total（直接读
-    `RunManager.score`，**不是**三行数值真正加总——Distance/Gears 目前没有换算成分数，
-    只是展示用，这点跟 Alto 截图"每行加总等于 Total"不一样，是讨论方案时跟用户确认过的
-    取舍）+ 只在破紀錄时才显示的 New High Score；破紀錄的判定是新开的
+    trickScore / bestTrickScore / landingQualityScore / nearMissScore / gearsCollected /
+    totalScore / isNewHighScore）广播给 `RunSummaryUI`。面板背景复用
+    `NodePanel`/`MenuPanel`/`PausePanel` 同一套 `BlurredPanelBackground.mat` +
+    `ScreenBlurState`；内容分两组——上半段是纯展示的 Distance Travelled / Gears
+    Collected（不计分，Distance/Gears 目前没有换算成分数）；下半段紧挨着 Total 的是真正
+    累加进 Total 的三项：Landing Quality / Trick Score（副标题显示本局单次最高分）/
+    Near Miss，底部 Total 就是这三项加总（`RunManager.score`）。**这个"两组行"的分法是
+    2026-09-23 实机反馈之后改的**——最初版本 Total 只读 `score`、但面板上只显示 Distance/
+    Trick/Gears 三行，玩家会下意识拿这三行去对 Total、对不上（比如 Distance 793m + Trick
+    250 + Gears 103 怎么都凑不出 Total 370），改成把 Landing Quality/Near Miss 也列成单独
+    一行、跟 Distance/Gears 分组隔开，这样"Total 是哪几行加出来的"从面板上就能直接看出来，
+    不用去猜；还是没有给 Distance/Gears 发明换算分数（那属于新计分规则，仍然不在这次改动
+    范围内）。只在破紀錄时才显示 New High Score；破紀錄的判定是新开的
     `RidingBike_HighScore`（PlayerPrefs）跟 `BestDistance` 是两条独立记录。成绩逐行淡入、
     Total 最后、New High Score 最后，总时长约 1 秒。底部 Home / ⚙ Gears Earned / Play Again
     ——Home 和 Play Again 目前是同一个行为（重新加载当前场景，项目没有单独主菜单场景），
     Gears Earned 只是展示"这一局捡了多少个"，齿轮早在拾取那一刻就实时加钱/存盘了
     （`GearPickup`→`GearManager.AddGear`），这里**不会**重复发钱。图标是 Unicode 符号占位
-    （▲/✎/⚙/★），项目里没有对应的美术资源，也没有生图工具能画
+    （▲/✎/⚙/✓/!/★），项目里没有对应的美术资源，也没有生图工具能画
 
 **Combo（连击）已移除**——原来这里显示"当前连击数"，2026-09-22 评估后认为系统太复杂、
 没有真正接入分数，整体砍掉了（见第 0 节 2026-09-22 补充），不再有这项显示。

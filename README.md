@@ -47,9 +47,10 @@ Alto's Odyssey 那种"一直往下滑"的手感),阶段间 SmoothStep 过渡不�
 坡度/角速度/垂直速度;空中转出的完整圈数按查表给 Trick Score(按圈数,不是精确角度
 档位)。三者都走右侧的 Feat 列表(参考 Alto's Odyssey:完成一项弹出一条独立条目,显示
 2 秒后淡出,淡出结束才计入右上角的 Score),互相独立,`Score` 是这三者的统一累计值,
-结算面板的 Total 直接读这个值(但 Distance/Gears 没有换算成分数,不计入 Total,细节
-见下面"局内 UI / 结算")。Combo 连击系统已经整体移除(实现过一版纯计数器,没有真正
-接入分数,评估后觉得太复杂,直接砍掉,不在当前设计范围内)。
+结算面板的 Total 直接读这个值,面板上 Landing Quality/Trick/Near Miss 三行紧挨着 Total
+摆在一起、加总正好等于 Total(Distance/Gears 没有换算成分数,单独分在展示用的一组,不
+计入 Total,细节见下面"局内 UI / 结算")。Combo 连击系统已经整体移除(实现过一版纯计
+数器,没有真正接入分数,评估后觉得太复杂,直接砍掉,不在当前设计范围内)。
 
 **摔车判定 / 生命值**(`CrashDetector.cs` + `BikeDamageSystem.cs`,3.4 / 3.8 节)
 车身触地且倾角超过阈值、持续一小段时间才判定一次"失控";失控不直接结束一局,而是
@@ -58,9 +59,11 @@ Alto's Odyssey 那种"一直往下滑"的手感),阶段间 SmoothStep 过渡不�
 **局内 UI / 结算**(`RunManager.cs` + `RunSummaryUI.cs`,3.5 节)
 距离、时速、氮气就绪状态、HP 血条、Score 实时显示;落地质量/特技/贴身险走右侧独立的
 Feat 列表,不再是顶部弹字堆叠。摔车 0.8 秒后(留时间给车身物理沉降)冻结画面、弹出
-Run Summary 结算面板(参考 Alto's Odyssey 截图,不是照抄 UI):Distance / Trick Score /
-Gears Collected 三行 + Total + 破紀錄时才显示的 New High Score,底部 Home / Gears
-Earned / Play Again。面板背景复用现成的全屏模糊(`ScreenBlurState` +
+Run Summary 结算面板(参考 Alto's Odyssey 截图,不是照抄 UI):上半段是展示用的 Distance
+Travelled / Gears Collected(不计分),下半段紧挨着 Total 的是 Landing Quality / Trick
+Score / Near Miss 三行,加总正好等于 Total(这个分组是上线后根据"Total 数字跟三行对不上"
+的实机反馈调整过一版,细节见设计文档 3.5 节),破紀錄时额外显示 New High Score,底部
+Home / Gears Earned / Play Again。面板背景复用现成的全屏模糊(`ScreenBlurState` +
 `BlurredPanelBackground.mat`),整个面板运行时代码搭建,图标是 Unicode 符号占位
 (项目里没有对应美术资源)。
 

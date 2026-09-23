@@ -80,6 +80,12 @@ public class RunManager : MonoBehaviour
     int trickTotalScore;
     int bestTrickScore;
 
+    // 结算页把 Landing Quality/Near Miss 也各自列成单独一行(不只是折进 Total 里看不见)，
+    // 这样"Total 到底是哪几行加出来的"是可以从面板上直接看出来的——这两个字段专门为此攒，
+    // AddFeatEntry/AddScore 那条统一计分路径完全没变。
+    int landingQualityTotalScore;
+    int nearMissTotalScore;
+
     // 结算时用"当前齿轮总数 - 这一局开局时的齿轮总数"算出"这一局捡了多少"——齿轮拾取
     // 那一刻就已经实时加钱+存盘了(见 GearPickup/GearManager)，这里只是纯展示用的差值,
     // 不会、也不能再调一次 AddGear（不然会重复发钱）。
@@ -281,7 +287,9 @@ public class RunManager : MonoBehaviour
 
     void HandleLanded(LandingDetector.Quality quality, LandingDetector.ContactOrder order)
     {
-        AddFeatEntry(LandingQualityLabel(quality), LandingQualityScore(quality));
+        int points = LandingQualityScore(quality);
+        landingQualityTotalScore += points;
+        AddFeatEntry(LandingQualityLabel(quality), points);
     }
 
     static string LandingQualityLabel(LandingDetector.Quality quality) => quality switch
@@ -348,6 +356,7 @@ public class RunManager : MonoBehaviour
 
     void HandleNearMiss()
     {
+        nearMissTotalScore += nearMissScore;
         AddFeatEntry("NEAR MISS!", nearMissScore);
     }
 
@@ -552,6 +561,8 @@ public class RunManager : MonoBehaviour
             distance = distance,
             trickScore = trickTotalScore,
             bestTrickScore = bestTrickScore,
+            landingQualityScore = landingQualityTotalScore,
+            nearMissScore = nearMissTotalScore,
             gearsCollected = gearsCollected,
             totalScore = score,
             isNewHighScore = isNewHighScore,

@@ -10,6 +10,10 @@ public struct RunSummaryData
     public int trickScore;
     /// <summary>本局单次特技的最高得分(参考 Alto's Odyssey "best combo" 的副标题用法)。</summary>
     public int bestTrickScore;
+    /// <summary>本局 Landing Quality(Perfect/Good/Not Bad 落地)累计得分。</summary>
+    public int landingQualityScore;
+    /// <summary>本局 Near Miss(贴身擦过障碍物)累计得分。</summary>
+    public int nearMissScore;
     /// <summary>本局捡到的齿轮数量——货币已经在拾取那一刻实时发放/存盘了,这里只是用于展示的计数。</summary>
     public int gearsCollected;
     /// <summary>本局 Total Score,直接取 RunManager 现有的统一计分入口(Landing Quality + Trick + Near Miss)。</summary>

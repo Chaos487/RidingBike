@@ -25,16 +25,20 @@ public class RunSummaryUI : MonoBehaviour
 
     GameObject panelRoot;
     Text distanceValueText;
+    Text gearsValueText;
+    Text landingQualityValueText;
     Text trickLabelText;
     Text trickValueText;
-    Text gearsValueText;
+    Text nearMissValueText;
     Text totalValueText;
     Text gearsEarnedText;
     GameObject newHighScoreRow;
 
     CanvasGroup distanceRowGroup;
-    CanvasGroup trickRowGroup;
     CanvasGroup gearsRowGroup;
+    CanvasGroup landingQualityRowGroup;
+    CanvasGroup trickRowGroup;
+    CanvasGroup nearMissRowGroup;
     CanvasGroup totalRowGroup;
     CanvasGroup highScoreRowGroup;
 
@@ -57,13 +61,17 @@ public class RunSummaryUI : MonoBehaviour
     void Show(RunSummaryData data)
     {
         distanceValueText.text = $"{data.distance:N0} m";
+        gearsValueText.text = $"{data.gearsCollected:N0}";
+
+        landingQualityValueText.text = $"{data.landingQualityScore:N0}";
 
         trickLabelText.text = data.bestTrickScore > 0
             ? $"✎  Trick Score - best: {data.bestTrickScore:N0}"
             : "✎  Trick Score";
         trickValueText.text = $"{data.trickScore:N0}";
 
-        gearsValueText.text = $"{data.gearsCollected:N0}";
+        nearMissValueText.text = $"{data.nearMissScore:N0}";
+
         totalValueText.text = $"{data.totalScore:N0}";
         gearsEarnedText.text = $"⚙ {data.gearsCollected:N0}";
 
@@ -79,8 +87,10 @@ public class RunSummaryUI : MonoBehaviour
     void PlayRevealAnimation()
     {
         distanceRowGroup.alpha = 0f;
-        trickRowGroup.alpha = 0f;
         gearsRowGroup.alpha = 0f;
+        landingQualityRowGroup.alpha = 0f;
+        trickRowGroup.alpha = 0f;
+        nearMissRowGroup.alpha = 0f;
         totalRowGroup.alpha = 0f;
         highScoreRowGroup.alpha = 0f;
 
@@ -89,10 +99,12 @@ public class RunSummaryUI : MonoBehaviour
         DOTween.Sequence()
             .SetUpdate(true) // 这时候 Time.timeScale 已经是 0(EnterRunSummary 里冻结的)，动画要走不受影响的 unscaled time
             .Insert(0.00f, distanceRowGroup.DOFade(1f, rowFade))
-            .Insert(0.12f, trickRowGroup.DOFade(1f, rowFade))
-            .Insert(0.24f, gearsRowGroup.DOFade(1f, rowFade))
-            .Insert(0.40f, totalRowGroup.DOFade(1f, rowFade))
-            .Insert(0.62f, highScoreRowGroup.DOFade(1f, rowFade));
+            .Insert(0.10f, gearsRowGroup.DOFade(1f, rowFade))
+            .Insert(0.20f, landingQualityRowGroup.DOFade(1f, rowFade))
+            .Insert(0.30f, trickRowGroup.DOFade(1f, rowFade))
+            .Insert(0.40f, nearMissRowGroup.DOFade(1f, rowFade))
+            .Insert(0.55f, totalRowGroup.DOFade(1f, rowFade))
+            .Insert(0.75f, highScoreRowGroup.DOFade(1f, rowFade));
     }
 
     void HomeClicked() => ReloadScene();
@@ -175,9 +187,19 @@ public class RunSummaryUI : MonoBehaviour
         ContentSizeFitter fitter = rows.AddComponent<ContentSizeFitter>();
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
+        // 上半段是纯展示的"本局数据"(不计分,Distance/Gears 目前没有换算成分数);下半段是
+        // 真正累加进 Total 的三项(Landing Quality/Trick/Near Miss),紧挨着 Total 摆在一起，
+        // 这样"Total 是哪几行加出来的"从面板上就能直接看出来，不用去猜——2026-09-23 根据
+        // 实机反馈("370 是怎么算出来的")加的两行 + 这个分组，取代了之前"三行凑数、Total
+        // 对不上"的版本。
         distanceRowGroup = CreateStatRow(rowsRect, "▲  Distance Travelled", out _, out distanceValueText, emphasized: false);
-        trickRowGroup = CreateStatRow(rowsRect, "✎  Trick Score", out trickLabelText, out trickValueText, emphasized: false);
         gearsRowGroup = CreateStatRow(rowsRect, "⚙  Gears Collected", out _, out gearsValueText, emphasized: false);
+
+        CreateSpacer(rowsRect, 14f);
+
+        landingQualityRowGroup = CreateStatRow(rowsRect, "✓  Landing Quality", out _, out landingQualityValueText, emphasized: false);
+        trickRowGroup = CreateStatRow(rowsRect, "✎  Trick Score", out trickLabelText, out trickValueText, emphasized: false);
+        nearMissRowGroup = CreateStatRow(rowsRect, "!  Near Miss", out _, out nearMissValueText, emphasized: false);
         totalRowGroup = CreateStatRow(rowsRect, "Total", out _, out totalValueText, emphasized: true);
 
         // New High Score:单独一行、居中、只在破紀錄时显示——放进同一个 VerticalLayoutGroup 里,
@@ -195,6 +217,14 @@ public class RunSummaryUI : MonoBehaviour
         badgeRt.anchorMax = Vector2.one;
         badgeRt.offsetMin = Vector2.zero;
         badgeRt.offsetMax = Vector2.zero;
+    }
+
+    // 纯留白，把"展示用数据"和"真正计分的三项"这两组行隔开一点距离，不用画分割线。
+    static void CreateSpacer(Transform parent, float height)
+    {
+        GameObject spacer = new GameObject("Spacer", typeof(RectTransform));
+        spacer.transform.SetParent(parent, false);
+        spacer.AddComponent<LayoutElement>().preferredHeight = height;
     }
 
     CanvasGroup CreateStatRow(Transform parent, string label, out Text labelText, out Text valueText, bool emphasized)
