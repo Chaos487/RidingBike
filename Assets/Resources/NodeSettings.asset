@@ -50,24 +50,24 @@ MonoBehaviour:
   - title: Off-Road Kit
     description: 'Jump Force +10
 
-      Max Speed -5%'
+      Baseline Speed -5%'
     minStage: 1
     riskLevel: 1
     weight: 8
     effects:
     - type: 1
       value: 10
-    - type: 0
+    - type: 5
       value: -5
   - title: Extreme Tuning
-    description: 'Max Speed +15%
+    description: 'Baseline Speed +15%
 
       Max HP -15'
     minStage: 1
     riskLevel: 2
     weight: 7
     effects:
-    - type: 0
+    - type: 5
       value: 15
     - type: 2
       value: -15
@@ -86,14 +86,14 @@ MonoBehaviour:
   - title: Nitro Overdrive
     description: 'Boost Recharge -50%
 
-      Max Speed -10%'
+      Baseline Speed -10%'
     minStage: 2
     riskLevel: 2
     weight: 6
     effects:
     - type: 4
       value: 50
-    - type: 0
+    - type: 5
       value: -10
   - title: Turbo Charger
     description: 'Baseline Speed +30%
