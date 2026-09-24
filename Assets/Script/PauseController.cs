@@ -5,8 +5,8 @@ using UnityEngine.UI;
 /// <summary>
 /// 骑行中的暂停入口——左下角一个暂停按钮(手机端点它,桌面端 Esc 键),布局参照 Alto's
 /// Odyssey 的暂停画面做成左右分屏:左边一列 Home/Restart/Resume,右边是 Goals/Settings/
-/// Language/Stats 四个 Tab(内容仍是占位,Tab 切换逻辑用 `TabGroupController`,跟开始画面的
-/// Menu 面板共用同一份)。
+/// Language/Stats 四个 Tab(Goals/Stats 已接真实数据,Settings/Language 仍是占位,Tab
+/// 切换逻辑用 `TabGroupController`,跟开始画面的 Menu 面板共用同一份)。
 ///
 /// 真正的"暂停"(Time.timeScale/BikeController 开关)在 `RunManager.TogglePause()` 里做,
 /// 这个脚本只管 UI 和调用它——保证 Esc 键和点暂停按钮触发的是同一条状态机路径，不会两边
@@ -15,6 +15,8 @@ using UnityEngine.UI;
 public class PauseController : MonoBehaviour
 {
     RunManager runManager;
+    GoalsTabUI goalsTabUI;
+    StatsTabUI statsTabUI;
 
     GameObject pauseButtonObject;
     GameObject pausePanel;
@@ -22,9 +24,11 @@ public class PauseController : MonoBehaviour
     Button restartButton;
     Button homeButton;
 
-    public void Initialize(RunManager manager)
+    public void Initialize(RunManager manager, GoalsTabUI goals, StatsTabUI stats)
     {
         runManager = manager;
+        goalsTabUI = goals;
+        statsTabUI = stats;
         runManager.OnGameStarted += HandleGameStarted;
         runManager.OnRunEnded += HandleRunEnded;
         runManager.OnPauseStateChanged += HandlePauseStateChanged;
@@ -123,6 +127,14 @@ public class PauseController : MonoBehaviour
     {
         SetPausePanelOpen(paused);
         if (pauseButtonObject != null) pauseButtonObject.SetActive(!paused);
+
+        // 打开的瞬间刷新一次——Goals/Stats 这两个 Tab 背后的跨局计数器在骑行过程中随时会变
+        // (不像开局那一刻的初始建表)，暂停期间看到的应该是最新数字，不是开局那一刻的快照。
+        if (paused)
+        {
+            if (goalsTabUI != null) goalsTabUI.Refresh();
+            if (statsTabUI != null) statsTabUI.Refresh();
+        }
     }
 
     /// <summary>面板显示状态和 ScreenBlurState 的开关绑在一起管——只有真的发生"开↔关"切换

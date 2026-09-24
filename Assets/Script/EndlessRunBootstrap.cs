@@ -71,19 +71,26 @@ public static class EndlessRunBootstrap
         GearManager gearManager = systems.AddComponent<GearManager>();
         gearManager.Initialize();
 
+        // 跨局玩家数据统计(参考 Alto's Odyssey 的 Stats 面板)——GoalManager 依赖它读跨局
+        // 累计计数(见 GoalManager.ApplyPlayerStats 注释),所以要在 GoalManager 之前创建。
+        // 跟 GoalManager 一样,事件订阅要等 LandingDetector/TrickSystem/ObstacleSpawner/
+        // NodeManager 都创建好才能接,放在本方法最后;这里先创建实例、从存档恢复历史数据。
+        PlayerStatsManager playerStatsManager = systems.AddComponent<PlayerStatsManager>();
+        playerStatsManager.Initialize();
+
         // 持久 Goals 系统(参考 Alto's Odyssey 的 Level 目标)——跟 ScoreSystem 是同一个套路,
-        // 只监听已有系统的事件,不控制 gameplay。事件订阅要等 LandingDetector/TrickSystem/
-        // ObstacleSpawner/NodeManager 都创建好才能接,放在本方法最后;这里先创建实例、
-        // 读配置、从存档恢复跨局进度。
+        // 只监听已有系统的事件,不控制 gameplay。这里先创建实例、读配置、从存档恢复跨局进度。
         GoalManager goalManager = systems.AddComponent<GoalManager>();
         goalManager.ApplySettings(FindSettings<GoalSettings>());
+        goalManager.ApplyPlayerStats(playerStatsManager);
         goalManager.Initialize(gearManager);
 
-        (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI) runUI = SetupRunManagerUI();
+        (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI, StatsTabUI statsTabUI) runUI = SetupRunManagerUI();
         RunManager runManager = runUI.runManager;
         runManager.Initialize(bike.transform, damageSystem, bike, gearManager);
 
         runUI.goalsTabUI.Initialize(goalManager);
+        runUI.statsTabUI.Initialize(playerStatsManager);
         // GoalsRecapUI 先弹、玩家点 Next 才显示 RunSummaryUI——两个面板轮流独占屏幕,见
         // RunSummaryUI.Show / GoalsRecapUI 顶部注释。
         runUI.goalsRecapUI.Initialize(runManager, goalManager, runUI.runSummaryUI);
@@ -133,9 +140,11 @@ public static class EndlessRunBootstrap
         // 见 RunManager.getNodeCount / NodeManager.NodeCount 的注释。
         runManager.getNodeCount = () => nodeManager.NodeCount;
 
-        // Goals 系统的跨局累计计数器要等这几个系统都创建好才能订阅它们的事件，见
-        // GoalManager.SubscribeGameplayEvents 注释——跟 ScoreSystem.Initialize 是同一个套路。
-        goalManager.SubscribeGameplayEvents(landingDetector, trickSystem, obstacleSpawner, nodeManager);
+        // Stats 面板的跨局累计计数器要等这几个系统都创建好才能订阅它们的事件，见
+        // PlayerStatsManager.SubscribeGameplayEvents 注释——跟 ScoreSystem.Initialize 是
+        // 同一个套路。Goals 系统现在读的是这里累加出来的数字(见 GoalManager.ApplyPlayerStats)，
+        // 不用再单独订阅一遍。
+        playerStatsManager.SubscribeGameplayEvents(runManager, landingDetector, trickSystem, obstacleSpawner, nodeManager, gearManager);
     }
 
     // Roguelike Node 三选一系统(GitHub Issue #3 存档方案,现在以物理化 Station 呈现)——
@@ -209,7 +218,7 @@ public static class EndlessRunBootstrap
     // UI 现在是手动在 Editor 里搭的 Assets/prefab/EndlessRunCanvas.prefab，实例化出来之后
     // 直接把 RunManager 挂到它根节点上——RunManager.Awake() 会按名字把预制体里的子物体
     // (DistanceText/SpeedText/.../HpBarBackground/HpBarFill) 找出来，改预制体视觉不用碰这份代码。
-    static (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI) SetupRunManagerUI()
+    static (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI, StatsTabUI statsTabUI) SetupRunManagerUI()
     {
         GameObject canvasPrefab = FindPrefab("EndlessRunCanvas");
         if (canvasPrefab == null)
@@ -217,7 +226,7 @@ public static class EndlessRunBootstrap
             Debug.LogError("EndlessRunBootstrap: 找不到 Assets/prefab/EndlessRunCanvas.prefab，局内 UI 不会显示。");
             GameObject fallback = new GameObject("RunManager (missing UI prefab)");
             return (fallback.AddComponent<RunManager>(), fallback.AddComponent<RunSummaryUI>(),
-                fallback.AddComponent<GoalsTabUI>(), fallback.AddComponent<GoalsRecapUI>());
+                fallback.AddComponent<GoalsTabUI>(), fallback.AddComponent<GoalsRecapUI>(), fallback.AddComponent<StatsTabUI>());
         }
 
         GameObject canvasInstance = Object.Instantiate(canvasPrefab);
@@ -247,20 +256,23 @@ public static class EndlessRunBootstrap
 
         RunManager runManager = canvasInstance.AddComponent<RunManager>();
 
-        // 开始画面左上角的 Menu 入口(Goals/Settings/Language/Stats 四个占位 Tab)——骑行真正
+        // 开始画面左上角的 Menu 入口(Goals/Settings/Language/Stats 四个 Tab)——骑行真正
         // 开始后就没用了,接到 RunManager.OnGameStarted 上让它自己收起来。
         MainMenuController mainMenu = canvasInstance.AddComponent<MainMenuController>();
         runManager.OnGameStarted += mainMenu.HandleGameStarted;
 
+        // Goals/Stats 两个 Tab(菜单/暂停面板里现成的 GoalsPanel/StatsPanel 节点，见各自
+        // 顶部注释)——只需要能 transform.Find 到 canvasInstance 下的 MenuPanel/PausePanel，
+        // 跟 GoalManager/PlayerStatsManager 的接线放在主 Setup() 里做(这里只 AddComponent，
+        // Initialize 调用点在调用方)。要在 PauseController 之前创建，因为暂停面板打开时要
+        // 刷新这两个 Tab(见 PauseController.HandlePauseStateChanged)，得先拿到引用。
+        GoalsTabUI goalsTabUI = canvasInstance.AddComponent<GoalsTabUI>();
+        StatsTabUI statsTabUI = canvasInstance.AddComponent<StatsTabUI>();
+
         // 骑行中的暂停入口(左下角按钮 + Esc 键),跟 Menu 共用同一套 Tab 面板逻辑——见
         // PauseController 内部注释。真正的暂停状态机在 RunManager 里，这里只是接上事件。
         PauseController pauseController = canvasInstance.AddComponent<PauseController>();
-        pauseController.Initialize(runManager);
-
-        // Goals Tab(菜单/暂停面板里现成的 GoalsPanel 节点，见 GoalsTabUI 顶部注释)——
-        // 只需要能 transform.Find 到 canvasInstance 下的 MenuPanel/PausePanel，跟 GoalManager
-        // 的接线放在主 Setup() 里做(这里只 AddComponent，Initialize 调用点在调用方)。
-        GoalsTabUI goalsTabUI = canvasInstance.AddComponent<GoalsTabUI>();
+        pauseController.Initialize(runManager, goalsTabUI, statsTabUI);
 
         // 摔车结算：GoalsRecapUI 先弹(本局目标进度)，玩家点 Next 才显示 RunSummaryUI——
         // 两个面板都是运行时代码搭建的(不是预制体节点)，跟 GoalManager/RunSummaryUI 的接线
@@ -269,7 +281,7 @@ public static class EndlessRunBootstrap
         RunSummaryUI runSummaryUI = canvasInstance.AddComponent<RunSummaryUI>();
         GoalsRecapUI goalsRecapUI = canvasInstance.AddComponent<GoalsRecapUI>();
 
-        return (runManager, runSummaryUI, goalsTabUI, goalsRecapUI);
+        return (runManager, runSummaryUI, goalsTabUI, goalsRecapUI, statsTabUI);
     }
 
     // 地形几何体是运行时按曲线生成的，没法预先摆好，但视觉(材质/贴图)可以在 Editor 里调——

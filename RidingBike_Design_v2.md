@@ -146,6 +146,25 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     一起补上，并给 `ScreenBlurState` 加了 `Reset()` 防止这两个"打开就不会再关"的面板
     让计数器一局比一局涨、回不到 0
 
+**2026-09-24 补充（同一天晚些时候：跨局 Stats 面板上线，Goals 计数器重构成共用组件）：**
+
+-   参考 Alto's Odyssey 的 Stats 面板新做了一套跨局玩家数据统计——`PlayerStatsManager.cs`
+    （新文件），只订阅其它系统已有的事件、不控制 gameplay，跟 `ScoreSystem`/`GoalManager`
+    同一个套路。详细内容/取舍见 3.18 节
+-   **顺带重构**：Trick/Perfect 落地/Near Miss/Node 这 4 个跨局计数器原来长在
+    `GoalManager` 里，Stats 面板上线后两边要用同一批数字——为了不让两边分别存一份、
+    迟早对不上，统一搬到 `PlayerStatsManager` 管，`GoalManager` 改成读它的公开属性
+    （新增 `GoalManager.ApplyPlayerStats(PlayerStatsManager)`）。**PlayerPrefs key 名字
+    原样沿用**，没有改名，玩家设备上已经攒的进度不会因为这次重构清零
+-   `GearManager` 新增 `OnGearEarned` 事件（区别于原有的 `OnGearCountChanged`——后者是
+    "当前余额"快照通知，花掉齿轮也会触发；`OnGearEarned` 只在真的赚到时触发，供
+    `PlayerStatsManager` 累加"历史一共赚过多少 Gear"这个统计项用）
+-   `PauseController.Initialize()` 签名从 `(RunManager)` 改成
+    `(RunManager, GoalsTabUI, StatsTabUI)`——暂停面板每次打开时会调用这两个 Tab 的
+    `Refresh()`。这是必要的：Goals/Stats 背后的跨局计数器在骑行过程中随时会变（不是
+    只在摔车结算那一刻才变），原来 `GoalsTabUI` 只在游戏启动时建一次表，骑行中途暂停
+    看到的其实是开局那一刻的旧快照——这次顺手把这个既有的小 bug 也修了
+
 ------------------------------------------------------------------------
 
 # 1. 核心玩法
@@ -614,12 +633,14 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     -   "单局最佳成绩"（Distance/Score）：直接读 `RunManager.BestDistanceKey`/`HighScoreKey`
         这两个已经在维护的存档记录（两个 key 从 `private const` 改成了 `public const`），
         `GoalManager` 自己不重复存一份
-    -   "跨局累计次数"（Trick/Perfect 落地/Near Miss/Node）：`GoalManager` 自己开
-        4 个新的 PlayerPrefs 计数器，`SubscribeGameplayEvents` 订阅
+    -   "跨局累计次数"（Trick/Perfect 落地/Near Miss/Node）：**2026-09-24 晚些时候起**改成
+        读 `PlayerStatsManager` 的公开属性（`GoalManager.ApplyPlayerStats` 注入），不再是
+        `GoalManager` 自己开计数器——Stats 面板（3.18 节）上线后两边要用同一批数字，统一
+        搬过去管，避免两份数据分别累加、迟早对不上。计数逻辑本身没变，仍然是
         `LandingDetector.OnLanded`(只数 Perfect)/`TrickSystem.OnTrickCompleted`/
-        `ObstacleSpawner.OnNearMiss`/`NodeManager.OnNodeReached`(新增的事件，之前
-        `NodeManager` 只有 `NodeCount` 这个数值，没有事件)持续累加，不随单局重开清零——
-        跟 `ScoreSystem` 是同一个"只监听事件、不控制 gameplay"的套路
+        `ObstacleSpawner.OnNearMiss`/`NodeManager.OnNodeReached`(`NodeManager` 新增的
+        事件，之前只有 `NodeCount` 这个数值，没有事件)持续累加，不随单局重开清零——跟
+        `ScoreSystem` 是同一个"只监听事件、不控制 gameplay"的套路
 -   **一读一写两个入口**：`GetDisplaySnapshot()` 纯只读、无副作用，给 `GoalsTabUI` 用；
     `SettleCurrentLevel()` 有副作用(发 Gear、写盘、可能推进 Level)，只在摔车结算前的
     `GoalsRecapUI` 弹出时调用一次。目标一旦发过奖励(`RidingBike_Goal_RewardedIds`，
@@ -646,6 +667,36 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     `EndBlur()`，这个 `static` 类的计数器会一局比一局涨、永远回不到 0；`ReloadScene()`
     (`RunSummaryUI`/`PauseController` 两处)现在都会显式调 `Reset()` 兜底，不依赖
     每个面板是否都乖乖配对调用过
+
+------------------------------------------------------------------------
+
+## 3.18 跨局 Stats 面板 `PlayerStatsManager.cs` + `StatsTabUI.cs` + `StatsUIUtil.cs`
+
+> **已实现，2026-09-24**——参考 Alto's Odyssey 的 Stats 面板，展示跨很多局游戏持续累计的
+> 玩家数据，纯只读，不影响任何判定/计分逻辑。
+
+-   **数据归属**：`PlayerStatsManager` 是所有"跨局累计计数器"的唯一归属地——原来长在
+    `GoalManager` 里的 Trick/Perfect 落地/Near Miss/Node 4 个计数器搬了过来（`GoalManager`
+    现在读它的公开属性，见 3.17 节的订正），新增 Good/Not Bad 落地（`LandingDetector.
+    OnLanded` 本来就带 `Quality`，之前只用了 Perfect 这一档）、总里程/总局数/历史最佳
+    Trick 分（`RunManager.OnRunSummaryReady` 里累加/比较）、累计获得 Gear（`GearManager`
+    新增的 `OnGearEarned` 事件，区别于"当前余额"）。单局最佳距离/分数不重复存，直接读
+    `RunManager.BestDistanceKey`/`HighScoreKey`
+-   **v1 内容(12 行)**：Best Distance / Best Score / Best Trick Score / Total Distance /
+    Total Runs / Tricks Performed / Perfect / Good / Not Bad Landings / Near Misses /
+    Nodes Reached / Gears Collected。没有做"总摔车次数"——这个项目一局只有"摔车→结算"
+    一条结束路径，这个数字会跟 Total Runs 完全相等，两条重复的数据没有意义
+-   **UI**：`StatsTabUI` 接进菜单/暂停面板里**现成的** `StatsPanel` 占位节点（`MenuPanel/
+    ContentArea/StatsPanel` 和 `PausePanel/TabArea/ContentArea/StatsPanel`——`TabGroupController`
+    的 `TabNames` 数组和 `EndlessRunCanvas.prefab` 里其实从 Goals Tab 上线前就已经预留了
+    这两个节点，只是内容一直没接），运行时把清单画进去，不改预制体。内容比 Goals Tab 多
+    (12 行 vs 最多 5 行)，固定高度装不下，`StatsUIUtil.BuildScrollView` 搭了一个
+    `ScrollRect + RectMask2D` 可滚动容器——这是 Goals Tab 没用过的组件，独立成
+    `StatsUIUtil.cs` 而不是塞进 `GoalsUIUtil.cs`
+-   **刷新时机**：这些数字在骑行过程中随时会变（不是只在结算那一刻），`StatsTabUI.Refresh()`
+    由 `PauseController.HandlePauseStateChanged` 在暂停面板每次打开时调用，不是只在
+    `Initialize()` 时建一次表——顺带把 `GoalsTabUI` 原来"只在开局建一次表、暂停期间看到
+    的其实是旧快照"这个既有小问题也一起修了
 
 ------------------------------------------------------------------------
 

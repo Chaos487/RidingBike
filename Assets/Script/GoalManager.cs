@@ -29,8 +29,9 @@ public struct GoalsSnapshot
 /// 两类判定口径(见 GoalRequirementType)：
 /// - "单局最佳成绩"(距离/分数)：直接读 RunManager 已经在维护的存档记录
 ///   (BestDistanceKey/HighScoreKey)，GoalManager 自己不重复存一份。
-/// - "跨局累计次数"(Trick/Perfect 落地/贴身险/Node)：GoalManager 自己开 PlayerPrefs 计数器，
-///   订阅对应系统的事件持续累加，不随单局重开清零。
+/// - "跨局累计次数"(Trick/Perfect 落地/贴身险/Node)：读 PlayerStatsManager 的公开属性
+///   (见 ApplyPlayerStats)——这几个计数器原来长在这个类里，接入 Stats 面板(参考 Alto's
+///   Odyssey 的跨局数据统计)之后统一搬过去管了，避免两边各存一份、迟早对不上。
 ///
 /// 有两个查询入口，一读一写：
 /// - GetDisplaySnapshot()：纯只读，给 Menu/暂停面板里的 Goals Tab 用，不发奖励、不推进 Level。
@@ -41,10 +42,6 @@ public struct GoalsSnapshot
 /// </summary>
 public class GoalManager : MonoBehaviour
 {
-    const string TrickCountKey = "RidingBike_Goal_TrickCount";
-    const string PerfectLandingCountKey = "RidingBike_Goal_PerfectLandingCount";
-    const string NearMissCountKey = "RidingBike_Goal_NearMissCount";
-    const string NodeCountKey = "RidingBike_Goal_NodeCount";
     const string CurrentLevelKey = "RidingBike_Goal_CurrentLevel";
     // 已经发过奖励的目标 id，逗号拼接存成一个字符串——目标一旦完成过一次奖励就不会再发第二次，
     // 哪怕跨局累计的计数器之后继续往上涨(比如 10 次 Trick 达成拿过奖励后，第 11、12 次不会重复给)。
@@ -52,11 +49,8 @@ public class GoalManager : MonoBehaviour
 
     GoalSettings settings;
     GearManager gearManager;
+    PlayerStatsManager playerStats;
 
-    int trickLifetimeCount;
-    int perfectLandingLifetimeCount;
-    int nearMissLifetimeCount;
-    int nodeLifetimeCount;
     int currentLevelIndex;
     HashSet<string> rewardedGoalIds = new HashSet<string>();
 
@@ -65,67 +59,31 @@ public class GoalManager : MonoBehaviour
         if (goalSettings != null) settings = goalSettings;
     }
 
+    /// <summary>跨局累计计数器(Trick/Perfect 落地/贴身险/Node)现在统一由 PlayerStatsManager
+    /// 管(见该类顶部注释)，GetProgress 读它的公开属性，这里不用再自己算。</summary>
+    public void ApplyPlayerStats(PlayerStatsManager stats)
+    {
+        playerStats = stats;
+    }
+
     public void Initialize(GearManager gearManagerRef)
     {
         gearManager = gearManagerRef;
 
-        trickLifetimeCount = PlayerPrefs.GetInt(TrickCountKey, 0);
-        perfectLandingLifetimeCount = PlayerPrefs.GetInt(PerfectLandingCountKey, 0);
-        nearMissLifetimeCount = PlayerPrefs.GetInt(NearMissCountKey, 0);
-        nodeLifetimeCount = PlayerPrefs.GetInt(NodeCountKey, 0);
         currentLevelIndex = PlayerPrefs.GetInt(CurrentLevelKey, 0);
 
         string rewarded = PlayerPrefs.GetString(RewardedIdsKey, string.Empty);
         rewardedGoalIds = new HashSet<string>(rewarded.Split(',', StringSplitOptions.RemoveEmptyEntries));
     }
 
-    /// <summary>跟 ScoreSystem.Initialize 是同一个套路——订阅这几个系统已有的事件，不改它们
-    /// 任何逻辑。nodeManager 可能为空(比如场景里没接 Node 系统)，为空就跳过对应订阅。</summary>
-    public void SubscribeGameplayEvents(LandingDetector landing, TrickSystem trick, ObstacleSpawner obstacles, NodeManager nodeManager)
-    {
-        landing.OnLanded += HandleLanded;
-        trick.OnTrickCompleted += HandleTrickCompleted;
-        obstacles.OnNearMiss += HandleNearMiss;
-        if (nodeManager != null) nodeManager.OnNodeReached += HandleNodeReached;
-    }
-
-    void HandleLanded(LandingDetector.Quality quality, LandingDetector.ContactOrder order)
-    {
-        if (quality != LandingDetector.Quality.Perfect) return;
-        perfectLandingLifetimeCount++;
-        PlayerPrefs.SetInt(PerfectLandingCountKey, perfectLandingLifetimeCount);
-        PlayerPrefs.Save();
-    }
-
-    void HandleTrickCompleted(int laps)
-    {
-        trickLifetimeCount++;
-        PlayerPrefs.SetInt(TrickCountKey, trickLifetimeCount);
-        PlayerPrefs.Save();
-    }
-
-    void HandleNearMiss()
-    {
-        nearMissLifetimeCount++;
-        PlayerPrefs.SetInt(NearMissCountKey, nearMissLifetimeCount);
-        PlayerPrefs.Save();
-    }
-
-    void HandleNodeReached()
-    {
-        nodeLifetimeCount++;
-        PlayerPrefs.SetInt(NodeCountKey, nodeLifetimeCount);
-        PlayerPrefs.Save();
-    }
-
     float GetProgress(GoalDefinition goal) => goal.requirementType switch
     {
         GoalRequirementType.BestDistanceInRun => PlayerPrefs.GetFloat(RunManager.BestDistanceKey, 0f),
         GoalRequirementType.BestScoreInRun => PlayerPrefs.GetInt(RunManager.HighScoreKey, 0),
-        GoalRequirementType.TrickCountLifetime => trickLifetimeCount,
-        GoalRequirementType.PerfectLandingCountLifetime => perfectLandingLifetimeCount,
-        GoalRequirementType.NearMissCountLifetime => nearMissLifetimeCount,
-        GoalRequirementType.NodeCountLifetime => nodeLifetimeCount,
+        GoalRequirementType.TrickCountLifetime => playerStats != null ? playerStats.TrickCount : 0,
+        GoalRequirementType.PerfectLandingCountLifetime => playerStats != null ? playerStats.PerfectLandingCount : 0,
+        GoalRequirementType.NearMissCountLifetime => playerStats != null ? playerStats.NearMissCount : 0,
+        GoalRequirementType.NodeCountLifetime => playerStats != null ? playerStats.NodeCount : 0,
         _ => 0f,
     };
 

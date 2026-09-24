@@ -15,6 +15,12 @@ public class GearManager : MonoBehaviour
     /// <summary>齿轮数量变化时触发(包括开局读档那一次),参数是变化后的总数。供 UI 更新显示。</summary>
     public event Action<int> OnGearCountChanged;
 
+    /// <summary>每次真正"赚到"齿轮时触发(开局读档那次不算,只在 AddGear 实际加了正数时才响),
+    /// 参数是这一次赚到的数量(不是变化后的总数)——供 PlayerStatsManager 累加"历史一共赚过
+    /// 多少 Gear"这个统计项用。跟 OnGearCountChanged 的区别:后者是"当前余额"的快照通知,
+    /// 这个是"发生过一次赚取"的事件,花掉齿轮不会触发这个。</summary>
+    public event Action<int> OnGearEarned;
+
     public void Initialize()
     {
         CurrentGearCount = PlayerPrefs.GetInt(GearCountKey, 0);
@@ -30,5 +36,6 @@ public class GearManager : MonoBehaviour
         PlayerPrefs.Save();
 
         OnGearCountChanged?.Invoke(CurrentGearCount);
+        OnGearEarned?.Invoke(amount);
     }
 }

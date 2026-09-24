@@ -75,18 +75,29 @@ Play Again。面板背景复用现成的全屏模糊(`ScreenBlurState` + `Blurre
 开始前是"tap to start"——屏幕背后能看到骑行场景(地形/车,只是暂停了),没有单独一个
 不透明的主菜单画面,全屏幕任意位置点一下就开始(参考 Alto's Odyssey 的开始画面手感)。
 左上角一个 Menu 入口,点开是 Goals/Settings/Language/Stats 四个 Tab 切换的面板,布局照抄
-参考图的交互(顶部横排 Tab + 内容区 + 右下角 Back)。**Goals 这个 Tab 已经接了真实数据**
-(见下面"持久 Goals 系统"一节),**其余三个 Tab 内容仍然只是占位文字,不接任何真实数据**
-(音量/暂停位置这些设置项、多语言切换、跑分统计都还没做)。Menu 入口只在"开始前"这个
-阶段有意义,骑行真正开始后会自动收起来。
+参考图的交互(顶部横排 Tab + 内容区 + 右下角 Back)。**Goals/Stats 这两个 Tab 已经接了真实
+数据**(见下面"持久 Goals 系统"/"跨局 Stats 面板"两节),**Settings/Language 两个 Tab 内容
+仍然只是占位文字,不接任何真实数据**(音量/暂停位置这些设置项、多语言切换都还没做)。
+Menu 入口只在"开始前"这个阶段有意义,骑行真正开始后会自动收起来。
 
 **持久 Goals 系统**(`GoalManager.cs` + `GoalSettings.cs` + `GoalsTabUI.cs` + `GoalsRecapUI.cs`,
 3.17 节)
 参考 Alto's Odyssey 的 Level 目标——固定 3 个目标一组,跨很多局游戏持续追踪,不是"每局
 随机抽目标"那种 roguelike 设计。第一版内容很小(6 条目标、2 个 Level),全部写在
 `GoalSettings` 资产里。Distance/Score 两类复用已有的"单局最佳成绩"存档,Trick/Landing/
-Near Miss/Node 四类是新加的跨局累计计数器。摔车结算流程现在多了一步:摔车 →
-`GoalsRecapUI`(本局目标进度,点 Next)→ `RunSummaryUI`(不变)。
+Near Miss/Node 四类跨局累计计数器现在统一由下面的 `PlayerStatsManager` 管(原来长在
+`GoalManager` 自己身上,Stats 面板上线后搬过去了,避免两边分别存一份)。摔车结算流程
+现在多了一步:摔车 → `GoalsRecapUI`(本局目标进度,点 Next)→ `RunSummaryUI`(不变)。
+
+**跨局 Stats 面板**(`PlayerStatsManager.cs` + `StatsTabUI.cs` + `StatsUIUtil.cs`,3.18 节)
+参考 Alto's Odyssey 的 Stats 面板——纯只读展示跨很多局游戏持续累计的数据,不影响任何
+判定/计分逻辑。第一版 12 行:单局最佳距离/分数/Trick 分,加上总里程、总局数、Trick
+次数、Perfect/Good/Not Bad 落地次数、贴身险次数、经过的 Node 数、累计获得的 Gear 数。
+接进菜单/暂停面板里 `EndlessRunCanvas.prefab` 早就留好但一直没接内容的 `StatsPanel`
+占位节点,内容行数比 Goals Tab 多不少,固定高度装不下,新加了 `ScrollRect` 可滚动容器
+(`StatsUIUtil.cs`)——这是这个项目 UI 第一次用到滚动。暂停面板每次打开都会刷新一次
+Goals/Stats 两个 Tab(顺带修了 Goals Tab 原来"只在开局建一次表、暂停期间看到的是旧
+快照"这个既有小问题)。
 
 **骑行中暂停**(`RunManager.cs` 的 `TogglePause()` + `PauseController.cs`)
 左下角一个暂停按钮(手机端点它),桌面端 `Esc` 键效果相同,两条路径最终都走
@@ -94,8 +105,8 @@ Near Miss/Node 四类是新加的跨局累计计数器。摔车结算流程现�
 `BikeController`)。暂停面板照参考图做成左右分屏——左边 Home/Restart/Resume 三个按钮
 (Home 和 Restart 现在是同一个行为:直接重新加载场景,项目没有单独的主菜单场景,重开
 自然会落回 tap to start;Photo Mode 这次不做),右边是跟开始画面 Menu **完全同一套**
-Goals/Settings/Language/Stats Tab 逻辑(抽成了 `TabGroupController.cs` 给两处复用,Goals
-接了真实数据,其余仍是占位)。摔车结算后暂停入口会跟着收起来。
+Goals/Settings/Language/Stats Tab 逻辑(抽成了 `TabGroupController.cs` 给两处复用,Goals/
+Stats 接了真实数据,Settings/Language 仍是占位)。摔车结算后暂停入口会跟着收起来。
 
 **开场引入动画**(`CameraDirector.EnterIntroFraming`/`PlayIntroReveal`)
 tap to start 画面车不直接可见——把镜头前瞻偏移(跟满速时"往前看"用的是同一个
