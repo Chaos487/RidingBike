@@ -12,6 +12,9 @@ using UnityEngine.UI;
 public class TabGroupController
 {
     static readonly string[] TabNames = { "Goals", "Settings", "Language", "Stats" };
+    // 跟 TabNames 一一对应，Language 这个 Tab 名字本身也要翻译("语言"/"言語"/...)，
+    // 跟它面板里那 7 个语言按钮的母语名字不是一回事(那些不翻译，见 LanguageTabUI)。
+    static readonly string[] TabLocalizationKeys = { "tab.goals", "tab.settings", "tab.language", "tab.stats" };
 
     readonly Button[] tabButtons = new Button[TabNames.Length];
     readonly Text[] tabTexts = new Text[TabNames.Length];
@@ -38,7 +41,23 @@ public class TabGroupController
             if (tabButtons[i] != null) tabButtons[i].onClick.AddListener(() => ShowTab(index));
         }
 
+        ApplyLocalization();
         ShowTab(0);
+    }
+
+    /// <summary>Tab 栏四个标题按当前语言重新画一遍——语言可能是在这次打开菜单期间被切换的
+    /// (比如先去 Language Tab 选了新语言，再切回来看别的 Tab)，调用方(MainMenuController/
+    /// PauseController)订阅 LocalizationManager.OnLocaleChanged 后要转调这个方法。</summary>
+    public void ApplyLocalization()
+    {
+        for (int i = 0; i < tabTexts.Length; i++)
+        {
+            if (tabTexts[i] == null) continue;
+            tabTexts[i].text = LocalizationManager.Get(TabLocalizationKeys[i]);
+            // 预制体里烘焙的 Text 组件默认用内置 Arial，没有中文/日文字形——换成
+            // LocalizationManager.GetFont()，见该方法注释。
+            tabTexts[i].font = LocalizationManager.GetFont();
+        }
     }
 
     public void ShowTab(int index)

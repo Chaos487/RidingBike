@@ -30,6 +30,14 @@ public class StatsTabUI : MonoBehaviour
         };
 
         Refresh();
+
+        // Refresh() 每次都整块重建行标签，重新调一遍就自然带上新语言。
+        LocalizationManager.OnLocaleChanged += Refresh;
+    }
+
+    void OnDestroy()
+    {
+        LocalizationManager.OnLocaleChanged -= Refresh;
     }
 
     /// <summary>跟 GoalsTabUI.Refresh 不同——这些数字在骑行过程中随时会变(不是只在摔车结算
@@ -64,17 +72,17 @@ public class StatsTabUI : MonoBehaviour
         }
 
         int index = 0;
-        StatsUIUtil.BuildStatRow(rows, index++, "Best Distance", $"{PlayerPrefs.GetFloat(RunManager.BestDistanceKey, 0f):N0}m");
-        StatsUIUtil.BuildStatRow(rows, index++, "Best Score", $"{PlayerPrefs.GetInt(RunManager.HighScoreKey, 0):N0}");
-        StatsUIUtil.BuildStatRow(rows, index++, "Best Trick Score", $"{stats.BestTrickScoreEver:N0}");
-        StatsUIUtil.BuildStatRow(rows, index++, "Total Distance", $"{stats.TotalDistance:N0}m");
-        StatsUIUtil.BuildStatRow(rows, index++, "Total Runs", $"{stats.TotalRuns:N0}");
-        StatsUIUtil.BuildStatRow(rows, index++, "Tricks Performed", $"{stats.TrickCount:N0}");
-        StatsUIUtil.BuildStatRow(rows, index++, "Perfect Landings", $"{stats.PerfectLandingCount:N0}");
-        StatsUIUtil.BuildStatRow(rows, index++, "Good Landings", $"{stats.GoodLandingCount:N0}");
-        StatsUIUtil.BuildStatRow(rows, index++, "Not Bad Landings", $"{stats.NotBadLandingCount:N0}");
-        StatsUIUtil.BuildStatRow(rows, index++, "Near Misses", $"{stats.NearMissCount:N0}");
-        StatsUIUtil.BuildStatRow(rows, index++, "Nodes Reached", $"{stats.NodeCount:N0}");
-        StatsUIUtil.BuildStatRow(rows, index++, "Gears Collected", $"{stats.TotalGearEarned:N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.bestDistance"), $"{PlayerPrefs.GetFloat(RunManager.BestDistanceKey, 0f):N0}m");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.bestScore"), $"{PlayerPrefs.GetInt(RunManager.HighScoreKey, 0):N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.bestTrickScore"), $"{stats.BestTrickScoreEver:N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.totalDistance"), $"{stats.TotalDistance:N0}m");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.totalRuns"), $"{stats.TotalRuns:N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.tricksPerformed"), $"{stats.TrickCount:N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.perfectLandings"), $"{stats.PerfectLandingCount:N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.goodLandings"), $"{stats.GoodLandingCount:N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.notBadLandings"), $"{stats.NotBadLandingCount:N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.nearMisses"), $"{stats.NearMissCount:N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.nodesReached"), $"{stats.NodeCount:N0}");
+        StatsUIUtil.BuildStatRow(rows, index++, LocalizationManager.Get("stats.gearsCollected"), $"{stats.TotalGearEarned:N0}");
     }
 }

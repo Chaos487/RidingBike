@@ -32,12 +32,21 @@ public class GoalsTabUI : MonoBehaviour
         }
 
         Refresh();
+
+        // Level 行标签("Level N")要跟着语言走——Refresh() 每次都整块重建，重新调一遍就
+        // 自然带上新语言，不用另外维护一份"只改文字"的路径。
+        LocalizationManager.OnLocaleChanged += Refresh;
     }
 
-    /// <summary>目标状态只在结算那一刻(GoalsRecapUI.SettleCurrentLevel)才会变，而摔车结算
-    /// 之后玩家没有机会再回到这个场景暂停/看菜单(直接走向 Home/Play Again 重开)——所以
-    /// 实际上只需要在 Initialize() 时画一次。留着这个公开方法是给以后万一需要在同一局内
-    /// 刷新显示用的，目前只有 Initialize() 内部调用它。</summary>
+    void OnDestroy()
+    {
+        LocalizationManager.OnLocaleChanged -= Refresh;
+    }
+
+    /// <summary>公开方法，三处会调:Initialize() 建面板后画一次；`PauseController` 每次打开
+    /// 暂停面板时调一次(跨局计数器在骑行过程中随时会变，见 PauseController.HandlePauseStateChanged)；
+    /// `LocalizationManager.OnLocaleChanged` 触发时调一次(语言可能是在同一次打开菜单期间
+    /// 被切换的)。每次都整块重建行内容，这个面板行数少，重建开销不是问题。</summary>
     public void Refresh()
     {
         if (goalManager == null) return;

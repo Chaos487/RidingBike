@@ -5,8 +5,8 @@ using UnityEngine.UI;
 /// <summary>
 /// 骑行中的暂停入口——左下角一个暂停按钮(手机端点它,桌面端 Esc 键),布局参照 Alto's
 /// Odyssey 的暂停画面做成左右分屏:左边一列 Home/Restart/Resume,右边是 Goals/Settings/
-/// Language/Stats 四个 Tab(Goals/Stats 已接真实数据,Settings/Language 仍是占位,Tab
-/// 切换逻辑用 `TabGroupController`,跟开始画面的 Menu 面板共用同一份)。
+/// Language/Stats 四个 Tab(四个都已接真实数据/功能,Tab 切换逻辑用 `TabGroupController`,
+/// 跟开始画面的 Menu 面板共用同一份)。
 ///
 /// 真正的"暂停"(Time.timeScale/BikeController 开关)在 `RunManager.TogglePause()` 里做,
 /// 这个脚本只管 UI 和调用它——保证 Esc 键和点暂停按钮触发的是同一条状态机路径，不会两边
@@ -23,6 +23,7 @@ public class PauseController : MonoBehaviour
     Button resumeButton;
     Button restartButton;
     Button homeButton;
+    TabGroupController tabGroup;
 
     public void Initialize(RunManager manager, GoalsTabUI goals, StatsTabUI stats)
     {
@@ -39,8 +40,36 @@ public class PauseController : MonoBehaviour
         FindUIReferences();
         WireButtons();
 
+        LocalizationManager.OnLocaleChanged += ApplyLocalization;
+        ApplyLocalization();
+
         if (pauseButtonObject != null) pauseButtonObject.SetActive(false);
         if (pausePanel != null) pausePanel.SetActive(false);
+    }
+
+    void OnDestroy()
+    {
+        LocalizationManager.OnLocaleChanged -= ApplyLocalization;
+    }
+
+    void ApplyLocalization()
+    {
+        // 预制体里烘焙的 Text 组件默认用内置 Arial，没有中文/日文字形，这里连字体一起换——
+        // 见 LocalizationManager.GetFont() 注释。
+        ApplyButtonLocalization(resumeButton, "button.resume");
+        ApplyButtonLocalization(restartButton, "button.restart");
+        ApplyButtonLocalization(homeButton, "button.home");
+        tabGroup?.ApplyLocalization();
+    }
+
+    static void ApplyButtonLocalization(Button button, string key)
+    {
+        if (button == null) return;
+        Text text = button.GetComponent<Text>();
+        if (text == null) return;
+
+        text.text = LocalizationManager.Get(key);
+        text.font = LocalizationManager.GetFont();
     }
 
     void Update()
@@ -68,10 +97,10 @@ public class PauseController : MonoBehaviour
         Transform homeTransform = transform.Find("PausePanel/ActionList/HomeButton");
         homeButton = homeTransform != null ? homeTransform.GetComponent<Button>() : null;
 
-        // TabArea 下面挂的是跟 MenuPanel 一样的 TabBar/ContentArea 结构,new 一个
-        // TabGroupController 就够了,不需要保留引用——它自己接管点击事件。
+        // TabArea 下面挂的是跟 MenuPanel 一样的 TabBar/ContentArea 结构。要保留引用——
+        // 语言切换时要转调 tabGroup.ApplyLocalization() 重新刷新 Tab 标题文字。
         Transform tabAreaTransform = transform.Find("PausePanel/TabArea");
-        if (tabAreaTransform != null) new TabGroupController(tabAreaTransform);
+        if (tabAreaTransform != null) tabGroup = new TabGroupController(tabAreaTransform);
     }
 
     void WireButtons()

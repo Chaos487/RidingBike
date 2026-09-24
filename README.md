@@ -75,10 +75,9 @@ Play Again。面板背景复用现成的全屏模糊(`ScreenBlurState` + `Blurre
 开始前是"tap to start"——屏幕背后能看到骑行场景(地形/车,只是暂停了),没有单独一个
 不透明的主菜单画面,全屏幕任意位置点一下就开始(参考 Alto's Odyssey 的开始画面手感)。
 左上角一个 Menu 入口,点开是 Goals/Settings/Language/Stats 四个 Tab 切换的面板,布局照抄
-参考图的交互(顶部横排 Tab + 内容区 + 右下角 Back)。**Goals/Stats 这两个 Tab 已经接了真实
-数据**(见下面"持久 Goals 系统"/"跨局 Stats 面板"两节),**Settings/Language 两个 Tab 内容
-仍然只是占位文字,不接任何真实数据**(音量/暂停位置这些设置项、多语言切换都还没做)。
-Menu 入口只在"开始前"这个阶段有意义,骑行真正开始后会自动收起来。
+参考图的交互(顶部横排 Tab + 内容区 + 右下角 Back)。**四个 Tab 现在都接了真实数据/功能**
+(见下面"持久 Goals 系统"/"跨局 Stats 面板"/"Settings 面板"/"本地化系统"几节)。Menu 入口
+只在"开始前"这个阶段有意义,骑行真正开始后会自动收起来。
 
 **持久 Goals 系统**(`GoalManager.cs` + `GoalSettings.cs` + `GoalsTabUI.cs` + `GoalsRecapUI.cs`,
 3.17 节)
@@ -99,14 +98,34 @@ Near Miss/Node 四类跨局累计计数器现在统一由下面的 `PlayerStatsM
 Goals/Stats 两个 Tab(顺带修了 Goals Tab 原来"只在开局建一次表、暂停期间看到的是旧
 快照"这个既有小问题)。
 
+**Settings 面板**(`SettingsTabUI.cs`,3.19 节)
+接进现成的 `SettingsPanel` 占位节点。Sounds/Music 两条音量滑条——`AudioManager` 本来
+没有音量控制 API,这里给每个音效槽位的音量再乘一个运行时缩放系数,不用新建
+AudioMixer 资产;Boost Button 一行是 Left/Right 分段按钮,切换加速按钮挂在屏幕左边还是
+右边(直接改 `BoostButton` 的 RectTransform 锚点,这个项目没有独立的跳跃按钮,不会跟
+任何其它按钮冲突)。没做分辨率设置——这个项目的输入/布局都是照手机触屏做的,"分辨率"
+是桌面/Steam 场景的概念。
+
+**本地化系统**(`LocalizationManager.cs` + `LocalizationTable.cs` + `LanguageTabUI.cs`,
+3.19 节)
+接进现成的 `LanguagePanel` 占位节点,7 个语言按钮的网格(English/简体中文/繁體中文/
+日本語/Deutsch/Français/Español),点一个切换 `LocalizationManager.CurrentLocale`(存
+PlayerPrefs,跨局持久)。**v1 只覆盖"常驻 UI"**——Tab 栏标题、Menu/暂停面板按钮、
+Settings/Run Summary/Goals/Stats 这几个面板的固定文案,大概 40 条 key,全部翻译成 7 种
+语言;骑行中右侧 Feat 列表的弹字(PERFECT!/NEAR MISS!/Backflip x{n})、Goal 具体目标
+标题、Node 三选一文案还没接,继续显示英文。**中文/日文字形需要手动配置**——Unity 内置
+字体(Arial)不含 CJK 字形,`LocalizationManager.GetFont()` 会尝试从
+`Assets/Resources/NotoSansCJK.ttf` 加载一份带中日文字形的字体资产,加进来之前中文/
+日文会显示成空白方框(英文/数字不受影响)。
+
 **骑行中暂停**(`RunManager.cs` 的 `TogglePause()` + `PauseController.cs`)
 左下角一个暂停按钮(手机端点它),桌面端 `Esc` 键效果相同,两条路径最终都走
 `RunManager.TogglePause()`(逻辑跟开始前的 gate 一样:`Time.timeScale = 0` + 禁用
 `BikeController`)。暂停面板照参考图做成左右分屏——左边 Home/Restart/Resume 三个按钮
 (Home 和 Restart 现在是同一个行为:直接重新加载场景,项目没有单独的主菜单场景,重开
 自然会落回 tap to start;Photo Mode 这次不做),右边是跟开始画面 Menu **完全同一套**
-Goals/Settings/Language/Stats Tab 逻辑(抽成了 `TabGroupController.cs` 给两处复用,Goals/
-Stats 接了真实数据,Settings/Language 仍是占位)。摔车结算后暂停入口会跟着收起来。
+Goals/Settings/Language/Stats Tab 逻辑(抽成了 `TabGroupController.cs` 给两处复用,四个
+Tab 都接了真实数据/功能)。摔车结算后暂停入口会跟着收起来。
 
 **开场引入动画**(`CameraDirector.EnterIntroFraming`/`PlayIntroReveal`)
 tap to start 画面车不直接可见——把镜头前瞻偏移(跟满速时"往前看"用的是同一个

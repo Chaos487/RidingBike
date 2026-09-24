@@ -20,6 +20,10 @@ public static class EndlessRunBootstrap
 
     static void Setup()
     {
+        // 当前语言要在任何 UI 建出来之前先读出来——RunSummaryUI/GoalsTabUI 这些面板的
+        // BuildUI() 里有不少文字是按当前语言现算的，读晚了会先用默认的 English 建一遍。
+        LocalizationManager.Initialize();
+
         // Near Miss 判定区比实心碰撞体大一圈、用 isTrigger 实现；这个项目里 Physics2D 的
         // queriesHitTriggers 是开着的(项目默认)，不关掉的话 IsGrounded/坡度探测这些射线
         // 会把"贴近但没撞到"的触发区也当成地面命中，产生假阳性的触地判定。
@@ -85,12 +89,17 @@ public static class EndlessRunBootstrap
         goalManager.ApplyPlayerStats(playerStatsManager);
         goalManager.Initialize(gearManager);
 
-        (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI, StatsTabUI statsTabUI) runUI = SetupRunManagerUI();
+        (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI, StatsTabUI statsTabUI,
+            SettingsTabUI settingsTabUI, LanguageTabUI languageTabUI) runUI = SetupRunManagerUI();
         RunManager runManager = runUI.runManager;
         runManager.Initialize(bike.transform, damageSystem, bike, gearManager);
 
         runUI.goalsTabUI.Initialize(goalManager);
         runUI.statsTabUI.Initialize(playerStatsManager);
+        // 不需要传任何系统引用进去——加速按钮/音量走的是 AudioManager.Instance 这个单例，
+        // 跟 EndlessRunBootstrap.SetupAudio() 拿它的方式一样，不用在这里手动接线。
+        runUI.settingsTabUI.Initialize();
+        runUI.languageTabUI.Initialize();
         // GoalsRecapUI 先弹、玩家点 Next 才显示 RunSummaryUI——两个面板轮流独占屏幕,见
         // RunSummaryUI.Show / GoalsRecapUI 顶部注释。
         runUI.goalsRecapUI.Initialize(runManager, goalManager, runUI.runSummaryUI);
@@ -218,7 +227,8 @@ public static class EndlessRunBootstrap
     // UI 现在是手动在 Editor 里搭的 Assets/prefab/EndlessRunCanvas.prefab，实例化出来之后
     // 直接把 RunManager 挂到它根节点上——RunManager.Awake() 会按名字把预制体里的子物体
     // (DistanceText/SpeedText/.../HpBarBackground/HpBarFill) 找出来，改预制体视觉不用碰这份代码。
-    static (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI, StatsTabUI statsTabUI) SetupRunManagerUI()
+    static (RunManager runManager, RunSummaryUI runSummaryUI, GoalsTabUI goalsTabUI, GoalsRecapUI goalsRecapUI, StatsTabUI statsTabUI,
+        SettingsTabUI settingsTabUI, LanguageTabUI languageTabUI) SetupRunManagerUI()
     {
         GameObject canvasPrefab = FindPrefab("EndlessRunCanvas");
         if (canvasPrefab == null)
@@ -226,7 +236,8 @@ public static class EndlessRunBootstrap
             Debug.LogError("EndlessRunBootstrap: 找不到 Assets/prefab/EndlessRunCanvas.prefab，局内 UI 不会显示。");
             GameObject fallback = new GameObject("RunManager (missing UI prefab)");
             return (fallback.AddComponent<RunManager>(), fallback.AddComponent<RunSummaryUI>(),
-                fallback.AddComponent<GoalsTabUI>(), fallback.AddComponent<GoalsRecapUI>(), fallback.AddComponent<StatsTabUI>());
+                fallback.AddComponent<GoalsTabUI>(), fallback.AddComponent<GoalsRecapUI>(), fallback.AddComponent<StatsTabUI>(),
+                fallback.AddComponent<SettingsTabUI>(), fallback.AddComponent<LanguageTabUI>());
         }
 
         GameObject canvasInstance = Object.Instantiate(canvasPrefab);
@@ -261,13 +272,16 @@ public static class EndlessRunBootstrap
         MainMenuController mainMenu = canvasInstance.AddComponent<MainMenuController>();
         runManager.OnGameStarted += mainMenu.HandleGameStarted;
 
-        // Goals/Stats 两个 Tab(菜单/暂停面板里现成的 GoalsPanel/StatsPanel 节点，见各自
-        // 顶部注释)——只需要能 transform.Find 到 canvasInstance 下的 MenuPanel/PausePanel，
-        // 跟 GoalManager/PlayerStatsManager 的接线放在主 Setup() 里做(这里只 AddComponent，
-        // Initialize 调用点在调用方)。要在 PauseController 之前创建，因为暂停面板打开时要
-        // 刷新这两个 Tab(见 PauseController.HandlePauseStateChanged)，得先拿到引用。
+        // Goals/Stats/Settings/Language 四个 Tab(菜单/暂停面板里现成的 GoalsPanel/
+        // StatsPanel/SettingsPanel/LanguagePanel 节点，见各自顶部注释)——只需要能
+        // transform.Find 到 canvasInstance 下的 MenuPanel/PausePanel，各自的 Initialize
+        // 调用点在主 Setup() 里(这里只 AddComponent)。Goals/Stats 要在 PauseController 之前
+        // 创建，因为暂停面板打开时要刷新这两个 Tab(见 PauseController.HandlePauseStateChanged)，
+        // 得先拿到引用。
         GoalsTabUI goalsTabUI = canvasInstance.AddComponent<GoalsTabUI>();
         StatsTabUI statsTabUI = canvasInstance.AddComponent<StatsTabUI>();
+        SettingsTabUI settingsTabUI = canvasInstance.AddComponent<SettingsTabUI>();
+        LanguageTabUI languageTabUI = canvasInstance.AddComponent<LanguageTabUI>();
 
         // 骑行中的暂停入口(左下角按钮 + Esc 键),跟 Menu 共用同一套 Tab 面板逻辑——见
         // PauseController 内部注释。真正的暂停状态机在 RunManager 里，这里只是接上事件。
@@ -281,7 +295,7 @@ public static class EndlessRunBootstrap
         RunSummaryUI runSummaryUI = canvasInstance.AddComponent<RunSummaryUI>();
         GoalsRecapUI goalsRecapUI = canvasInstance.AddComponent<GoalsRecapUI>();
 
-        return (runManager, runSummaryUI, goalsTabUI, goalsRecapUI, statsTabUI);
+        return (runManager, runSummaryUI, goalsTabUI, goalsRecapUI, statsTabUI, settingsTabUI, languageTabUI);
     }
 
     // 地形几何体是运行时按曲线生成的，没法预先摆好，但视觉(材质/贴图)可以在 Editor 里调——

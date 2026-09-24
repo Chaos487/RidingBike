@@ -44,6 +44,12 @@ public class RunSummaryUI : MonoBehaviour
     GameObject distanceRecordRow;
     Text distanceRecordValueText;
     GameObject newHighScoreRow;
+    Text newHighScoreBadgeText;
+
+    Text titleText;
+    Text totalLabelText;
+    Text homeButtonText;
+    Text playAgainButtonText;
 
     // 动画按这个顺序依次淡入——只包含固定存在的 7 行 + Total，New Distance Record/New High
     // Score 这两个条件行不放进来统一排(它们各自的时机在 PlayRevealAnimation 里单独处理，
@@ -67,8 +73,8 @@ public class RunSummaryUI : MonoBehaviour
         landingQualityValueText.text = $"{data.landingQualityScore:N0}";
 
         trickLabelText.text = data.bestTrickScore > 0
-            ? $"✎  Trick Score - best: {data.bestTrickScore:N0}"
-            : "✎  Trick Score";
+            ? $"✎  {string.Format(LocalizationManager.Get("runsummary.trickScoreBest"), data.bestTrickScore.ToString("N0"))}"
+            : $"✎  {LocalizationManager.Get("runsummary.trickScore")}";
         trickValueText.text = $"{data.trickScore:N0}";
 
         nearMissValueText.text = $"{data.nearMissScore:N0}";
@@ -81,10 +87,21 @@ public class RunSummaryUI : MonoBehaviour
 
         // 原始数值(793m / 103 个齿轮…)只在这里更新标签文字，不参与上面几行的"分数"显示——
         // 每次 Show() 都要重新拼一遍，因为标签是运行时字符串，不能在 BuildUI() 里写死。
-        SetRowLabel(distanceValueText, "▲", $"Distance Travelled ({data.distance:N0}m)");
-        SetRowLabel(gearsValueText, "⚙", $"Gears Collected ({data.gearsCollected:N0})");
-        SetRowLabel(nodeValueText, "◆", $"Nodes Passed ({data.nodeCount:N0})");
-        SetRowLabel(maxHpValueText, "♥", $"Max HP ({data.finalMaxHp:0})");
+        // 顺带也是这个面板刷新语言的地方——每局只弹一次，不需要像 Goals/Stats 那两个
+        // Tab 一样订阅 LocalizationManager.OnLocaleChanged 实时刷新，Show() 时读一次
+        // 当前语言就够了。
+        SetRowLabel(distanceValueText, "▲", string.Format(LocalizationManager.Get("runsummary.distance"), data.distance.ToString("N0")));
+        SetRowLabel(gearsValueText, "⚙", string.Format(LocalizationManager.Get("runsummary.gears"), data.gearsCollected.ToString("N0")));
+        SetRowLabel(nodeValueText, "◆", string.Format(LocalizationManager.Get("runsummary.nodes"), data.nodeCount.ToString("N0")));
+        SetRowLabel(maxHpValueText, "♥", string.Format(LocalizationManager.Get("runsummary.maxhp"), data.finalMaxHp.ToString("0")));
+        SetRowLabel(landingQualityValueText, "✓", LocalizationManager.Get("runsummary.landingQuality"));
+        SetRowLabel(nearMissValueText, "!", LocalizationManager.Get("runsummary.nearMiss"));
+        SetRowLabel(distanceRecordValueText, "▲", LocalizationManager.Get("runsummary.newDistanceRecord"));
+        totalLabelText.text = LocalizationManager.Get("runsummary.total");
+        titleText.text = LocalizationManager.Get("runsummary.title");
+        homeButtonText.text = LocalizationManager.Get("button.home");
+        playAgainButtonText.text = LocalizationManager.Get("runsummary.playAgain");
+        newHighScoreBadgeText.text = $"★ {LocalizationManager.Get("runsummary.newHighScore")}";
 
         // 背景模糊材质要等 ScreenBlurFeature 真的跑了这趟渲染 Pass 才有内容可采样——
         // 之前这里漏调了这一句，面板背景实际上一直没有真的模糊过。这个面板打开之后不会再关
@@ -166,7 +183,7 @@ public class RunSummaryUI : MonoBehaviour
 
         BuildBackground(panelRect);
 
-        CreateText(panelRect, "Run Complete", 46, FontStyle.Bold, TextAnchor.MiddleCenter,
+        titleText = CreateText(panelRect, "Run Complete", 46, FontStyle.Bold, TextAnchor.MiddleCenter,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -50f), new Vector2(800f, 60f));
 
         BuildRows(panelRect);
@@ -238,7 +255,7 @@ public class RunSummaryUI : MonoBehaviour
         distanceRecordRowGroup = CreateStatRow(rowsRect, "▲  New Distance Record", out distanceRecordValueText, false, out _, out distanceRecordRow);
         distanceRecordValueText.color = new Color(1f, 0.85f, 0.3f, 1f);
 
-        totalRowGroup = CreateStatRow(rowsRect, "Total", out totalValueText, true, out _, out _);
+        totalRowGroup = CreateStatRow(rowsRect, "Total", out totalValueText, true, out totalLabelText, out _);
 
         // New High Score：只在破紀錄时显示，放在 Total 之后——纯粹的破紀錄提示，不像
         // New Distance Record 那样带具体分数(它已经算在 Total 里了，这里不用重复显示)。
@@ -247,10 +264,10 @@ public class RunSummaryUI : MonoBehaviour
         LayoutElement badgeLayout = newHighScoreRow.AddComponent<LayoutElement>();
         badgeLayout.preferredHeight = 40f;
         highScoreRowGroup = newHighScoreRow.AddComponent<CanvasGroup>();
-        Text badgeText = CreateText(newHighScoreRow.transform, "★ New High Score", 26, FontStyle.Bold, TextAnchor.MiddleCenter,
+        newHighScoreBadgeText = CreateText(newHighScoreRow.transform, "★ New High Score", 26, FontStyle.Bold, TextAnchor.MiddleCenter,
             Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        badgeText.color = new Color(1f, 0.85f, 0.3f, 1f);
-        RectTransform badgeRt = (RectTransform)badgeText.transform;
+        newHighScoreBadgeText.color = new Color(1f, 0.85f, 0.3f, 1f);
+        RectTransform badgeRt = (RectTransform)newHighScoreBadgeText.transform;
         badgeRt.anchorMin = Vector2.zero;
         badgeRt.anchorMax = Vector2.one;
         badgeRt.offsetMin = Vector2.zero;
@@ -299,15 +316,19 @@ public class RunSummaryUI : MonoBehaviour
 
     void BuildBottomBar(Transform parent)
     {
-        CreateTextButton(parent, "Home", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
-            new Vector2(40f, 40f), new Vector2(180f, 64f), TextAnchor.MiddleLeft).onClick.AddListener(HomeClicked);
+        Button homeButton = CreateTextButton(parent, "Home", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
+            new Vector2(40f, 40f), new Vector2(180f, 64f), TextAnchor.MiddleLeft);
+        homeButton.onClick.AddListener(HomeClicked);
+        homeButtonText = homeButton.GetComponent<Text>();
 
         gearsEarnedText = CreateText(parent, "⚙ 0", 30, FontStyle.Bold, TextAnchor.MiddleCenter,
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 46f), new Vector2(240f, 56f));
         gearsEarnedText.color = new Color(1f, 0.82f, 0.35f, 1f);
 
-        CreateTextButton(parent, "Play Again", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-            new Vector2(-40f, 40f), new Vector2(220f, 64f), TextAnchor.MiddleRight).onClick.AddListener(PlayAgainClicked);
+        Button playAgainButton = CreateTextButton(parent, "Play Again", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
+            new Vector2(-40f, 40f), new Vector2(220f, 64f), TextAnchor.MiddleRight);
+        playAgainButton.onClick.AddListener(PlayAgainClicked);
+        playAgainButtonText = playAgainButton.GetComponent<Text>();
     }
 
     Button CreateTextButton(Transform parent, string label, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
@@ -339,7 +360,7 @@ public class RunSummaryUI : MonoBehaviour
         rt.sizeDelta = sizeDelta;
 
         Text text = obj.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = LocalizationManager.GetFont();
         text.fontSize = fontSize;
         text.fontStyle = style;
         text.alignment = alignment;

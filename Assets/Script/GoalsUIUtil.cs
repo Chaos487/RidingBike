@@ -24,7 +24,7 @@ public static class GoalsUIUtil
         rt.sizeDelta = sizeDelta;
 
         Text text = obj.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = LocalizationManager.GetFont();
         text.fontSize = fontSize;
         text.fontStyle = style;
         text.alignment = alignment;
@@ -98,7 +98,8 @@ public static class GoalsUIUtil
         LayoutElement layoutElement = row.AddComponent<LayoutElement>();
         layoutElement.preferredHeight = height;
 
-        CreateText(row.transform, $"Level {levelNumber}", 28, FontStyle.Bold, TextAnchor.MiddleCenter,
+        string content = string.Format(LocalizationManager.Get("goals.level"), levelNumber);
+        CreateText(row.transform, content, 28, FontStyle.Bold, TextAnchor.MiddleCenter,
             Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
     }
 }

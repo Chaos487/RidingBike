@@ -92,7 +92,7 @@ public class GoalsRecapUI : MonoBehaviour
 
         BuildBackground(panelRect);
 
-        GoalsUIUtil.CreateText(panelRect, "GOALS", 40, FontStyle.Bold, TextAnchor.MiddleCenter,
+        GoalsUIUtil.CreateText(panelRect, LocalizationManager.Get("goalsrecap.title"), 40, FontStyle.Bold, TextAnchor.MiddleCenter,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -50f), new Vector2(600f, 60f));
 
         GameObject rows = new GameObject("RowsContainer", typeof(RectTransform));
@@ -117,7 +117,7 @@ public class GoalsRecapUI : MonoBehaviour
 
         rowsContainer = rows.transform;
 
-        CreateTextButton(panelRect, "Next", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
+        CreateTextButton(panelRect, LocalizationManager.Get("goalsrecap.next"), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
             new Vector2(-40f, 40f), new Vector2(180f, 64f), TextAnchor.MiddleRight).onClick.AddListener(NextClicked);
 
         panelRoot.SetActive(false);

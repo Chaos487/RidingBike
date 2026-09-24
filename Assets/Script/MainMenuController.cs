@@ -12,8 +12,10 @@ using UnityEngine.UI;
 public class MainMenuController : MonoBehaviour
 {
     GameObject menuButtonObject;
+    Text menuButtonLabel;
     GameObject menuPanel;
     Button backButton;
+    Text backButtonLabel;
     TabGroupController tabGroup;
 
     void Awake()
@@ -21,13 +23,39 @@ public class MainMenuController : MonoBehaviour
         FindUIReferences();
         WireButtons();
 
+        LocalizationManager.OnLocaleChanged += ApplyLocalization;
+        ApplyLocalization();
+
         if (menuPanel != null) menuPanel.SetActive(false);
+    }
+
+    void OnDestroy()
+    {
+        LocalizationManager.OnLocaleChanged -= ApplyLocalization;
+    }
+
+    void ApplyLocalization()
+    {
+        // 预制体里烘焙的 Text 组件默认用内置 Arial，没有中文/日文字形，这里连字体一起换——
+        // 见 LocalizationManager.GetFont() 注释。
+        if (menuButtonLabel != null)
+        {
+            menuButtonLabel.text = LocalizationManager.Get("button.menu");
+            menuButtonLabel.font = LocalizationManager.GetFont();
+        }
+        if (backButtonLabel != null)
+        {
+            backButtonLabel.text = LocalizationManager.Get("button.back");
+            backButtonLabel.font = LocalizationManager.GetFont();
+        }
+        tabGroup?.ApplyLocalization();
     }
 
     void FindUIReferences()
     {
         Transform menuButtonTransform = transform.Find("MenuButton");
         menuButtonObject = menuButtonTransform != null ? menuButtonTransform.gameObject : null;
+        menuButtonLabel = menuButtonTransform != null ? menuButtonTransform.Find("MenuButtonLabel")?.GetComponent<Text>() : null;
 
         Transform menuPanelTransform = transform.Find("MenuPanel");
         menuPanel = menuPanelTransform != null ? menuPanelTransform.gameObject : null;
@@ -35,6 +63,7 @@ public class MainMenuController : MonoBehaviour
 
         Transform backButtonTransform = transform.Find("MenuPanel/BackButton");
         backButton = backButtonTransform != null ? backButtonTransform.GetComponent<Button>() : null;
+        backButtonLabel = backButtonTransform != null ? backButtonTransform.Find("BackButtonLabel")?.GetComponent<Text>() : null;
     }
 
     void WireButtons()

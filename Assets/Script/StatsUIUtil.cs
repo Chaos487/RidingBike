@@ -23,7 +23,7 @@ public static class StatsUIUtil
         rt.sizeDelta = sizeDelta;
 
         Text text = obj.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = LocalizationManager.GetFont();
         text.fontSize = fontSize;
         text.fontStyle = style;
         text.alignment = alignment;

@@ -41,6 +41,10 @@ public class SoundSlot
     }
 }
 
+/// <summary>Sounds(SFX)/Music 两条音量总线——沿用 SettingsTabUI 的分类:bgm/ambient 算
+/// Music,ride/landing/boost/crash 算 Sounds。</summary>
+public enum SoundCategory { Music, Sounds }
+
 /// <summary>
 /// 全局音频管理器。直接挂在场景里一个独立的空物体上手动配置(不是 EndlessRunBootstrap 运行时生成的)，
 /// 每个槽位对应一类游戏事件，音频列表/随机顺序播放/延迟时间/是否循环全在 Inspector 里配，不用改代码。
@@ -51,6 +55,9 @@ public class SoundSlot
 /// </summary>
 public class AudioManager : MonoBehaviour
 {
+    const string SoundsVolumeKey = "RidingBike_SoundsVolume";
+    const string MusicVolumeKey = "RidingBike_MusicVolume";
+
     public static AudioManager Instance { get; private set; }
 
     [Header("BGM(默认循环，进场景自动播放)")]
@@ -80,9 +87,15 @@ public class AudioManager : MonoBehaviour
     Coroutine boostDelayRoutine;
     Coroutine crashDelayRoutine;
 
+    public float SoundsVolume { get; private set; } = 1f;
+    public float MusicVolume { get; private set; } = 1f;
+
     void Awake()
     {
         Instance = this;
+
+        SoundsVolume = PlayerPrefs.GetFloat(SoundsVolumeKey, 1f);
+        MusicVolume = PlayerPrefs.GetFloat(MusicVolumeKey, 1f);
 
         bgmSource = CreateSource();
         ambientSource = CreateSource();
@@ -94,8 +107,8 @@ public class AudioManager : MonoBehaviour
 
     void Start()
     {
-        Play(bgm, bgmSource, ref bgmDelayRoutine);
-        Play(ambient, ambientSource, ref ambientDelayRoutine);
+        Play(bgm, bgmSource, ref bgmDelayRoutine, SoundCategory.Music);
+        Play(ambient, ambientSource, ref ambientDelayRoutine, SoundCategory.Music);
     }
 
     AudioSource CreateSource()
@@ -105,22 +118,49 @@ public class AudioManager : MonoBehaviour
         return source;
     }
 
-    public void PlayBgm() => Play(bgm, bgmSource, ref bgmDelayRoutine);
+    public void SetSoundsVolume(float volume)
+    {
+        SoundsVolume = Mathf.Clamp01(volume);
+        PlayerPrefs.SetFloat(SoundsVolumeKey, SoundsVolume);
+        PlayerPrefs.Save();
+        ApplyVolumeToLoopingSources();
+    }
+
+    public void SetMusicVolume(float volume)
+    {
+        MusicVolume = Mathf.Clamp01(volume);
+        PlayerPrefs.SetFloat(MusicVolumeKey, MusicVolume);
+        PlayerPrefs.Save();
+        ApplyVolumeToLoopingSources();
+    }
+
+    /// <summary>一次性音效(landing/boost/crash)下次触发时自然会用最新的音量总线重新算，
+    /// 不用管；但 bgm/ambient/ride 这三个是循环槽位，播放中途拖动滑条要立刻听到变化，
+    /// 得主动把已经在播的 AudioSource.volume 改掉。</summary>
+    void ApplyVolumeToLoopingSources()
+    {
+        if (bgmSource != null && bgmSource.isPlaying) bgmSource.volume = bgm.volume * MusicVolume;
+        if (ambientSource != null && ambientSource.isPlaying) ambientSource.volume = ambient.volume * MusicVolume;
+        if (rideSource != null && rideSource.isPlaying) rideSource.volume = ride.volume * SoundsVolume;
+    }
+
+    public void PlayBgm() => Play(bgm, bgmSource, ref bgmDelayRoutine, SoundCategory.Music);
     public void StopBgm() => Stop(bgmSource, ref bgmDelayRoutine);
-    public void PlayAmbient() => Play(ambient, ambientSource, ref ambientDelayRoutine);
+    public void PlayAmbient() => Play(ambient, ambientSource, ref ambientDelayRoutine, SoundCategory.Music);
     public void StopAmbient() => Stop(ambientSource, ref ambientDelayRoutine);
 
     /// <summary>开始骑行槽位——一局开始时调用。</summary>
-    public void PlayRide() => Play(ride, rideSource, ref rideDelayRoutine);
+    public void PlayRide() => Play(ride, rideSource, ref rideDelayRoutine, SoundCategory.Sounds);
     /// <summary>停止骑行槽位——摔车时调用。对一次性(非 Loop)槽位没意义，只用来打断循环。</summary>
     public void StopRide() => Stop(rideSource, ref rideDelayRoutine);
 
-    public void PlayLanding() => Play(landing, landingSource, ref landingDelayRoutine);
-    public void PlayBoost() => Play(boost, boostSource, ref boostDelayRoutine);
-    public void PlayCrash() => Play(crash, crashSource, ref crashDelayRoutine);
+    public void PlayLanding() => Play(landing, landingSource, ref landingDelayRoutine, SoundCategory.Sounds);
+    public void PlayBoost() => Play(boost, boostSource, ref boostDelayRoutine, SoundCategory.Sounds);
+    public void PlayCrash() => Play(crash, crashSource, ref crashDelayRoutine, SoundCategory.Sounds);
 
-    /// <summary>统一播放入口，Loop 与否由 slot.loop 决定，跟槽位类别无关。</summary>
-    void Play(SoundSlot slot, AudioSource source, ref Coroutine delayRoutine)
+    /// <summary>统一播放入口，Loop 与否由 slot.loop 决定，跟槽位类别无关；category 决定
+    /// 这个槽位吃 Sounds 还是 Music 那条音量总线(见 SettingsTabUI)。</summary>
+    void Play(SoundSlot slot, AudioSource source, ref Coroutine delayRoutine, SoundCategory category)
     {
         if (!slot.HasClips) return;
 
@@ -132,36 +172,38 @@ public class AudioManager : MonoBehaviour
 
         if (slot.delay > 0f)
         {
-            delayRoutine = StartCoroutine(DelayedPlay(slot, source));
+            delayRoutine = StartCoroutine(DelayedPlay(slot, source, category));
         }
         else
         {
-            FirePlay(slot, source);
+            FirePlay(slot, source, category);
         }
     }
 
-    IEnumerator DelayedPlay(SoundSlot slot, AudioSource source)
+    IEnumerator DelayedPlay(SoundSlot slot, AudioSource source, SoundCategory category)
     {
         yield return new WaitForSeconds(slot.delay);
-        FirePlay(slot, source);
+        FirePlay(slot, source, category);
     }
 
-    void FirePlay(SoundSlot slot, AudioSource source)
+    void FirePlay(SoundSlot slot, AudioSource source, SoundCategory category)
     {
         AudioClip clip = slot.PickClip();
         if (clip == null) return;
 
+        float scaledVolume = slot.volume * (category == SoundCategory.Music ? MusicVolume : SoundsVolume);
+
         if (slot.loop)
         {
             source.clip = clip;
-            source.volume = slot.volume;
+            source.volume = scaledVolume;
             source.loop = true;
             source.Play();
         }
         else
         {
             // 一次性播放不占用 source.clip/loop 状态，同一个 AudioSource 上可以叠加多次触发。
-            source.PlayOneShot(clip, slot.volume);
+            source.PlayOneShot(clip, scaledVolume);
         }
     }
 

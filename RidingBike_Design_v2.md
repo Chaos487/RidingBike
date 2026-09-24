@@ -165,6 +165,29 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     只在摔车结算那一刻才变），原来 `GoalsTabUI` 只在游戏启动时建一次表，骑行中途暂停
     看到的其实是开局那一刻的旧快照——这次顺手把这个既有的小 bug 也修了
 
+**2026-09-24 补充（再晚一点：Settings 面板 + 本地化系统上线，支持 7 种语言）：**
+
+-   新增 `SettingsTabUI.cs`——Sounds/Music 音量滑条(`AudioManager` 新增
+    `SetSoundsVolume`/`SetMusicVolume`，给每个音效槽位乘一个运行时缩放系数，没有新建
+    AudioMixer 资产) + Boost Button Left/Right 分段按钮(直接改 `BoostButton` 的
+    RectTransform 锚点)。不做分辨率——这个项目照手机触屏做的输入/布局，"分辨率"是
+    桌面/Steam 场景的概念
+-   新增 `LocalizationManager.cs`/`LocalizationTable.cs`/`LanguageTabUI.cs`——7 种语言
+    (English/简体中文/繁體中文/日本語/Deutsch/Français/Español)，v1 只覆盖"常驻 UI"
+    (Tab 栏/Menu/暂停面板按钮 + Settings/Run Summary/Goals/Stats 固定文案，约 40 条
+    key)，骑行中 Feat 列表弹字/Goal 目标标题/Node 三选一文案还没接，继续显示英文。
+    翻译表是纯 C# 静态字典，不做 ScriptableObject 资产
+-   **已知缺口，待用户补充资产**：Unity 内置字体(Arial)不含 CJK 字形，
+    `LocalizationManager.GetFont()` 会尝试从 `Assets/Resources/NotoSansCJK.ttf` 加载
+    带中日文字形的字体，**这份资产还没有人放进项目**——找不到就退回 Arial，简体中文/
+    繁體中文/日本語三种语言选中后文字会显示成空白方框(英文/数字不受影响，不会报错崩溃)。
+    详细见 3.19 节
+-   顺带清理：项目里所有 `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")` 这种
+    硬编码字体获取方式——`RunSummaryUI`/`GoalsUIUtil`/`StatsUIUtil`/`SettingsTabUI`/
+    `LanguageTabUI` 的 `CreateText`，以及 `TabGroupController`/`MainMenuController`/
+    `PauseController` 改预制体已有 Text 组件的地方，全部统一改成
+    `LocalizationManager.GetFont()`
+
 ------------------------------------------------------------------------
 
 # 1. 核心玩法
@@ -556,8 +579,8 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 -   左上角一个 Menu 入口，点开是一个几乎不透明的面板，顶部横排 Goals/Settings/
     Language/Stats 四个 Tab 切换(选中的加粗变白，其余灰色)，右下角 Back 按钮退回开始
     画面
--   **四个 Tab 目前都只是占位文字**，没有接任何真实数据/逻辑——存档进度(Goals)、
-    音量/暂停位置这些设置项(Settings)、多语言切换(Language)、跑分统计(Stats)都还没做
+-   **四个 Tab 现在都接了真实数据/功能**——存档进度(Goals，3.17 节)、跑分统计(Stats，
+    3.18 节)、音量/加速按钮位置(Settings，3.19 节)、7 种语言切换(Language，3.19 节)
 -   Menu 入口只在"开始前"这个阶段有意义：`RunManager.OnGameStarted` 一触发(玩家点了
     "tap to start")就自动把 Menu 入口和面板一起收起来
 -   跟 `RunManager` 一样按名字在 `EndlessRunCanvas.prefab` 里 `Find` 子物体，改预制体
@@ -581,7 +604,7 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 -   面板布局照参考图(Alto's Odyssey 的暂停画面)做成左右分屏：左边 `ActionList` 竖排
     Home/Restart/Resume 三个按钮，右边 `TabArea` 装的是跟开始画面 Menu 面板结构完全一致的
     `TabBar`/`ContentArea`(`TabGroupController` 认的就是这两个相对路径)，四个 Tab 内容
-    同样是占位文字
+    现在都接了真实数据/功能(见 3.17~3.19 节)
 -   Home 和 Restart 现在是同一个行为——项目没有单独的主菜单场景，"回到主菜单"就是
     `SceneManager.LoadScene` 重新加载当前场景，自然会落回 `EnterStartGate` 的
     tap to start 画面；跟摔车结算画面已有的"R / 点屏幕重开"走的是同一条重载场景的路径，
@@ -697,6 +720,68 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     由 `PauseController.HandlePauseStateChanged` 在暂停面板每次打开时调用，不是只在
     `Initialize()` 时建一次表——顺带把 `GoalsTabUI` 原来"只在开局建一次表、暂停期间看到
     的其实是旧快照"这个既有小问题也一起修了
+
+------------------------------------------------------------------------
+
+## 3.19 Settings 面板 + 本地化系统 `SettingsTabUI.cs` + `LocalizationManager.cs` + `LocalizationTable.cs` + `LanguageTabUI.cs`
+
+> **已实现，2026-09-24**——Settings 参考 Alto's Odyssey 的音量/按钮位置设置；Language
+> 参考同一套截图的语言网格，接入 7 种语言(English/简体中文/繁體中文/日本語/Deutsch/
+> Français/Español)。两个面板都接进 `EndlessRunCanvas.prefab` 里早就预留好、但一直没接
+> 内容的 `SettingsPanel`/`LanguagePanel` 占位节点，跟 Goals/Stats Tab 是同一套路。
+
+**Settings：**
+
+-   Sounds/Music 两条音量滑条——`AudioManager` 本来完全没有音量控制 API(6 个音效槽位
+    各自是独立 `AudioSource`，没有接 `AudioMixer`)，新增 `AudioManager.SetSoundsVolume`/
+    `SetMusicVolume`，给每个槽位自己的音量再乘一个运行时缩放系数(PlayerPrefs 持久化)，
+    没有新建 AudioMixer 资产。槽位归类：`bgm`/`ambient` 算 Music，`ride`/`landing`/
+    `boost`/`crash` 算 Sounds(新增 `SoundCategory` 枚举标记)。循环槽位(bgm/ambient/ride)
+    拖动滑条时要立刻听到变化，播放中的 `AudioSource.volume` 会主动改；一次性音效
+    (landing/boost/crash)下次触发时自然用最新音量算，不用管
+-   Boost Button 一行是 Left/Right 分段按钮，决定加速按钮挂在屏幕左边还是右边(新增
+    `ButtonSide` 枚举，PlayerPrefs 持久化，**只能往末尾加**——跟项目里其它枚举同样的
+    序列化安全规则，`Right` 排第一是为了兼容 `BoostButton` 现在硬编码在右下角这个既有
+    默认值，旧存档没有这条记录时 `GetInt` 的默认值 0 要落在"维持现状"这一边)。直接改
+    `BoostButton` 的 RectTransform 锚点——这个项目没有独立的跳跃按钮(跳跃是全屏幕任意
+    位置点按触发)，改哪边都不会跟任何其它按钮冲突
+-   Slider/分段按钮的可视化元素(Background/Fill/Handle)全部运行时代码搭建，这个项目
+    UI 第一次用到 `UnityEngine.UI.Slider` 组件
+-   没做分辨率设置——这个项目的输入/布局都是照手机触屏做的，"分辨率"是桌面/Steam 场景
+    的概念，手机上没有这个用户概念
+
+**本地化系统：**
+
+-   `LocalizationManager`：纯静态类(不挂 GameObject，跟 `ScreenBlurState` 是同一类"全局
+    状态"，只是这个会持久化到 PlayerPrefs)，`Locale` 枚举当前语言(存的是序号，**只能往
+    末尾加**)，`SetLocale` 切换时广播 `OnLocaleChanged`
+-   `LocalizationTable`：纯 C# 静态字典，不做成 ScriptableObject 资产——翻译内容不需要
+    在 Inspector 里手调，代码里直接维护比让用户去 Editor 建一份资产省一轮来回。每个 key
+    对应长度 7 的字符串数组，下标顺序跟 `Locale` 枚举一致
+-   **v1 范围只覆盖"常驻 UI"**——Tab 栏标题、Menu/暂停面板按钮(Resume/Restart/Home/Back/
+    Menu)、Settings/Run Summary/Goals/Stats 这几个面板的固定文案，一共约 40 条 key。
+    **不覆盖**：骑行中右侧 Feat 列表的弹字(PERFECT!/NEAR MISS!/Backflip x{n})、Goal 具体
+    目标标题(数据来自 `GoalSettings.asset`)、Node 三选一文案——这几处继续显示英文，等
+    以后单独扩，不会因为切换语言变成一半中文一半英文的判断标准是"是不是常驻不变的界面
+    文字"
+-   `LanguageTabUI`：7 个语言按钮的网格(`GridLayoutGroup`，3 列)，按钮本身显示各自的
+    **母语名字**("简体中文"/"日本語"这种)，**不**跟着当前选中的语言翻译——不管玩家现在
+    选的是哪个语言，都要能一眼认出自己母语那个按钮，参考图和大部分 App 的语言选择器都是
+    这么处理的
+-   哪些面板需要"实时刷新"取决于它们能不能在同一次打开菜单期间被切换过语言又看到：
+    `TabGroupController`/`GoalsTabUI`/`StatsTabUI`/`SettingsTabUI`/`MainMenuController`/
+    `PauseController` 都订阅了 `LocalizationManager.OnLocaleChanged`(在各自 `OnDestroy()`
+    里取消订阅，避免场景重载后残留静态事件订阅指向已销毁的物体)；`RunSummaryUI`/
+    `GoalsRecapUI` 只在自己的 `Show()`/结算那一刻读一次当前语言就够，因为这两个面板每局
+    只出现一次、不会中途被切换语言；`LanguageTabUI` 自己的按钮文字(母语名字)不受语言
+    切换影响，不用订阅
+-   **中文/日文字形需要手动配置**：Unity 内置字体(`LegacyRuntime.ttf`，即 Arial)不含
+    CJK 字形，这件事没法用代码绕过去。`LocalizationManager.GetFont()` 是所有运行时搭 UI
+    的地方(以及预制体里烘焙的 Text 组件被代码改文字的地方)统一拿字体的入口，会尝试从
+    `Assets/Resources/NotoSansCJK.ttf` 加载一份带中日文字形的字体资产；**这份资产还没有
+    人放进项目**，找不到就退回内置 Arial——英文/数字显示完全正常，但简体中文/繁體中文/
+    日本語三种语言选中后，那些文字目前会显示成空白方框，不会报错崩溃。等字体资产加进来
+    (比如 Noto Sans CJK/思源黑体，免费可商用)就能直接看到效果，不用再改代码
 
 ------------------------------------------------------------------------
 
