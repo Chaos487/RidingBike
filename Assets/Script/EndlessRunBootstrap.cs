@@ -187,7 +187,7 @@ public static class EndlessRunBootstrap
         GameObject gearPrefab = FindPrefab("Gear");
         if (gearPrefab == null)
         {
-            Debug.LogError("EndlessRunBootstrap: 找不到 Assets/Resources/Gear.prefab，不生成齿轮。");
+            Debug.LogError("EndlessRunBootstrap: 找不到 Assets/Resources/Prefabs/Gear.prefab，不生成齿轮。");
             return;
         }
 
@@ -353,7 +353,7 @@ public static class EndlessRunBootstrap
         GameObject exhaustPrefab = FindPrefab("ExhaustTrail");
         if (exhaustPrefab == null)
         {
-            Debug.LogWarning("EndlessRunBootstrap: 找不到 Assets/Resources/ExhaustTrail.prefab，不生成尾气效果(纯装饰，不影响其它系统)。");
+            Debug.LogWarning("EndlessRunBootstrap: 找不到 Assets/Resources/Prefabs/ExhaustTrail.prefab，不生成尾气效果(纯装饰，不影响其它系统)。");
             return;
         }
 
@@ -414,6 +414,10 @@ public static class EndlessRunBootstrap
 
     // 优先在编辑器里按类型搜整个 Assets(不要求放在 Resources 目录下,创建在哪里都能找到);
     // 找不到就退回 Resources.Load,给打包后的版本留一条路。没有资产的话直接用脚本里的默认值。
+    // Resources.Load 这条路必须给完整相对路径(2026-09-24 把设置资产统一收进
+    // Assets/Resources/Settings/ 之后)，只传类型名会在真机构建里找不到文件
+    // (Editor 内 AssetDatabase 全项目搜索不受这层子目录影响，容易掩盖这个问题——
+    // 真机构建才会暴露，这个项目在 iOS 上已经因为类似原因出过一次坑，见第 0 节)。
     static T FindSettings<T>() where T : ScriptableObject
     {
 #if UNITY_EDITOR
@@ -425,7 +429,7 @@ public static class EndlessRunBootstrap
             if (asset != null) return asset;
         }
 #endif
-        return Resources.Load<T>(typeof(T).Name);
+        return Resources.Load<T>($"Settings/{typeof(T).Name}");
     }
 
     // 优先在编辑器里按名字搜——限定在 Assets/prefab 目录下,不搜整个 Assets。项目里导入的
@@ -434,7 +438,11 @@ public static class EndlessRunBootstrap
     // AssetDatabase.FindAssets 的文本搜索是模糊子串匹配,不是精确文件名匹配——哪怕限定了目录,
     // "Ground" 也会命中同目录下的 "Background.prefab"(Back-Ground 本身就包含这个子串),
     // 之前就因为这个把地形错误地实例化成了 Background 预制体。所以这里手动按精确文件名过滤,
-    // 不依赖搜索结果的顺序。找不到就退回 Resources.Load，给打包后的版本留一条路。
+    // 不依赖搜索结果的顺序。这几个 Runtime 预制体实际放在 Assets/Resources/Prefabs/(不是
+    // Assets/prefab/，只有 Bike.prefab 在那——两个不同用途的目录，名字很像容易搞混)，
+    // 上面这段 Editor 内搜索对它们其实从来没命中过，一直靠下面 Resources.Load 兜底分支在跑；
+    // 找不到就退回 Resources.Load，给打包后的版本留一条路，路径同样要带上 Prefabs/ 前缀
+    // (原因跟 FindSettings<T>() 的注释一样)。
     static GameObject FindPrefab(string name)
     {
 #if UNITY_EDITOR
@@ -448,6 +456,6 @@ public static class EndlessRunBootstrap
             if (prefab != null) return prefab;
         }
 #endif
-        return Resources.Load<GameObject>(name);
+        return Resources.Load<GameObject>($"Prefabs/{name}");
     }
 }

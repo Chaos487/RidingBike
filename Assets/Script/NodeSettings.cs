@@ -26,8 +26,8 @@ public enum EffectType
     /// <summary>保底前进速度 (BikeController.baselineSpeedKmh),按百分比加成/减益——车速永远
     /// 不会低于这个值,跟"车速上限"是两码事(那个只是不会超过,不保证达到)。故意加在枚举
     /// 最后面,不要插到中间——这些枚举值会按整数序号(不是按名字)序列化进
-    /// Assets/Resources/NodeSettings.asset,插到中间会把已经手调好的那份资产里所有排在
-    /// 后面的 EffectType 全部错位。</summary>
+    /// Assets/Resources/Settings/NodeSettings.asset,插到中间会把已经手调好的那份资产里所有
+    /// 排在后面的 EffectType 全部错位。</summary>
     BaselineSpeedPercent,
 }
 

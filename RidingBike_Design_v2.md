@@ -178,15 +178,38 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     key)，骑行中 Feat 列表弹字/Goal 目标标题/Node 三选一文案还没接，继续显示英文。
     翻译表是纯 C# 静态字典，不做 ScriptableObject 资产
 -   **已知缺口，待用户补充资产**：Unity 内置字体(Arial)不含 CJK 字形，
-    `LocalizationManager.GetFont()` 会尝试从 `Assets/Resources/NotoSansCJK.ttf` 加载
+    `LocalizationManager.GetFont()` 会尝试从 `Assets/Resources/Fonts/NotoSansCJK.ttf` 加载
     带中日文字形的字体，**这份资产还没有人放进项目**——找不到就退回 Arial，简体中文/
     繁體中文/日本語三种语言选中后文字会显示成空白方框(英文/数字不受影响，不会报错崩溃)。
-    详细见 3.19 节
+    详细见 3.19 节，[GitHub #7](https://github.com/Chaos487/RidingBike/issues/7) 有完整
+    排查记录
 -   顺带清理：项目里所有 `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")` 这种
     硬编码字体获取方式——`RunSummaryUI`/`GoalsUIUtil`/`StatsUIUtil`/`SettingsTabUI`/
     `LanguageTabUI` 的 `CreateText`，以及 `TabGroupController`/`MainMenuController`/
     `PauseController` 改预制体已有 Text 组件的地方，全部统一改成
     `LocalizationManager.GetFont()`
+
+**2026-09-24 补充（最后一条：整理 `Assets/Resources/` 目录结构）：**
+
+-   按用户要求把 Resources 根目录下越堆越多的文件归了类——原来 14 个文件全平铺在根目录，
+    现在分三个子目录：`Prefabs/`(`Background`/`EndlessRunCanvas`/`ExhaustTrail`/`Gear`/
+    `Ground` 五个预制体)、`Settings/`(`BikeExhaustSettings`/`CameraDirectorSettings`/
+    `EndlessRunSettings`/`GearSettings`/`GoalSettings`/`GroundForegroundLayerSettings`/
+    `LandingDetectorSettings`/`NodeSettings`/`ScoreSettings` 九份 ScriptableObject 资产)、
+    `Fonts/`(还没人放进去，等 [GitHub #7](https://github.com/Chaos487/RidingBike/issues/7)
+    那份 CJK 字体资产)。用 `git mv` 连 `.meta` 文件一起搬(GUID 不变，不会把已有的场景/
+    预制体引用搞丢)
+-   **`DOTweenSettings.asset` 故意没有动**，留在 Resources 根目录——这是 DOTween 插件自己
+    的内部约定路径，不是这个项目的 `FindSettings<T>()`/`FindPrefab()` 在管，贸然挪动位置
+    有搞坏所有 Tween 动画的风险(`RunSummaryUI`/`GoalsRecapUI`/`CameraDirector` 等好几处都
+    重度依赖)，不值得为了"目录整洁"冒这个险
+-   `EndlessRunBootstrap.FindSettings<T>()`/`FindPrefab(string)` 的 `Resources.Load` 兜底
+    分支相应加上了 `Settings/`/`Prefabs/` 前缀——这条路径必须写对，Editor 内的
+    `AssetDatabase` 全项目搜索不受子目录影响(还能正常工作，容易掩盖问题)，只有真机构建
+    才会真正暴露路径错了(这个项目在 iOS 上已经因为类似原因出过一次坑，见本节前面)
+-   顺带发现并订正一处文档陈旧内容：`Assets/Resources/ExhaustTrail.prefab` 实际上已经
+    有人做了(不知道是哪次会话之间用户自己在 Editor 里加的)，本文档 09-21 补充里"这份
+    粒子预制体还没有人做"是过时说法，3.16 节已经订正
 
 ------------------------------------------------------------------------
 
@@ -548,7 +571,7 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 
 ## 3.13 齿轮（游戏内货币）`GearManager.cs` + `GearSpawner.cs` + `GearPickup.cs` + `GearSettings.cs`
 
--   沿赛道随机生成可拾取的齿轮(`Assets/Resources/Gear.prefab`，单张 sprite，不是 sprite
+-   沿赛道随机生成可拾取的齿轮(`Assets/Resources/Prefabs/Gear.prefab`，单张 sprite，不是 sprite
     sheet)，车身碰到(`WheelContactSensor`)即拾取
 -   生成用跟 `StationMarkerSpawner` 一样"轮询地形高度生成到目标 X"的手法；每个生成点不是
     放单个齿轮，而是放一组，组内数量(`minGroupSize`~`maxGroupSize`)、组内间距
@@ -620,7 +643,7 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 
 ## 3.16 尾气/扬尘粒子效果 `BikeExhaust.cs` + `BikeExhaustSettings.cs`
 
--   挂在车身根节点(`Bike`)上，实例化 `Assets/Resources/ExhaustTrail.prefab`——一个
+-   挂在车身根节点(`Bike`)上，实例化 `Assets/Resources/Prefabs/ExhaustTrail.prefab`——一个
     `ParticleSystem`，视觉参数(形状/颜色/大小/生命周期)完全由美术在预制体上调，脚本只管
     "什么时候喷、喷多猛"，只碰 `EmissionModule.enabled`/`rateOverTimeMultiplier` 这两个字段
 -   挂点是车身根节点而不是后轮——后轮是真实物理体，转动很快，粒子系统的发射方向会跟着
@@ -631,11 +654,11 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 -   强度：按车速在 `minEmissionMultiplier`~`maxEmissionMultiplier` 之间插值，Boost 时直接
     覆盖成 `boostEmissionMultiplier`(不等车速真的追上去，按下那一下就该有反应，跟
     `CameraDirector.UpdateZoom` 里 Boost 直接拉满目标是同一个思路)
--   **预制体现在还没有人做**——找不到就在 `EndlessRunBootstrap` 里打一条 `Debug.LogWarning`
-    直接跳过，不影响其它系统。预制体要放在 `Assets/Resources/`（不是 `Assets/prefab/`），
-    因为 `FindPrefab` 的 Editor 内 `AssetDatabase` 搜索在真机构建里会被编译掉，只有
-    `Resources.Load` 兜底分支在真机上生效——这个项目之前在 iOS 上因为资产没放
-    Resources 下出过一次空白屏的坑（见第 0 节），这次直接按已经验证过的路子走
+-   找不到预制体就在 `EndlessRunBootstrap` 里打一条 `Debug.LogWarning` 直接跳过，不影响
+    其它系统。预制体放在 `Assets/Resources/Prefabs/`（不是 `Assets/prefab/`，2026-09-24
+    整理 Resources 目录结构时归了类，见第 0 节该日期补充），因为 `FindPrefab` 的 Editor 内
+    `AssetDatabase` 搜索在真机构建里会被编译掉，只有 `Resources.Load` 兜底分支在真机上
+    生效——这个项目之前在 iOS 上因为资产没放 Resources 下出过一次空白屏的坑（见第 0 节）
 
 ------------------------------------------------------------------------
 
@@ -778,7 +801,8 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
 -   **中文/日文字形需要手动配置**：Unity 内置字体(`LegacyRuntime.ttf`，即 Arial)不含
     CJK 字形，这件事没法用代码绕过去。`LocalizationManager.GetFont()` 是所有运行时搭 UI
     的地方(以及预制体里烘焙的 Text 组件被代码改文字的地方)统一拿字体的入口，会尝试从
-    `Assets/Resources/NotoSansCJK.ttf` 加载一份带中日文字形的字体资产；**这份资产还没有
+    `Assets/Resources/Fonts/NotoSansCJK.ttf` 加载一份带中日文字形的字体资产(2026-09-24
+    整理 Resources 目录结构时把字体单独收进了 Fonts/ 子目录)；**这份资产还没有
     人放进项目**，找不到就退回内置 Arial——英文/数字显示完全正常，但简体中文/繁體中文/
     日本語三种语言选中后，那些文字目前会显示成空白方框，不会报错崩溃。等字体资产加进来
     (比如 Noto Sans CJK/思源黑体，免费可商用)就能直接看到效果，不用再改代码

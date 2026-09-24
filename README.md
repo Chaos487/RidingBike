@@ -115,7 +115,7 @@ Settings/Run Summary/Goals/Stats 这几个面板的固定文案,大概 40 条 ke
 语言;骑行中右侧 Feat 列表的弹字(PERFECT!/NEAR MISS!/Backflip x{n})、Goal 具体目标
 标题、Node 三选一文案还没接,继续显示英文。**中文/日文字形需要手动配置**——Unity 内置
 字体(Arial)不含 CJK 字形,`LocalizationManager.GetFont()` 会尝试从
-`Assets/Resources/NotoSansCJK.ttf` 加载一份带中日文字形的字体资产,加进来之前中文/
+`Assets/Resources/Fonts/NotoSansCJK.ttf` 加载一份带中日文字形的字体资产,加进来之前中文/
 日文会显示成空白方框(英文/数字不受影响)。
 
 **骑行中暂停**(`RunManager.cs` 的 `TogglePause()` + `PauseController.cs`)
@@ -154,14 +154,14 @@ Odyssey 的沙丘剪影)。不用 `BackgroundScroller` 的摄像机视差公式(
 需要在 Play 模式里实际盯着调。**
 
 **尾气/扬尘粒子效果**(`BikeExhaust.cs` + `BikeExhaustSettings.cs`)
-挂在车身根节点上,实例化 `Assets/Resources/ExhaustTrail.prefab`(一个 `ParticleSystem`,视觉
-参数——形状/颜色/大小/生命周期——完全由美术在预制体上调,脚本只管"什么时候喷、喷多猛"：
-接地且车速超过阈值才喷,喷发强度按车速插值、Boost 时额外拉满)。**这个预制体现在还没有人
-做**,`EndlessRunBootstrap` 找不到就跳过、只打一条 Warning,不影响其它系统——纯装饰功能。
+挂在车身根节点上,实例化 `Assets/Resources/Prefabs/ExhaustTrail.prefab`(一个 `ParticleSystem`,
+视觉参数——形状/颜色/大小/生命周期——完全由美术在预制体上调,脚本只管"什么时候喷、喷多猛"：
+接地且车速超过阈值才喷,喷发强度按车速插值、Boost 时额外拉满)。`EndlessRunBootstrap` 找不到
+就跳过、只打一条 Warning,不影响其它系统——纯装饰功能。
 
 **齿轮(游戏内货币)**(`GearManager.cs` 管持久化 + `GearSpawner.cs` 生成 + `GearPickup.cs` 拾取 +
 `GearSettings.cs` 配置)
-骑行沿途生成可拾取的齿轮(`Assets/Resources/Gear.prefab`,单张 sprite),车身碰到即拾取,
+骑行沿途生成可拾取的齿轮(`Assets/Resources/Prefabs/Gear.prefab`,单张 sprite),车身碰到即拾取,
 数量立刻存 `PlayerPrefs`(货币比"最远距离"这种纯记录更经不起丢,不等结算才存)并实时刷新
 右上角 UI。生成用跟 `StationMarkerSpawner` 一样"轮询地形高度"的手法,每个生成点放一组
 (数量在 `minGroupSize`~`maxGroupSize` 间随机,组内间距 `intraGroupSpacing`,组与组之间的

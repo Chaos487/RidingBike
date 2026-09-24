@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 尾气/扬尘粒子效果——挂在车身根节点(Bike)上,实例化 Assets/Resources/ExhaustTrail.prefab。
+/// 尾气/扬尘粒子效果——挂在车身根节点(Bike)上,实例化 Assets/Resources/Prefabs/ExhaustTrail.prefab。
 /// 粒子本身的形状/颜色/大小/生命周期这些视觉参数完全由美术在那份预制体的 ParticleSystem
 /// 组件上调,这个脚本只管"什么时候喷、喷多猛"——通过 EmissionModule.enabled/
 /// rateOverTimeMultiplier 控制,不直接碰粒子系统的其它任何字段。

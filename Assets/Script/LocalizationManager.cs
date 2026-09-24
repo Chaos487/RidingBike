@@ -65,8 +65,9 @@ public static class LocalizationManager
     ///
     /// **需要手动配置**：Unity 内置字体不含 CJK 字形，这件事没法用代码绕过去，必须往项目里
     /// 加一份真正带中日文字形的字体资产(比如 Noto Sans CJK/思源黑体，免费可商用)，导入后
-    /// 放到 `Assets/Resources/NotoSansCJK.ttf`(或者改这个方法里的名字对上实际文件名)。
-    /// 在字体资产加进来之前，这个方法会退回内置 Arial——英文/数字显示完全正常，只有
-    /// 中文/日文文字会是空白方框，不会报错崩溃。</summary>
-    public static Font GetFont() => Resources.Load<Font>("NotoSansCJK") ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+    /// 放到 `Assets/Resources/Fonts/NotoSansCJK.ttf`(2026-09-24 整理 Resources 目录结构时
+    /// 把字体单独收进了 Fonts/ 子目录，不再是 Resources 根目录——改这个方法里的路径字符串
+    /// 就能对上别的实际文件名/位置)。在字体资产加进来之前，这个方法会退回内置 Arial——
+    /// 英文/数字显示完全正常，只有中文/日文文字会是空白方框，不会报错崩溃。</summary>
+    public static Font GetFont() => Resources.Load<Font>("Fonts/NotoSansCJK") ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 }
