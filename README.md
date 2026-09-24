@@ -115,8 +115,16 @@ Settings/Run Summary/Goals/Stats 这几个面板的固定文案,大概 40 条 ke
 语言;骑行中右侧 Feat 列表的弹字(PERFECT!/NEAR MISS!/Backflip x{n})、Goal 具体目标
 标题、Node 三选一文案还没接,继续显示英文。**中文/日文字形需要手动配置**——Unity 内置
 字体(Arial)不含 CJK 字形,`LocalizationManager.GetFont()` 会尝试从
-`Assets/Resources/Fonts/NotoSansCJK.ttf` 加载一份带中日文字形的字体资产,加进来之前中文/
-日文会显示成空白方框(英文/数字不受影响)。
+`Assets/Resources/Fonts/NotoSansCJK.ttf` 加载一份带中日文字形的字体资产——**已解决**,
+用户已经放了 Noto Sans SC Regular 字重进去,找不到时仍会退回 Arial(英文/数字不受影响,
+只有中文/日文会显示成空白方框)。
+
+**加速按钮充能可视化**(`BoostButtonUI.cs`,3.20 节)
+环形进度条随 `BikeController.DistanceSinceLastBoost` 慢慢描满,充满瞬间闪一下(DOTween)。
+跟这个项目其它 UI 不一样,`Fill`/`Flash` 两个子物体是在 Editor 里手摆的(不是运行时代码
+生成),想要能直接在 Inspector 里调颜色/位置反复试效果——`BoostButtonUI` 因此破例用
+`[SerializeField]` 拖引用。**代码已实现,目前是 no-op**,还需要在 `BoostButton` 下手动建
+`Fill`/`Flash` 两个 Image 子物体、挂上这个组件、把引用拖进去才会生效。
 
 **骑行中暂停**(`RunManager.cs` 的 `TogglePause()` + `PauseController.cs`)
 左下角一个暂停按钮(手机端点它),桌面端 `Esc` 键效果相同,两条路径最终都走

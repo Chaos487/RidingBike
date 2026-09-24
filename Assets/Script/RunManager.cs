@@ -165,6 +165,17 @@ public class RunManager : MonoBehaviour
         damageSystem.OnHpChanged += HandlePartialDamage;
         damageSystem.OnMaxHpChanged += HandleMaxHpChanged;
 
+        // 加速按钮的充能环/闪光效果(BoostButtonUI)是可选组件——挂在 BoostButton 上才会
+        // 生效,没挂的话这里就是个 no-op,不影响按钮原有的就绪/未就绪纯色切换(下面 Update()
+        // 里那段)。要等这里才接是因为 BoostButtonUI.Initialize() 需要 bikeController，
+        // 而 FindUIReferences()(Awake() 里跑的，boostButton 是在那边找到的)比这个方法先跑，
+        // 那时候 bikeController 还没赋值。
+        if (boostButton != null)
+        {
+            BoostButtonUI boostButtonUI = boostButton.GetComponent<BoostButtonUI>();
+            if (boostButtonUI != null) boostButtonUI.Initialize(bikeController);
+        }
+
         // 开局先按满血刷一次血条文字,不然要等到第一次扣血才会显示"100/100"。
         UpdateHpBar(damageSystem.maxHp, damageSystem.maxHp);
 

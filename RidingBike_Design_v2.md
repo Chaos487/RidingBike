@@ -211,6 +211,19 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     有人做了(不知道是哪次会话之间用户自己在 Editor 里加的)，本文档 09-21 补充里"这份
     粒子预制体还没有人做"是过时说法，3.16 节已经订正
 
+**2026-09-24 补充（同一天最后一条：加速按钮充能可视化，`BoostButtonUI.cs`）：**
+
+-   讨论后明确这次不走"ScriptableObject Settings 资产"这个项目一贯的套路——用户想要的是
+    能直接在 Editor 里手摆子物体、在 Inspector 里改颜色/位置反复试效果，所以新组件
+    `BoostButtonUI` 破例用 `[SerializeField]` 拖引用(`fillImage`/`flashImage`)，不是这个
+    项目其它地方统一用的 `transform.Find(名字)` 运行时查找。细节/取舍见 3.20 节
+-   环形充能进度复用 `BikeController` 已经公开的 `DistanceSinceLastBoost`/
+    `boostRechargeDistance`，没有新增 `BikeController` 的公开 API；充满瞬间闪一下用
+    DOTween，只在"从没就绪变成就绪"那一帧触发一次，不会在保持就绪状态时反复触发
+-   代码是完整的，但**目前是 no-op**——`Fill`/`Flash` 两个子物体和 `BoostButtonUI`
+    组件本身都还没有人在 Editor 里挂上去，跟之前 `ExhaustTrail.prefab`/`GoalSettings.asset`
+    那几次一样，等用户在 Editor 里手动搭好这一步，效果才会真的出现
+
 ------------------------------------------------------------------------
 
 # 1. 核心玩法
@@ -802,10 +815,44 @@ P0 三个系统（Landing Quality / Trick Score / Near Miss）本身都已经闭
     CJK 字形，这件事没法用代码绕过去。`LocalizationManager.GetFont()` 是所有运行时搭 UI
     的地方(以及预制体里烘焙的 Text 组件被代码改文字的地方)统一拿字体的入口，会尝试从
     `Assets/Resources/Fonts/NotoSansCJK.ttf` 加载一份带中日文字形的字体资产(2026-09-24
-    整理 Resources 目录结构时把字体单独收进了 Fonts/ 子目录)；**这份资产还没有
-    人放进项目**，找不到就退回内置 Arial——英文/数字显示完全正常，但简体中文/繁體中文/
-    日本語三种语言选中后，那些文字目前会显示成空白方框，不会报错崩溃。等字体资产加进来
-    (比如 Noto Sans CJK/思源黑体，免费可商用)就能直接看到效果，不用再改代码
+    整理 Resources 目录结构时把字体单独收进了 Fonts/ 子目录)。**已解决**——用户已经把
+    Noto Sans SC Regular 字重放进了这个路径(见 [GitHub #7](https://github.com/Chaos487/RidingBike/issues/7)，
+    实机验证中文/日文正常显示后可以关闭这个 issue)；找不到的话仍然会退回内置 Arial，
+    英文/数字不受影响，只有中文/日文会显示成空白方框，不会报错崩溃
+
+------------------------------------------------------------------------
+
+## 3.20 加速按钮充能可视化 `BoostButtonUI.cs`
+
+> **代码已实现，2026-09-24——需要用户在 Editor 里手摆子物体才会生效，目前是 no-op。**
+
+-   **数据来源**：`BikeController` 本来就没有存一个"充能进度"的数值，只有
+    `DistanceSinceLastBoost`(自上次用 Boost 以来跑了多远)和 `boostRechargeDistance`
+    (充满需要多远，默认 150m，Node 三选一的 Effect 能改)两个已经公开的字段/属性——
+    `BoostButtonUI.Update()` 直接拿 `DistanceSinceLastBoost / boostRechargeDistance`
+    现算 0~1 的进度，没有新增 `BikeController` 的公开 API
+-   **跟这个项目其它 UI 的关键区别**：`Fill`/`Flash` 这两个子物体是**用户在 Editor 里手摆
+    的**，不是运行时代码生成的——想要能直接在 Inspector 里调颜色/位置/大小反复试效果，
+    不用每次改代码走一遍 Play 才能看到，讨论方案时明确选的这条路(另一个选项是做成
+    `BoostButtonSettings` ScriptableObject，跟项目其它系统一致，但这次没选)。`BoostButtonUI`
+    因此破例用 `[SerializeField]` 拖引用，不是这个项目其它地方统一用的
+    `transform.Find(名字)` 运行时查找
+-   **环形进度**：充能环用 `Image.Type = Filled` + `Fill Method = Radial 360`——
+    `EndlessRunCanvas.prefab` 里 `BoostButton` 自己的 Image 组件其实早就把 `Fill Method`
+    设成了 `Radial360`，只是 `Type` 一直没切到 `Filled`，像是更早以前想做这个效果但没做完，
+    这次直接把这条线接上
+-   **充满闪光**：只在"从没就绪变成就绪"那一帧触发一次(`ready && !wasReady`)，不是每帧
+    判断 `IsBoostReady` 本身——不然只要保持就绪状态(玩家迟迟不点 Boost)就会每帧重新触发
+    一次动画，把 `flashImage` 焊死在全不透明状态，不是真的"闪一下"。动效(缩放脉冲 +
+    淡入淡出)用 DOTween，跟这个项目其它动画同一个技术栈
+-   **可选组件，不影响现有逻辑**：`RunManager` 里原有的 `boostReadyColor`/
+    `boostNotReadyColor` 纯色切换完全没动，`BoostButtonUI` 没挂的话
+    `boostButton.GetComponent<BoostButtonUI>()` 拿到 `null`，`RunManager.Initialize()`
+    里那段直接跳过——两套视觉理论上可以同时叠加(充能环 + 底色都在变)
+-   **用户需要在 Editor 里做的事**（脚本自己的注释里也写了完整步骤）：在 `BoostButton`
+    下新建 `Fill` 子物体(Image，Type=Filled，Fill Method=Radial 360，Fill Origin
+    建议 Top + Clockwise，颜色随便调)和 `Flash` 子物体(Image，叠在 Fill 上面，初始
+    Alpha=0)，然后在 `BoostButton` 上加 `BoostButtonUI` 组件，把两个 Image 拖进对应槽位
 
 ------------------------------------------------------------------------
 
