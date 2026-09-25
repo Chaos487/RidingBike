@@ -155,7 +155,7 @@ MonoBehaviour:
   maxDownhillLength: 200
   minHillHeight: 10
   maxHillHeight: 50
-  gapChance: 0.5
+  gapChance: 0.25
   minGapSpan: 7
   maxGapSpan: 15
   gapDepth: 25
