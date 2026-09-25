@@ -6,7 +6,9 @@ using UnityEngine;
 /// 坡度、角速度、垂直速度。一次腾空只产生一次判定:两轮都离地时(Airborne)任一轮首次
 /// 触地记录 FirstContactWheel/FirstContactTime,进入 LandingPending;另一轮触地就算 Δt
 /// 分档,或者等超过 landingTimeout 另一轮还没触地就直接判 NotBad;判定完立即广播,
-/// 回到 Grounded 状态,直到 bike.IsConfirmedGrounded 变 false(经过
+/// 先等待 bike.IsConfirmedGrounded 变 true，确认本次接地已完成防抖；然后才允许在它
+/// 再次变 false、且两轮均已离地时重新武装。不能把结算后尚未更新的旧 false 当作新起跳。
+/// 从 Grounded 等待下一次确认腾空(经过
 /// BikeController.airborneConfirmTime 双向防抖确认过的"真的腾空了")才重新武装
 /// (Airborne),避免车身仍贴着地面、或者只是被地形 Collider 重建/悬挂噪声/boost
 /// 瞬间顶了一下这类几毫秒的假离地，被误判成"又落地了一次"。
@@ -17,7 +19,7 @@ public class LandingDetector : MonoBehaviour
     public enum ContactOrder { Simultaneous, FrontFirst, BackFirst }
     public enum Wheel { Front, Back }
 
-    enum State { Airborne, Pending, Grounded }
+    enum State { Airborne, Pending, AwaitingGroundedConfirmation, Grounded }
 
     /// <summary>一次落地判定的完整结果。DeltaTime/FirstContactWheel 主要用于调试和以后的 ScoreSystem。</summary>
     public readonly struct LandingResult
@@ -57,7 +59,8 @@ public class LandingDetector : MonoBehaviour
         bike = bikeController;
         // 跟旧版一样:按当前实际接地状态初始化,不然如果一进场景车就是停在地上的,
         // 会被误判成"这一帧刚从空中落地"，凭空触发一次判定。
-        state = AnyWheelGrounded() ? State.Grounded : State.Airborne;
+        state = bike.IsConfirmedGrounded ? State.Grounded
+            : AnyWheelGrounded() ? State.AwaitingGroundedConfirmation : State.Airborne;
     }
 
     public void ApplySettings(LandingDetectorSettings settings)
@@ -86,12 +89,19 @@ public class LandingDetector : MonoBehaviour
                 UpdatePending(frontGrounded, backGrounded);
                 break;
 
+            case State.AwaitingGroundedConfirmation:
+                // Raw wheel contact can settle a landing before BikeController's 0.05s
+                // debounce confirms it. Consume that contact once and wait for true;
+                // the old false is still the SAME airtime, not a new takeoff.
+                if (bike.IsConfirmedGrounded) state = State.Grounded;
+                break;
+
             case State.Grounded:
                 // 重新武装的条件改成读 bike.IsConfirmedGrounded(双向防抖过的接地状态)，不再是
                 // 原始的"两轮都离地"——地形 Collider 重建/悬挂噪声/boost 瞬间顶一下这类几毫秒的
                 // 假离地，现在会被 BikeController.airborneConfirmTime 直接挡掉，不会走到这里，
                 // 从源头上减少凭空触发一次新落地判定的次数(而不是靠事后加锁/加冷却掩盖)。
-                if (!bike.IsConfirmedGrounded)
+                if (!frontGrounded && !backGrounded && !bike.IsConfirmedGrounded)
                 {
                     // 临时调试日志，排查"偶尔一弹一弹"导致的 landing/trick 误判用——加了双向防抖
                     // 之后这条应该只在真的腾空时才打印。排查完可以整段删掉，不影响任何逻辑。
@@ -174,7 +184,7 @@ public class LandingDetector : MonoBehaviour
 
     void Finish(Quality quality, ContactOrder order, float deltaTime, Wheel firstWheel)
     {
-        state = State.Grounded;
+        state = bike.IsConfirmedGrounded ? State.Grounded : State.AwaitingGroundedConfirmation;
         LastLanding = new LandingResult(quality, order, deltaTime, firstWheel);
 
         // 临时调试日志，排查"偶尔一弹一弹"导致的 landing/trick 误判用——重点看 deltaTime 是不是
