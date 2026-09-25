@@ -596,6 +596,9 @@ public class RunManager : MonoBehaviour
     {
         GameObject root = new GameObject("FeatListRoot", typeof(RectTransform));
         root.transform.SetParent(transform, false);
+        // Keep runtime HUD feedback behind the same modal backdrop as Distance/HP/Score.
+        Transform nodePanel = transform.Find("NodePanel");
+        if (nodePanel != null) root.transform.SetSiblingIndex(nodePanel.GetSiblingIndex());
 
         RectTransform rt = (RectTransform)root.transform;
         rt.anchorMin = new Vector2(1f, 1f);
