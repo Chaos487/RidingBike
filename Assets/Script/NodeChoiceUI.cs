@@ -101,7 +101,7 @@ public class NodeChoiceUI : MonoBehaviour
     {
         for (int i = 0; i < 3; i++)
         {
-            Transform card = transform.Find($"Choice{i}");
+            Transform card = transform.Find($"ChoicesLayout/Choice{i}");
             if (card == null)
             {
                 Debug.LogError($"NodeChoiceUI: 在 NodePanel 里找不到 \"Choice{i}\"，检查一下 EndlessRunCanvas.prefab 的层级/命名有没有改动。");
